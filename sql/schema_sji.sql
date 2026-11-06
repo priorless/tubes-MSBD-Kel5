@@ -1,21 +1,3 @@
--- ============================================================
--- SCHEMA SJI v2 - MySQL 8.x
--- Cara pakai: phpMyAdmin (Import) atau CLI: mysql -u root < schema_sji.sql
--- Kalau laptop sudah terlanjur menjalankan v1: DROP DATABASE db_sji; dulu.
---
--- PERUBAHAN v2:
--- 1) tbl_tenaga_kerja diganti nama jadi tbl_karyawan (semua karyawan:
---    lapangan + staff kantor).
--- 2) Kolom baru: kategori, gaji_pokok, tunjangan (gaji tetap staff internal).
--- 3) id_jenis_layanan boleh NULL (staff internal tidak punya jasa yang dijual).
--- 4) status tambah opsi 'Aktif' untuk staff internal.
--- 5) tbl_users.id_tenaga_kerja diganti nama jadi id_karyawan;
---    sekarang SEMUA akun (termasuk staff) menempel ke tbl_karyawan.
--- 6) Role 'Tenaga Kerja' diganti nama jadi 'Karyawan Lapangan'.
--- Catatan: status internal & validasi kategori diatur oleh trigger
--- trg_set_status_karyawan_baru (file komponen, jatah Orang 1),
--- jadi TIDAK ada di file ini.
--- ============================================================
 CREATE DATABASE IF NOT EXISTS db_sji
   CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE db_sji;
