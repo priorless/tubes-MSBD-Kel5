@@ -1,0 +1,89 @@
+/* public/css/ceo-theme.css — tema & animasi modul CEO (di atas AdminLTE) */
+:root {
+  --ceo-bg: #f4f6fb;
+  --ceo-surface: #ffffff;
+  --ceo-text: #1e293b;
+  --ceo-muted: #64748b;
+  --ceo-border: #e2e8f0;
+  --ceo-accent: #6366f1;
+  --ceo-accent-2: #06b6d4;
+  --ceo-good: #10b981;
+  --ceo-bad: #ef4444;
+  --ceo-shadow: 0 10px 30px -12px rgba(30, 41, 59, .18);
+}
+body.ceo-dark {
+  --ceo-bg: #0b1220;
+  --ceo-surface: #141c2f;
+  --ceo-text: #e5e9f5;
+  --ceo-muted: #94a3b8;
+  --ceo-border: #243049;
+  --ceo-shadow: 0 10px 30px -12px rgba(0, 0, 0, .6);
+}
+
+.ceo-wrap { background: var(--ceo-bg); color: var(--ceo-text); padding: 1.5rem; border-radius: 16px; transition: background .4s, color .4s; }
+
+/* Hero */
+.ceo-hero {
+  position: relative; overflow: hidden; border-radius: 18px; padding: 1.75rem 2rem; margin-bottom: 1.5rem; color: #fff;
+  background: linear-gradient(120deg, #4f46e5, #06b6d4, #8b5cf6); background-size: 200% 200%;
+  animation: ceoGradient 12s ease infinite;
+}
+.ceo-hero::after {
+  content: ""; position: absolute; right: -60px; top: -60px; width: 240px; height: 240px; border-radius: 50%;
+  background: rgba(255, 255, 255, .15); animation: ceoFloat 7s ease-in-out infinite;
+}
+.ceo-hero h2 { font-weight: 800; margin: 0 0 .25rem; }
+.ceo-hero p { margin: 0; opacity: .9; }
+.ceo-toggle { position: absolute; right: 1.25rem; bottom: 1.1rem; z-index: 2; border: 0; border-radius: 999px; padding: .35rem .9rem;
+  background: rgba(255, 255, 255, .22); color: #fff; backdrop-filter: blur(6px); cursor: pointer; transition: background .2s; }
+.ceo-toggle:hover { background: rgba(255, 255, 255, .35); }
+
+/* Kartu */
+.ceo-card {
+  background: var(--ceo-surface); border: 1px solid var(--ceo-border); border-radius: 16px; padding: 1.25rem 1.4rem;
+  box-shadow: var(--ceo-shadow); height: 100%;
+  opacity: 0; transform: translateY(18px); animation: ceoUp .6s cubic-bezier(.2, .8, .2, 1) forwards;
+  transition: transform .25s, box-shadow .25s, background .4s, border-color .4s;
+}
+.ceo-card:hover { transform: translateY(-4px); box-shadow: 0 18px 38px -14px rgba(99, 102, 241, .35); }
+.ceo-stagger > *:nth-child(1) .ceo-card { animation-delay: .05s; }
+.ceo-stagger > *:nth-child(2) .ceo-card { animation-delay: .12s; }
+.ceo-stagger > *:nth-child(3) .ceo-card { animation-delay: .19s; }
+.ceo-stagger > *:nth-child(4) .ceo-card { animation-delay: .26s; }
+.ceo-stagger > *:nth-child(5) .ceo-card { animation-delay: .33s; }
+.ceo-stagger > *:nth-child(6) .ceo-card { animation-delay: .40s; }
+.ceo-stagger > *:nth-child(n+7) .ceo-card { animation-delay: .47s; }
+
+.ceo-kpi-label { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ceo-muted); font-weight: 700; }
+.ceo-kpi-value { font-size: 1.9rem; font-weight: 800; line-height: 1.2; margin-top: .3rem; }
+.ceo-kpi-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, var(--ceo-accent), var(--ceo-accent-2)); float: right; }
+.ceo-title { font-weight: 800; margin-bottom: 1rem; }
+.ceo-chart { position: relative; height: 380px; }
+
+/* Form & tombol */
+.ceo-card .form-control { background: var(--ceo-surface); color: var(--ceo-text); border-color: var(--ceo-border); border-radius: 10px; transition: box-shadow .2s, border-color .2s; }
+.ceo-card .form-control:focus { border-color: var(--ceo-accent); box-shadow: 0 0 0 3px rgba(99, 102, 241, .25); }
+.ceo-btn { border: 0; border-radius: 10px; padding: .65rem 1rem; font-weight: 700; color: #fff; width: 100%;
+  background: linear-gradient(135deg, var(--ceo-accent), var(--ceo-accent-2)); transition: transform .15s, filter .2s; }
+.ceo-btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+.ceo-btn:active { transform: scale(.98); }
+
+.ceo-result { font-size: 2.6rem; font-weight: 900; animation: ceoPop .6s cubic-bezier(.2, 1.4, .4, 1); }
+.ceo-good { color: var(--ceo-good); } .ceo-bad { color: var(--ceo-bad); }
+.ceo-badge { display: inline-block; padding: .2rem .7rem; border-radius: 999px; font-size: .8rem; font-weight: 700; }
+.ceo-badge.good { background: rgba(16, 185, 129, .15); color: var(--ceo-good); }
+.ceo-badge.bad { background: rgba(239, 68, 68, .15); color: var(--ceo-bad); }
+.ceo-empty { text-align: center; color: var(--ceo-muted); padding: 3rem 1rem; }
+
+.ceo-alert { border-radius: 12px; animation: ceoSlide .45s ease; }
+
+@keyframes ceoUp { to { opacity: 1; transform: none; } }
+@keyframes ceoPop { 0% { transform: scale(.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes ceoSlide { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+@keyframes ceoGradient { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes ceoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(22px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ceo-card, .ceo-hero, .ceo-hero::after, .ceo-result, .ceo-alert { animation: none !important; opacity: 1; transform: none; }
+}

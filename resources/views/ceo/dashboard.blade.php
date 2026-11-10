@@ -1,138 +1,93 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Eksekutif - CEO</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body class="bg-slate-100 text-slate-800 font-sans antialiased">
-    <div class="min-h-screen flex flex-col">
-        <!-- Header Navigasi -->
-        <header class="bg-slate-900 text-white shadow-md">
-            <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-                <h1 class="text-xl font-bold tracking-wide">Executive Panel - CEO</h1>
-                <nav class="flex space-x-4">
-                    <a href="{{ route('ceo.dashboard') }}" class="px-3 py-2 rounded bg-slate-800 text-white font-medium">Dashboard</a>
-                    <a href="{{ route('ceo.profit-klien') }}" class="px-3 py-2 rounded hover:bg-slate-800 text-slate-300">Profit Klien</a>
-                </nav>
-            </div>
-        </header>
+{{-- resources/views/ceo/dashboard.blade.php
+     GANTI 'layouts.app' dengan nama layout AdminLTE yang dipakai kelompokmu, dan sesuaikan nama section/stack-nya. --}}
+@extends('layouts.app')
 
-        <!-- Main Content -->
-        <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-8">
-            <div class="mb-8 flex justify-between items-center">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-900">Dashboard Ringkasan Eksekutif</h2>
-                    <p class="text-sm text-slate-500">Pemantauan metrik operasional dan performa keuangan perusahaan.</p>
-                </div>
-            </div>
+@section('title', 'Dashboard CEO')
 
-            <!-- Kartu Metrik Utama (v_dashboard_eksekutif) -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                @php
-                    $metrics = (array) $dashboardData;
-                @endphp
+@push('css')
+    <link rel="stylesheet" href="{{ asset('css/ceo-theme.css') }}">
+@endpush
 
-                @forelse($metrics as $key => $val)
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                            {{ ucwords(str_replace('_', ' ', $key)) }}
-                        </p>
-                        <h3 class="text-2xl font-extrabold text-slate-800">
-                            @if(is_numeric($val) && str_contains(strtolower($key), 'total') || str_contains(strtolower($key), 'kas') || str_contains(strtolower($key), 'pendapatan'))
-                                Rp {{ number_format((float)$val, 0, ',', '.') }}
-                            @else
-                                {{ $val ?? '-' }}
-                            @endif
-                        </h3>
-                    </div>
-                @empty
-                    <div class="col-span-4 bg-white p-6 rounded-xl border border-slate-200 text-center text-slate-500">
-                        Data ringkasan eksekutif belum tersedia.
-                    </div>
-                @endforelse
-            </div>
-
-            <!-- Area Grafik Chart.js (v_arus_kas_bulanan) -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-slate-800">Tren Arus Kas Bulanan (Pemasukan vs Pengeluaran)</h3>
-                    <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium">Chart.js Live</span>
-                </div>
-                <div class="relative w-full" style="height: 380px;">
-                    <canvas id="arusKasChart"></canvas>
-                </div>
-            </div>
-        </main>
+@section('content')
+<div class="ceo-wrap">
+    <div class="ceo-hero">
+        <h2>Dashboard Eksekutif</h2>
+        <p>Ringkasan kinerja perusahaan SJI secara real-time</p>
+        <button type="button" class="ceo-toggle" id="ceoTheme">🌙 Mode Gelap</button>
     </div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const ctx = document.getElementById('arusKasChart').getContext('2d');
-            
-            const labels = @json($chartLabels);
-            const dataPemasukan = @json($chartPemasukan);
-            const dataPengeluaran = @json($chartPengeluaran);
+    @if(session('error') || isset($error))
+        <div class="alert alert-danger ceo-alert">{{ session('error') ?? $error }}</div>
+    @endif
 
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels.length ? labels : ['Belum Ada Data'],
-                    datasets: [
-                        {
-                            label: 'Pemasukan (Rp)',
-                            data: dataPemasukan,
-                            backgroundColor: 'rgba(16, 185, 129, 0.85)', // Emerald
-                            borderColor: 'rgb(16, 185, 129)',
-                            borderWidth: 1,
-                            borderRadius: 6
-                        },
-                        {
-                            label: 'Pengeluaran (Rp)',
-                            data: dataPengeluaran,
-                            backgroundColor: 'rgba(239, 68, 68, 0.85)', // Red
-                            borderColor: 'rgb(239, 68, 68)',
-                            borderWidth: 1,
-                            borderRadius: 6
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: { font: { family: 'sans-serif', size: 13 } }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) label += ': ';
-                                    if (context.parsed.y !== null) {
-                                        label += new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(context.parsed.y);
-                                    }
-                                    return label;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return 'Rp ' + (value / 1000000).toLocaleString('id-ID') + ' Jt';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        });
-    </script>
-</body>
-</html>
+    <div class="row ceo-stagger">
+        @forelse($kpi as $k)
+            <div class="col-md-6 col-xl-3 mb-4">
+                <div class="ceo-card">
+                    <div class="ceo-kpi-icon">{{ $k['uang'] ? '💰' : '📊' }}</div>
+                    <div class="ceo-kpi-label">{{ $k['label'] }}</div>
+                    @if($k['angka'])
+                        <div class="ceo-kpi-value" data-count="{{ $k['nilai'] }}" data-uang="{{ $k['uang'] ? 1 : 0 }}">0</div>
+                    @else
+                        <div class="ceo-kpi-value" style="font-size:1.3rem">{{ $k['nilai'] }}</div>
+                    @endif
+                </div>
+            </div>
+        @empty
+            <div class="col-12"><div class="ceo-card ceo-empty">Belum ada data ringkasan eksekutif.</div></div>
+        @endforelse
+    </div>
+
+    <div class="ceo-card" style="animation-delay:.5s">
+        <h4 class="ceo-title">Arus Kas Bulanan</h4>
+        <div class="ceo-chart"><canvas id="arusKasChart"></canvas></div>
+    </div>
+</div>
+@endsection
+
+@push('js')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(() => {
+    const rupiah = n => 'Rp ' + Number(n).toLocaleString('id-ID');
+
+    // Mode gelap tersimpan di browser
+    const body = document.body, btn = document.getElementById('ceoTheme');
+    const setDark = on => { body.classList.toggle('ceo-dark', on); btn.textContent = on ? '☀️ Mode Terang' : '🌙 Mode Gelap'; localStorage.setItem('ceoDark', on ? '1' : '0'); };
+    setDark(localStorage.getItem('ceoDark') === '1');
+    btn.onclick = () => setDark(!body.classList.contains('ceo-dark'));
+
+    // Animasi hitung naik pada kartu KPI
+    document.querySelectorAll('[data-count]').forEach(el => {
+        const target = parseFloat(el.dataset.count), uang = el.dataset.uang === '1', dur = 1400, t0 = performance.now();
+        const tick = now => {
+            const p = Math.min((now - t0) / dur, 1), v = target * (1 - Math.pow(1 - p, 4));
+            el.textContent = uang ? rupiah(Math.round(v)) : Math.round(v).toLocaleString('id-ID');
+            if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    });
+
+    // Grafik arus kas
+    const ctx = document.getElementById('arusKasChart').getContext('2d');
+    const grad = (c1, c2) => { const g = ctx.createLinearGradient(0, 0, 0, 380); g.addColorStop(0, c1); g.addColorStop(1, c2); return g; };
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: @json($chartLabels),
+            datasets: [
+                { label: 'Pemasukan', data: @json($chartPemasukan), backgroundColor: grad('#34d399', '#059669'), borderRadius: 8 },
+                { label: 'Pengeluaran', data: @json($chartPengeluaran), backgroundColor: grad('#fb7185', '#e11d48'), borderRadius: 8 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: 1400, easing: 'easeOutQuart' },
+            interaction: { mode: 'index', intersect: false },
+            plugins: { tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + rupiah(c.parsed.y) } } },
+            scales: { y: { ticks: { callback: v => rupiah(v) }, grid: { color: 'rgba(148,163,184,.2)' } }, x: { grid: { display: false } } }
+        }
+    });
+})();
+</script>
+@endpush
