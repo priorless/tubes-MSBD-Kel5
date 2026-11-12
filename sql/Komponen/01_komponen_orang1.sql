@@ -33,7 +33,7 @@ BEGIN
   IF NEW.kategori = 'Lapangan' THEN
     SELECT id INTO v_role FROM tbl_roles WHERE nama_role = 'Karyawan Lapangan';
     INSERT INTO tbl_users (id_karyawan, username, password, id_role)
-    VALUES (NEW.id, NEW.nip, SHA2(NEW.nip, 255), v_role);
+    VALUES (NEW.id, NEW.nip, SHA2(NEW.nip, 256), v_role);
   END IF;
 END //
 
