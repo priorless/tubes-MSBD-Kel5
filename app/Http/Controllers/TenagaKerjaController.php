@@ -37,8 +37,7 @@ class TenagaKerjaController extends Controller
             $data['hariIni'] = $this->db->absensiHariIni($id);
             $data['waktuServer'] = $this->db->waktuServer();
             $data['status'] = $this->statusAbsensi($data['hariIni']);
-            $kolomMasuk = $this->kolomAbsensi()['kolomMasuk'];
-            $data['masukIso'] = $data['hariIni'] && $kolomMasuk ? $this->isoHariIni($data['hariIni']->{$kolomMasuk}) : null;
+            $data['masukIso'] = $this->isoMasuk($data['hariIni']);
         } catch (QueryException $e) {
             session()->now('gagal', TenagaKerjaService::pesanError($e));
         } catch (KolomTidakDitemukan $e) {
@@ -53,6 +52,12 @@ class TenagaKerjaController extends Controller
         try {
             $this->db->checkIn(KaryawanAktif::id());
         } catch (QueryException $e) {
+            // 1062 = UNIQUE (id_karyawan, tgl) — terjadi jika dua permintaan check-in
+            // masuk bersamaan sehingga trigger belum melihat baris pertama.
+            if ((int) ($e->errorInfo[1] ?? 0) === 1062) {
+                return $this->balasAbsensi($request, false, 'Anda sudah check-in hari ini.');
+            }
+
             // SQLSTATE 45000 dari trigger (mis. absensi ganda) muncul di sini
             return $this->balasAbsensi($request, false, TenagaKerjaService::pesanError($e));
         } catch (KolomTidakDitemukan $e) {
@@ -98,7 +103,7 @@ class TenagaKerjaController extends Controller
                 'status'     => $this->statusAbsensi($hariIni),
                 'jam_masuk'  => $hariIni && $kolom['kolomMasuk'] ? FormatKolom::jam($hariIni->{$kolom['kolomMasuk']}) : null,
                 'jam_keluar' => $hariIni && $kolom['kolomKeluar'] ? FormatKolom::jam($hariIni->{$kolom['kolomKeluar']}) : null,
-                'masuk_iso'  => $hariIni && $kolom['kolomMasuk'] ? $this->isoHariIni($hariIni->{$kolom['kolomMasuk']}) : null,
+                'masuk_iso'  => $this->isoMasuk($hariIni),
             ], $ok ? 200 : 422);
         }
 
@@ -122,53 +127,75 @@ class TenagaKerjaController extends Controller
             $tabel = $this->db->tabel('absensi');
 
             return [
-                'kolomMasuk'  => $this->db->kolom($tabel, 'jam_masuk'),
-                'kolomKeluar' => $this->db->kolom($tabel, 'jam_keluar'),
-                'kolomStatus' => $this->db->kolom($tabel, 'status'),
+                'kolomMasuk'   => $this->db->kolom($tabel, 'jam_masuk'),
+                'kolomKeluar'  => $this->db->kolom($tabel, 'jam_keluar'),
+                'kolomStatus'  => $this->db->kolom($tabel, 'status'),
+                'kolomTanggal' => $this->db->kolom($tabel, 'tanggal'),
             ];
         } catch (QueryException) {
-            return ['kolomMasuk' => null, 'kolomKeluar' => null, 'kolomStatus' => null];
+            return ['kolomMasuk' => null, 'kolomKeluar' => null, 'kolomStatus' => null, 'kolomTanggal' => null];
         }
     }
 
-    /** Nilai jam (TIME atau DATETIME) → ISO 8601 hari ini, untuk penghitung durasi di browser. */
-    private function isoHariIni(mixed $nilai): ?string
+    /**
+     * Waktu check-in → ISO 8601, untuk penghitung durasi di browser.
+     * Tanggal diambil dari baris absensi itu sendiri (diisi CURDATE() database),
+     * BUKAN dari jam PHP, karena zona waktu aplikasi (UTC) berbeda dengan database.
+     */
+    private function isoMasuk(?object $baris): ?string
     {
-        if (blank($nilai)) {
+        $k = $this->kolomAbsensi();
+        if (! $baris || ! $k['kolomMasuk'] || blank($baris->{$k['kolomMasuk']} ?? null)) {
             return null;
         }
-        $teks = (string) $nilai;
+        $masuk = (string) $baris->{$k['kolomMasuk']};
 
-        return strlen($teks) <= 8 ? now()->toDateString().'T'.$teks : str_replace(' ', 'T', $teks);
+        if (strlen($masuk) > 8) {
+            return str_replace(' ', 'T', $masuk);   // kolom DATETIME
+        }
+
+        $tanggal = $k['kolomTanggal'] ? ($baris->{$k['kolomTanggal']} ?? null) : null;
+
+        return blank($tanggal) ? null : substr((string) $tanggal, 0, 10).'T'.$masuk;
     }
 
     /* =====================================================================
      * Riwayat absensi
      * ===================================================================== */
 
-    public function riwayat(Request $request)
+    /** Filter riwayat: tahun & bulan (sesuai kolom v_rekap_absensi_pribadi). */
+    private function validasiPeriode(Request $request): array
     {
         $valid = $request->validate([
-            'dari'   => 'nullable|date',
-            'sampai' => 'nullable|date|after_or_equal:dari',
+            'tahun' => 'nullable|integer|between:2000,2100',
+            'bulan' => 'nullable|integer|between:1,12',
         ], [
-            'dari.date'             => 'Tanggal awal tidak valid.',
-            'sampai.date'           => 'Tanggal akhir tidak valid.',
-            'sampai.after_or_equal' => 'Tanggal akhir tidak boleh sebelum tanggal awal.',
+            'tahun.integer' => 'Tahun tidak valid.',
+            'tahun.between' => 'Tahun harus antara 2000 dan 2100.',
+            'bulan.integer' => 'Bulan tidak valid.',
+            'bulan.between' => 'Bulan harus antara 1 dan 12.',
         ]);
-        $dari = $valid['dari'] ?? null;
-        $sampai = $valid['sampai'] ?? null;
+
+        return [
+            isset($valid['tahun']) ? (int) $valid['tahun'] : null,
+            isset($valid['bulan']) ? (int) $valid['bulan'] : null,
+        ];
+    }
+
+    public function riwayat(Request $request)
+    {
+        [$tahun, $bulan] = $this->validasiPeriode($request);
         $id = KaryawanAktif::id();
 
         $riwayat = null;
-        $ringkasan = collect();
+        $rekap = [];
         $kolom = [];
         $kolomStatus = null;
 
         try {
             $view = $this->db->tabel('rekap_absensi');
-            $riwayat = $this->db->riwayatAbsensi($id, $dari, $sampai, (int) config('tenaga_kerja.per_halaman_riwayat', 15));
-            $ringkasan = $this->db->ringkasanStatus($id, $dari, $sampai);
+            $riwayat = $this->db->riwayatAbsensi($id, $tahun, $bulan, (int) config('tenaga_kerja.per_halaman_riwayat', 15));
+            $rekap = $this->db->ringkasanRekap($id, $tahun, $bulan);
             $kolom = $this->kolomTampil($view);
             $kolomStatus = $this->db->kolom($view, 'status');
         } catch (QueryException $e) {
@@ -177,18 +204,18 @@ class TenagaKerjaController extends Controller
             session()->now('gagal', $e->getMessage());
         }
 
-        return view('tenaga-kerja.riwayat', compact('riwayat', 'ringkasan', 'kolom', 'kolomStatus', 'dari', 'sampai')
+        return view('tenaga-kerja.riwayat', compact('riwayat', 'rekap', 'kolom', 'kolomStatus', 'tahun', 'bulan')
             + $this->dataUmum());
     }
 
     /** Unduh riwayat absensi milik sendiri sebagai CSV (bisa dibuka di Excel). */
     public function riwayatCsv(Request $request): StreamedResponse|RedirectResponse
     {
-        $valid = $request->validate(['dari' => 'nullable|date', 'sampai' => 'nullable|date|after_or_equal:dari']);
+        [$tahun, $bulan] = $this->validasiPeriode($request);
         $id = KaryawanAktif::id();
 
         try {
-            $baris = $this->db->semuaRiwayatAbsensi($id, $valid['dari'] ?? null, $valid['sampai'] ?? null);
+            $baris = $this->db->semuaRiwayatAbsensi($id, $tahun, $bulan);
             $kolom = $this->kolomTampil($this->db->tabel('rekap_absensi'));
         } catch (QueryException $e) {
             return back()->with('gagal', TenagaKerjaService::pesanError($e));

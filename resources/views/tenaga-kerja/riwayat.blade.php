@@ -4,68 +4,69 @@
 
 @use('App\Support\FormatKolom')
 
+@php
+    // Kartu ringkasan: total dari kolom rekap view (SUM tampilan, dihitung di database).
+    $kartuRekap = [
+        'rekap_hadir'       => ['label' => 'Hari Hadir',       'warna' => 'sukses',     'ikon' => 'bi-check2-circle'],
+        'rekap_terlambat'   => ['label' => 'Hari Terlambat',   'warna' => 'peringatan', 'ikon' => 'bi-alarm'],
+        'rekap_tidak_hadir' => ['label' => 'Hari Tidak Hadir', 'warna' => 'bahaya',     'ikon' => 'bi-x-circle'],
+        'rekap_lembur'      => ['label' => 'Total Jam Lembur', 'warna' => 'teal',       'ikon' => 'bi-hourglass-split'],
+    ];
+    $adaFilter = $tahun || $bulan;
+    $labelPeriode = trim(($bulan ? FormatKolom::namaBulan($bulan) : 'Semua bulan').' '.($tahun ?: ''));
+@endphp
+
 @section('content')
 {{-- ===================== RINGKASAN ===================== --}}
 <div class="row g-4 mb-4">
-    <div class="col-6 col-lg-3 tk-reveal">
-        <div class="tk-card tk-stat">
-            <div class="tk-stat-ikon tk-bg-teal"><i class="bi bi-journal-check"></i></div>
-            <div class="tk-stat-angka" data-hitung="{{ $riwayat?->total() ?? 0 }}">0</div>
-            <div class="tk-stat-label">Total Catatan</div>
-        </div>
-    </div>
-    @foreach ($ringkasan->take(3) as $statusNama => $jumlah)
+    @foreach ($kartuRekap as $kunci => $kartu)
+        @continue(! isset($rekap[$kunci]))
         <div class="col-6 col-lg-3 tk-reveal">
             <div class="tk-card tk-stat">
-                <div class="tk-stat-ikon tk-bg-{{ FormatKolom::warnaStatus($statusNama) }}"><i class="bi bi-bar-chart"></i></div>
-                <div class="tk-stat-angka" data-hitung="{{ $jumlah }}">0</div>
-                <div class="tk-stat-label">{{ $statusNama ?: 'Tanpa Keterangan' }}</div>
+                <div class="tk-stat-ikon tk-bg-{{ $kartu['warna'] }}"><i class="bi {{ $kartu['ikon'] }}"></i></div>
+                <div class="tk-stat-angka" data-hitung="{{ (int) $rekap[$kunci]['jumlah'] }}">0</div>
+                <div class="tk-stat-label">{{ $kartu['label'] }}</div>
             </div>
         </div>
     @endforeach
 </div>
 
-{{-- ===================== FILTER ===================== --}}
+{{-- ===================== FILTER (per periode, sesuai view rekap bulanan) ===================== --}}
 <section class="tk-card mb-4 tk-reveal">
     <form method="GET" action="{{ route('tenaga-kerja.riwayat') }}" class="row g-3 align-items-end" id="tkFormFilter">
         <div class="col-6 col-md-3">
-            <label for="dari" class="tk-label">Dari Tanggal</label>
-            <input type="date" id="dari" name="dari" value="{{ $dari }}" class="form-control tk-input">
+            <label for="bulan" class="tk-label">Bulan</label>
+            <select id="bulan" name="bulan" class="form-select tk-input">
+                <option value="">Semua bulan</option>
+                @for ($b = 1; $b <= 12; $b++)
+                    <option value="{{ $b }}" @selected($bulan === $b)>{{ FormatKolom::namaBulan($b) }}</option>
+                @endfor
+            </select>
         </div>
         <div class="col-6 col-md-3">
-            <label for="sampai" class="tk-label">Sampai Tanggal</label>
-            <input type="date" id="sampai" name="sampai" value="{{ $sampai }}" class="form-control tk-input">
+            <label for="tahun" class="tk-label">Tahun</label>
+            <input type="number" id="tahun" name="tahun" value="{{ $tahun }}" min="2000" max="2100" step="1"
+                   placeholder="Semua tahun" class="form-control tk-input">
         </div>
         <div class="col-12 col-md-6 d-flex gap-2 flex-wrap">
             <button type="submit" class="tk-btn tk-btn-utama"><i class="bi bi-funnel"></i> Terapkan</button>
-            @if ($dari || $sampai)
+            @if ($adaFilter)
                 <a href="{{ route('tenaga-kerja.riwayat') }}" class="tk-btn tk-btn-garis"><i class="bi bi-x-lg"></i> Reset</a>
             @endif
-            <a href="{{ route('tenaga-kerja.riwayat.unduh', array_filter(['dari' => $dari, 'sampai' => $sampai])) }}"
+            <a href="{{ route('tenaga-kerja.riwayat.unduh', array_filter(['tahun' => $tahun, 'bulan' => $bulan])) }}"
                class="tk-btn tk-btn-garis ms-md-auto" data-no-transisi>
                 <i class="bi bi-download"></i> Unduh CSV
             </a>
         </div>
-        <div class="col-12">
-            <div class="tk-preset">
-                <span class="tk-label mb-0 me-1">Cepat:</span>
-                <button type="button" class="tk-pill" data-preset="7">7 hari terakhir</button>
-                <button type="button" class="tk-pill" data-preset="30">30 hari terakhir</button>
-                <button type="button" class="tk-pill" data-preset="bulan-ini">Bulan ini</button>
-                <button type="button" class="tk-pill" data-preset="bulan-lalu">Bulan lalu</button>
-            </div>
-        </div>
     </form>
 </section>
 
-{{-- ===================== TABEL ===================== --}}
+{{-- ===================== TABEL (satu baris = satu bulan) ===================== --}}
 <section class="tk-card tk-reveal">
     <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center mb-3">
-        <h2 class="tk-card-title mb-0"><i class="bi bi-table"></i> Catatan Kehadiran
-            @if ($dari || $sampai)
-                <small class="tk-muted fw-normal">
-                    ({{ $dari ? FormatKolom::tanggal($dari, 'd M Y') : 'awal' }} – {{ $sampai ? FormatKolom::tanggal($sampai, 'd M Y') : 'sekarang' }})
-                </small>
+        <h2 class="tk-card-title mb-0"><i class="bi bi-table"></i> Rekap Kehadiran Bulanan
+            @if ($adaFilter)
+                <small class="tk-muted fw-normal">({{ $labelPeriode }})</small>
             @endif
         </h2>
         <div class="tk-search">
@@ -109,7 +110,7 @@
         </div>
 
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-            <div class="tk-muted small">Menampilkan {{ $riwayat->firstItem() }}–{{ $riwayat->lastItem() }} dari {{ $riwayat->total() }} catatan</div>
+            <div class="tk-muted small">Menampilkan {{ $riwayat->firstItem() }}–{{ $riwayat->lastItem() }} dari {{ $riwayat->total() }} bulan</div>
             {{ $riwayat->links('pagination::bootstrap-5') }}
         </div>
     @else
@@ -117,7 +118,7 @@
             <div class="tk-kosong-ilustrasi"><i class="bi bi-calendar-x"></i></div>
             <p class="tk-panel-judul">Belum ada catatan absensi</p>
             <p class="tk-panel-sub">
-                @if ($dari || $sampai) Tidak ada data pada rentang tanggal ini. Coba ubah filter. @else Riwayat akan muncul setelah Anda melakukan absensi. @endif
+                @if ($adaFilter) Tidak ada data pada periode {{ $labelPeriode }}. Coba ubah filter. @else Riwayat akan muncul setelah Anda melakukan absensi. @endif
             </p>
             <a href="{{ route('tenaga-kerja.absensi') }}" class="tk-btn tk-btn-utama mt-2"><i class="bi bi-fingerprint"></i> Ke Halaman Absensi</a>
         </div>

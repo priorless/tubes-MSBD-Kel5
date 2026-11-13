@@ -18,7 +18,7 @@ class FormatKolom
     private const POLA_UANG = '/(gaji|tunjangan|upah|bonus|insentif|lembur|potongan|pph|pajak|bpjs|denda|kasbon|thr|nominal|uang|biaya|total|bersih|kotor|pendapatan|penghasilan)/i';
 
     /** Kata kunci kolom angka yang BUKAN uang (jumlah hari, jam, dll.). */
-    private const POLA_BUKAN_UANG = '/(hari|jam|jumlah_hadir|kehadiran|hadir|izin|sakit|alpha|alpa|cuti|terlambat|menit|bulan|tahun|^id_|_id$)/i';
+    private const POLA_BUKAN_UANG = '/(hari|jam|baris|jumlah_hadir|kehadiran|hadir|izin|sakit|alpha|alpa|cuti|terlambat|menit|bulan|tahun|^id_|_id$)/i';
 
     /** Kata kunci kolom potongan (untuk pengelompokan tampilan slip). */
     private const POLA_POTONGAN = '/(potongan|pph|pajak|bpjs|denda|kasbon|iuran)/i';
@@ -28,6 +28,9 @@ class FormatKolom
         'no_hp' => 'No. HP', 'no_telp' => 'No. Telepon', 'no_rekening' => 'No. Rekening',
         'tgl_lahir' => 'Tanggal Lahir', 'tgl_masuk' => 'Tanggal Masuk', 'email' => 'Email',
         'jam_masuk' => 'Jam Masuk', 'jam_keluar' => 'Jam Keluar', 'thr' => 'THR',
+        'nip' => 'NIP', 'no_ktp' => 'No. KTP',
+        'total_baris' => 'Hari Tercatat', 'total_jam_lembur' => 'Total Jam Lembur',
+        'hari_tidak_hadir' => 'Hari Tidak Hadir',
     ];
 
     public static function label(string $kolom): string
@@ -117,7 +120,7 @@ class FormatKolom
         return match (true) {
             str_contains($s, 'hadir') || str_contains($s, 'tepat') || str_contains($s, 'lunas')
                 || str_contains($s, 'aktif') || str_contains($s, 'dibayar') => 'sukses',
-            str_contains($s, 'terlambat') || str_contains($s, 'izin') || str_contains($s, 'cuti')
+            str_contains($s, 'terlambat') || str_contains($s, 'izin') || str_contains($s, 'cuti') || str_contains($s, 'sakit')
                 || str_contains($s, 'pending') || str_contains($s, 'proses') => 'peringatan',
             str_contains($s, 'alpa') || str_contains($s, 'alpha') || str_contains($s, 'tidak')
                 || str_contains($s, 'belum') || str_contains($s, 'nonaktif') => 'bahaya',

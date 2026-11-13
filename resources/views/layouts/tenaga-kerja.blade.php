@@ -94,7 +94,7 @@
         @if (!empty($modeUjiCoba))
             <div class="tk-banner-uji">
                 <i class="bi bi-cone-striped"></i>
-                <span><strong>Mode uji coba:</strong> identitas karyawan diambil dari <code>TK_DEV_ID_KARYAWAN</code> di file .env karena fitur login belum tersedia.</span>
+                <span><strong>Mode uji coba:</strong> identitas karyawan diambil dari <code>TK_DEV_ID_KARYAWAN</code> di file .env karena Anda belum login. Nilai ini otomatis diabaikan setelah login.</span>
             </div>
         @endif
 

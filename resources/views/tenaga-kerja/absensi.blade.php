@@ -20,7 +20,7 @@
             <div class="tk-hero-pola"></div>
             <div class="tk-hero-isi">
                 <div class="tk-hero-sapa"><span id="tkSapaan">Halo</span>, {{ $namaKaryawan }} <span class="tk-wave">👋</span></div>
-                <div class="tk-hero-tanggal" id="tkTanggal">{{ now()->locale('id')->translatedFormat('l, d F Y') }}</div>
+                <div class="tk-hero-tanggal" id="tkTanggal">{{ FormatKolom::tanggal($waktuServer, 'l, d F Y') }}</div>
 
                 <div class="tk-clock" id="tkClock" data-server="{{ $waktuServer }}" aria-label="Jam saat ini">
                     <span class="tk-digit" data-i="0">0</span><span class="tk-digit" data-i="1">0</span>

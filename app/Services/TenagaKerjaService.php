@@ -105,8 +105,9 @@ class TenagaKerjaService
     {
         $tabel = $this->tabel('karyawan');
 
+        // tbl_karyawan memakai primary key `id` (bukan id_karyawan)
         return DB::table($tabel)
-            ->where($this->kolomWajib($tabel, 'id_karyawan'), $idKaryawan)
+            ->where($this->kolomWajib($tabel, 'pk_karyawan'), $idKaryawan)
             ->first();
     }
 
@@ -182,66 +183,84 @@ class TenagaKerjaService
     }
 
     /* =====================================================================
-     * Riwayat absensi (v_rekap_absensi_pribadi)
+     * Riwayat absensi (v_rekap_absensi_pribadi — rekap PER BULAN)
      * ===================================================================== */
 
-    private function queryRiwayat(int $idKaryawan, ?string $dari, ?string $sampai)
+    /** Query dasar: selalu difilter id_karyawan milik pengguna aktif, opsional tahun/bulan. */
+    private function queryRiwayat(int $idKaryawan, ?int $tahun, ?int $bulan)
     {
         $view = $this->tabel('rekap_absensi');
-        $kolomTanggal = $this->kolom($view, 'tanggal');
-
-        if (($dari || $sampai) && ! $kolomTanggal) {
-            throw new KolomTidakDitemukan('Filter tanggal tidak tersedia karena view riwayat tidak memiliki kolom tanggal.');
-        }
 
         return DB::table($view)
             ->where($this->kolomWajib($view, 'id_karyawan'), $idKaryawan)
-            ->when($dari, fn ($q) => $q->whereRaw("DATE(`$kolomTanggal`) >= ?", [$dari]))
-            ->when($sampai, fn ($q) => $q->whereRaw("DATE(`$kolomTanggal`) <= ?", [$sampai]));
+            ->when($tahun, fn ($q) => $q->where($this->kolomWajib($view, 'periode_tahun'), $tahun))
+            ->when($bulan, fn ($q) => $q->where($this->kolomWajib($view, 'periode_bulan'), $bulan));
     }
 
-    public function riwayatAbsensi(int $idKaryawan, ?string $dari, ?string $sampai, int $perHalaman): LengthAwarePaginator
+    /** Urutkan periode terbaru lebih dulu (tahun, lalu bulan) jika kolomnya ada. */
+    private function urutkanPeriode($query, string $view)
     {
-        $kolomTanggal = $this->kolom($this->tabel('rekap_absensi'), 'tanggal');
+        $tahun = $this->kolom($view, 'periode_tahun');
+        $bulan = $this->kolom($view, 'periode_bulan');
 
-        return $this->queryRiwayat($idKaryawan, $dari, $sampai)
-            ->when($kolomTanggal, fn ($q) => $q->orderByDesc($kolomTanggal))
+        return $query
+            ->when($tahun, fn ($q) => $q->orderByDesc($tahun))
+            ->when($bulan, fn ($q) => $q->orderByDesc($bulan));
+    }
+
+    public function riwayatAbsensi(int $idKaryawan, ?int $tahun, ?int $bulan, int $perHalaman): LengthAwarePaginator
+    {
+        return $this->urutkanPeriode($this->queryRiwayat($idKaryawan, $tahun, $bulan), $this->tabel('rekap_absensi'))
             ->paginate($perHalaman)
             ->withQueryString();
     }
 
     /** Semua baris (untuk ekspor CSV) — tetap hanya milik karyawan ini. */
-    public function semuaRiwayatAbsensi(int $idKaryawan, ?string $dari, ?string $sampai): Collection
+    public function semuaRiwayatAbsensi(int $idKaryawan, ?int $tahun, ?int $bulan): Collection
     {
-        $kolomTanggal = $this->kolom($this->tabel('rekap_absensi'), 'tanggal');
-
-        return $this->queryRiwayat($idKaryawan, $dari, $sampai)
-            ->when($kolomTanggal, fn ($q) => $q->orderByDesc($kolomTanggal))
+        return $this->urutkanPeriode($this->queryRiwayat($idKaryawan, $tahun, $bulan), $this->tabel('rekap_absensi'))
             ->get();
     }
 
     /**
-     * Jumlah baris per nilai status (hanya COUNT tampilan, bukan logika bisnis).
-     * Mengembalikan koleksi kosong jika view tidak punya kolom status.
+     * Total kolom rekap (hadir, terlambat, tidak hadir, jam lembur) untuk periode yang difilter.
+     * Hanya SUM tampilan atas angka yang sudah dihitung view — bukan logika bisnis.
+     * Kolom yang tidak ada di view dilewati.
+     *
+     * @return array<string, array{kolom: string, jumlah: float}>  kunci = rekap_hadir, dst.
      */
-    public function ringkasanStatus(int $idKaryawan, ?string $dari, ?string $sampai): Collection
+    public function ringkasanRekap(int $idKaryawan, ?int $tahun, ?int $bulan): array
     {
-        $kolomStatus = $this->kolom($this->tabel('rekap_absensi'), 'status');
-        if (! $kolomStatus) {
-            return collect();
+        $view = $this->tabel('rekap_absensi');
+        $kolom = collect(['rekap_hadir', 'rekap_terlambat', 'rekap_tidak_hadir', 'rekap_lembur'])
+            ->mapWithKeys(fn ($kunci) => [$kunci => $this->kolom($view, $kunci)])
+            ->filter();
+
+        if ($kolom->isEmpty()) {
+            return [];
         }
 
-        return $this->queryRiwayat($idKaryawan, $dari, $sampai)
-            ->selectRaw("`$kolomStatus` AS status, COUNT(*) AS jumlah")
-            ->groupBy($kolomStatus)
-            ->orderByDesc('jumlah')
-            ->pluck('jumlah', 'status');
+        $baris = $this->queryRiwayat($idKaryawan, $tahun, $bulan)
+            ->selectRaw($kolom->map(fn ($k, $kunci) => "COALESCE(SUM(`$k`), 0) AS `$kunci`")->implode(', '))
+            ->first();
+
+        return $kolom->map(fn ($k, $kunci) => ['kolom' => $k, 'jumlah' => (float) ($baris->{$kunci} ?? 0)])->all();
     }
 
     /* =====================================================================
      * Slip gaji (v_slip_gaji_detail)
      * ===================================================================== */
 
+    /**
+     * Daftar slip milik karyawan aktif.
+     *
+     * v_slip_gaji_detail TIDAK memiliki kolom id_karyawan; kolom `id`-nya adalah
+     * id PAYROLL, sehingga TIDAK BOLEH dipakai sebagai identitas karyawan.
+     * Identitas yang dipakai: NIP yang dibaca dari tbl_karyawan berdasarkan
+     * id_karyawan pengguna login (NIP UNIQUE + NOT NULL, dan view men-JOIN
+     * tbl_payroll ke tbl_karyawan, jadi NIP di view = NIP pemilik payroll).
+     * Jika suatu saat view menyediakan id_karyawan, kolom itu dipakai.
+     */
     public function slipGaji(int $idKaryawan): Collection
     {
         $view = $this->tabel('slip_gaji');
@@ -249,8 +268,21 @@ class TenagaKerjaService
         $bulan = $this->kolom($view, 'periode_bulan');
         $periode = $this->kolom($view, 'periode');
 
+        if ($kolomIdKaryawan = $this->kolom($view, 'id_karyawan')) {
+            $filter = [$kolomIdKaryawan, $idKaryawan];
+        } else {
+            $karyawan = $this->karyawan($idKaryawan);
+            $nip = $karyawan?->{$this->kolomWajib($this->tabel('karyawan'), 'nip')};
+
+            // Tanpa identitas yang valid, jangan pernah query view tanpa filter.
+            if ($nip === null || trim((string) $nip) === '') {
+                return collect();
+            }
+            $filter = [$this->kolomWajib($view, 'nip'), (string) $nip];
+        }
+
         return DB::table($view)
-            ->where($this->kolomWajib($view, 'id_karyawan'), $idKaryawan)
+            ->where(...$filter)
             ->when($tahun, fn ($q) => $q->orderByDesc($tahun))
             ->when($bulan, fn ($q) => $q->orderByDesc($bulan))
             ->when(! $tahun && $periode, fn ($q) => $q->orderByDesc($periode))
