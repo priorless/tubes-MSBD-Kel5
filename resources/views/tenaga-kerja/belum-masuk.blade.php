@@ -17,9 +17,16 @@
             {{-- Sudah login, tetapi akun tidak memiliki id_karyawan (mis. akun staf/CEO) --}}
             <h1 class="tk-panel-judul">Akun Anda belum terhubung dengan data karyawan</h1>
             <p class="tk-panel-sub">Portal Karyawan hanya dapat dibuka oleh akun yang terhubung ke data karyawan. Hubungi bagian HRD.</p>
+            <form method="POST" action="{{ route('logout') }}" class="mt-3">
+                @csrf
+                <button type="submit" class="tk-btn tk-btn-garis"><i class="bi bi-box-arrow-right"></i> Keluar</button>
+            </form>
         @else
             <h1 class="tk-panel-judul">Sesi Anda tidak dikenali</h1>
             <p class="tk-panel-sub">Halaman Portal Karyawan hanya dapat dibuka oleh karyawan yang sudah masuk (login).</p>
+            @if (Route::has('login'))
+                <a href="{{ route('login') }}" class="tk-btn tk-btn-utama mt-2"><i class="bi bi-box-arrow-in-right"></i> Masuk</a>
+            @endif
             @if (app()->environment('local'))
                 <div class="tk-catatan text-start mt-3">
                     <i class="bi bi-wrench"></i>

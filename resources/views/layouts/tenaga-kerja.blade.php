@@ -59,6 +59,20 @@
                     <div class="tk-sidebar-user-sub text-truncate">{{ $jabatan ?? (!empty($kategori) ? 'Karyawan '.$kategori : 'Karyawan') }}</div>
                 </div>
             </div>
+            @auth
+                {{-- Route password.change & logout disediakan modul autentikasi (routes/auth.php) --}}
+                <nav class="tk-nav mt-2">
+                    <a href="{{ route('password.change') }}" class="tk-nav-link">
+                        <i class="bi bi-key"></i><span>Ganti Password</span>
+                    </a>
+                    <form method="POST" action="{{ route('logout') }}" class="m-0">
+                        @csrf
+                        <button type="submit" class="tk-nav-link w-100 border-0 bg-transparent text-start">
+                            <i class="bi bi-box-arrow-right"></i><span>Keluar</span>
+                        </button>
+                    </form>
+                </nav>
+            @endauth
         </div>
     </aside>
 
@@ -88,6 +102,14 @@
                         @endif
                     </div>
                 </a>
+                @auth
+                    <form method="POST" action="{{ route('logout') }}" class="m-0">
+                        @csrf
+                        <button type="submit" class="tk-icon-btn" title="Keluar" aria-label="Keluar">
+                            <i class="bi bi-box-arrow-right"></i>
+                        </button>
+                    </form>
+                @endauth
             </div>
         </header>
 
@@ -113,6 +135,10 @@
         $tkFlash = [];
         if (session('sukses')) { $tkFlash[] = ['tipe' => 'sukses', 'pesan' => session('sukses')]; }
         if (session('gagal'))  { $tkFlash[] = ['tipe' => 'gagal',  'pesan' => session('gagal')]; }
+        // Kunci flash dari modul autentikasi & handler global (bootstrap/app.php): success / error / warning
+        if (session('success')) { $tkFlash[] = ['tipe' => 'sukses', 'pesan' => session('success')]; }
+        if (session('error'))   { $tkFlash[] = ['tipe' => 'gagal',  'pesan' => session('error')]; }
+        if (session('warning')) { $tkFlash[] = ['tipe' => 'gagal',  'pesan' => session('warning')]; }
         foreach ($errors->all() as $pesanError) { $tkFlash[] = ['tipe' => 'gagal', 'pesan' => $pesanError]; }
     @endphp
     <script>window.TK_FLASH = @json($tkFlash);</script>
