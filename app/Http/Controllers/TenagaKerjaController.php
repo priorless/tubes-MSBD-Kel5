@@ -10,7 +10,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -32,12 +31,14 @@ class TenagaKerjaController extends Controller
     public function absensi()
     {
         $id = KaryawanAktif::id();
-        $data = ['hariIni' => null, 'waktuServer' => now()->toDateTimeString(), 'status' => 'belum'];
+        $data = ['hariIni' => null, 'waktuServer' => now()->toDateTimeString(), 'status' => 'belum', 'masukIso' => null];
 
         try {
             $data['hariIni'] = $this->db->absensiHariIni($id);
             $data['waktuServer'] = $this->db->waktuServer();
             $data['status'] = $this->statusAbsensi($data['hariIni']);
+            $kolomMasuk = $this->kolomAbsensi()['kolomMasuk'];
+            $data['masukIso'] = $data['hariIni'] && $kolomMasuk ? $this->isoHariIni($data['hariIni']->{$kolomMasuk}) : null;
         } catch (QueryException $e) {
             session()->now('gagal', TenagaKerjaService::pesanError($e));
         } catch (KolomTidakDitemukan $e) {
