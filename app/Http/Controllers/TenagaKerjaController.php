@@ -29,20 +29,22 @@ class TenagaKerjaController extends Controller
     public function absensi()
     {
         $id = KaryawanAktif::id();
-        $data = ['hariIni' => null, 'waktuServer' => now()->toDateTimeString(), 'status' => 'belum', 'masukIso' => null];
+        $data = ['hariIni' => null, 'waktuServer' => now()->toDateTimeString(), 'status' => 'belum', 'masukIso' => null, 'penugasan' => null];
 
         try {
             $data['hariIni'] = $this->db->absensiHariIni($id);
             $data['waktuServer'] = $this->db->waktuServer();
             $data['status'] = $this->statusAbsensi($data['hariIni']);
             $data['masukIso'] = $this->isoMasuk($data['hariIni']);
+            $data['penugasan'] = $this->db->penugasanAktif($id);
         } catch (QueryException $e) {
             session()->now('gagal', TenagaKerjaService::pesanError($e));
         } catch (KolomTidakDitemukan $e) {
             session()->now('gagal', $e->getMessage());
         }
 
-        $data['lokasi'] = $this->lokasiHariIni();
+        $data['lokasi'] = $this->lokasiDariBaris($data['hariIni']);
+        $data['akurasiPeringatan'] = (int) config('tenaga_kerja.akurasi_gps_peringatan', 100);
 
         return view('tenaga-kerja.absensi', $data + $this->dataUmum() + $this->kolomAbsensi());
     }
@@ -56,7 +58,7 @@ class TenagaKerjaController extends Controller
         }
 
         try {
-            $this->db->checkIn(KaryawanAktif::id());
+            $this->db->checkIn(KaryawanAktif::id(), $lokasi);
         } catch (QueryException $e) {
             // 1062 = UNIQUE (id_karyawan, tgl) — terjadi jika dua permintaan check-in
             // masuk bersamaan sehingga trigger belum melihat baris pertama.
@@ -70,9 +72,25 @@ class TenagaKerjaController extends Controller
             return $this->balasAbsensi($request, false, $e->getMessage());
         }
 
-        $this->simpanLokasiHariIni('masuk', $lokasi);
+        return $this->balasAbsensi($request, true, $this->pesanCheckIn());
+    }
 
-        return $this->balasAbsensi($request, true, 'Check-in berhasil. Selamat bekerja!');
+    /** Pesan sukses check-in; menyebut keterlambatan bila trigger mencatat menit terlambat. */
+    private function pesanCheckIn(): string
+    {
+        try {
+            $baris = $this->db->absensiHariIni(KaryawanAktif::id());
+            $kolom = $this->db->kolom($this->db->tabel('absensi'), 'menit_terlambat');
+        } catch (QueryException|KolomTidakDitemukan) {
+            $baris = null;
+            $kolom = null;
+        }
+
+        $menit = $baris && $kolom ? (int) ($baris->{$kolom} ?? 0) : 0;
+
+        return $menit > 0
+            ? "Check-in berhasil. Anda tercatat terlambat $menit menit dari jadwal shift."
+            : 'Check-in berhasil. Selamat bekerja!';
     }
 
     public function checkOut(Request $request): JsonResponse|RedirectResponse
@@ -84,7 +102,7 @@ class TenagaKerjaController extends Controller
         }
 
         try {
-            $jumlah = $this->db->checkOut(KaryawanAktif::id());
+            $jumlah = $this->db->checkOut(KaryawanAktif::id(), $lokasi);
         } catch (QueryException $e) {
             return $this->balasAbsensi($request, false, TenagaKerjaService::pesanError($e));
         } catch (KolomTidakDitemukan $e) {
@@ -96,14 +114,13 @@ class TenagaKerjaController extends Controller
                 'Tidak ada data check-in hari ini yang dapat di-check-out. Pastikan Anda sudah check-in dan belum check-out.');
         }
 
-        $this->simpanLokasiHariIni('keluar', $lokasi);
-
         return $this->balasAbsensi($request, true, 'Check-out berhasil. Terima kasih atas kerja keras Anda hari ini!');
     }
 
     /* =====================================================================
      * Lokasi check-in / check-out
-     * Lokasi hanya ditampilkan (disimpan di sesi login untuk hari ini), TIDAK ke database.
+     * Koordinat disimpan ke tbl_absensi. Jarak ke lokasi kerja & penolakan di luar
+     * radius dihitung trigger database (trg_validasi_absen_masuk / trg_auto_hitung_lembur).
      * ===================================================================== */
 
     private const string PESAN_LOKASI_WAJIB = 'Lokasi Anda belum terdeteksi. Izinkan akses lokasi (GPS) di browser, lalu coba lagi.';
@@ -111,7 +128,7 @@ class TenagaKerjaController extends Controller
     /**
      * Koordinat dari browser (navigator.geolocation). Null jika kosong atau tidak valid.
      *
-     * @return array{latitude: float, longitude: float, akurasi: int|null, waktu: string}|null
+     * @return array{latitude: float, longitude: float, akurasi: int|null}|null
      */
     private function lokasiDariRequest(Request $request): ?array
     {
@@ -130,38 +147,44 @@ class TenagaKerjaController extends Controller
         return [
             'latitude' => round((float) $data['latitude'], 6),
             'longitude' => round((float) $data['longitude'], 6),
-            'akurasi' => isset($data['akurasi']) ? (int) round((float) $data['akurasi']) : null,
-            'waktu' => now()->timezone('Asia/Jakarta')->format('H:i'),
+            'akurasi' => isset($data['akurasi']) ? (int) min(round((float) $data['akurasi']), 4294967295) : null,
         ];
     }
 
     /**
-     * @param  'masuk'|'keluar'  $jenis
-     * @param  array{latitude: float, longitude: float, akurasi: int|null, waktu: string}  $lokasi
+     * Lokasi check-in/check-out yang TERSIMPAN di baris absensi, untuk ditampilkan.
+     *
+     * @return array{masuk?: array{latitude: float, longitude: float, akurasi: int|null, jarak: int|null}, keluar?: array{latitude: float, longitude: float, akurasi: int|null, jarak: int|null}}
      */
-    private function simpanLokasiHariIni(string $jenis, array $lokasi): void
+    private function lokasiDariBaris(?object $baris): array
     {
-        session()->put($this->kunciSesiLokasi().'.'.$jenis, $lokasi);
-    }
-
-    /**
-     * @return array{masuk?: array<string, mixed>, keluar?: array<string, mixed>}
-     */
-    private function lokasiHariIni(): array
-    {
-        return (array) session($this->kunciSesiLokasi(), []);
-    }
-
-    /** Kunci sesi per karyawan per tanggal server database, agar lokasi kemarin tidak ikut tampil. */
-    private function kunciSesiLokasi(): string
-    {
-        try {
-            $tanggal = substr($this->db->waktuServer(), 0, 10);
-        } catch (QueryException) {
-            $tanggal = now()->toDateString();
+        if (! $baris) {
+            return [];
         }
 
-        return 'tenaga_kerja_lokasi.'.KaryawanAktif::id().'.'.$tanggal;
+        $hasil = [];
+        try {
+            $tabel = $this->db->tabel('absensi');
+            foreach (['masuk', 'keluar'] as $jenis) {
+                $kolom = fn (string $kunci) => $this->db->kolom($tabel, "{$kunci}_$jenis");
+                [$lat, $lng, $akurasi, $jarak] = [$kolom('lat'), $kolom('lng'), $kolom('akurasi'), $kolom('jarak')];
+
+                if (! $lat || ! $lng || blank($baris->{$lat} ?? null) || blank($baris->{$lng} ?? null)) {
+                    continue;
+                }
+
+                $hasil[$jenis] = [
+                    'latitude' => round((float) $baris->{$lat}, 6),
+                    'longitude' => round((float) $baris->{$lng}, 6),
+                    'akurasi' => $akurasi && filled($baris->{$akurasi} ?? null) ? (int) $baris->{$akurasi} : null,
+                    'jarak' => $jarak && filled($baris->{$jarak} ?? null) ? (int) $baris->{$jarak} : null,
+                ];
+            }
+        } catch (QueryException) {
+            return $hasil;
+        }
+
+        return $hasil;
     }
 
     /** Balasan JSON (untuk tombol AJAX) atau redirect + notifikasi (tanpa JavaScript). */
@@ -183,7 +206,8 @@ class TenagaKerjaController extends Controller
                 'jam_masuk' => $hariIni && $kolom['kolomMasuk'] ? FormatKolom::jam($hariIni->{$kolom['kolomMasuk']}) : null,
                 'jam_keluar' => $hariIni && $kolom['kolomKeluar'] ? FormatKolom::jam($hariIni->{$kolom['kolomKeluar']}) : null,
                 'masuk_iso' => $this->isoMasuk($hariIni),
-                'lokasi' => $this->lokasiHariIni(),
+                'status_kehadiran' => $hariIni && $kolom['kolomStatus'] ? ($hariIni->{$kolom['kolomStatus']} ?? null) : null,
+                'lokasi' => $this->lokasiDariBaris($hariIni),
             ], $ok ? 200 : 422);
         }
 
@@ -271,6 +295,8 @@ class TenagaKerjaController extends Controller
         $rekap = [];
         $kolom = [];
         $kolomStatus = null;
+        $harian = collect();
+        $periodeHarian = null;
 
         try {
             $view = $this->db->tabel('rekap_absensi');
@@ -278,13 +304,21 @@ class TenagaKerjaController extends Controller
             $rekap = $this->db->ringkasanRekap($id, $tahun, $bulan);
             $kolom = $this->kolomTampil($view);
             $kolomStatus = $this->db->kolom($view, 'status');
+
+            // Detail harian: bulan yang difilter, atau bulan berjalan menurut server database.
+            $sekarang = $this->db->waktuServer();
+            $periodeHarian = [
+                'tahun' => $tahun ?? (int) substr($sekarang, 0, 4),
+                'bulan' => $bulan ?? (int) substr($sekarang, 5, 2),
+            ];
+            $harian = $this->db->absensiHarian($id, $periodeHarian['tahun'], $periodeHarian['bulan']);
         } catch (QueryException $e) {
             session()->now('gagal', TenagaKerjaService::pesanError($e));
         } catch (KolomTidakDitemukan $e) {
             session()->now('gagal', $e->getMessage());
         }
 
-        return view('tenaga-kerja.riwayat', compact('riwayat', 'rekap', 'kolom', 'kolomStatus', 'tahun', 'bulan')
+        return view('tenaga-kerja.riwayat', compact('riwayat', 'rekap', 'kolom', 'kolomStatus', 'tahun', 'bulan', 'harian', 'periodeHarian')
             + $this->dataUmum());
     }
 
