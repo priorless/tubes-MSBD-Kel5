@@ -31,6 +31,34 @@
         <div class="sidebar">
             <nav class="mt-2">
                 <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
+                    @if (Route::has('hrd.dashboard'))
+                        <li class="nav-header">HRD</li>
+                        <li class="nav-item">
+                            <a href="{{ route('hrd.dashboard') }}" class="nav-link {{ request()->routeIs('hrd.dashboard') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <p>Dashboard HRD</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('hrd.karyawan.index') }}" class="nav-link {{ request()->routeIs('hrd.karyawan.*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-users"></i>
+                                <p>Data Karyawan</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('hrd.pool') }}" class="nav-link {{ request()->routeIs('hrd.pool') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-user-check"></i>
+                                <p>Pool Karyawan</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ route('hrd.sertifikat.index') }}" class="nav-link {{ request()->routeIs('hrd.sertifikat.*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-id-card"></i>
+                                <p>Dokumen Sertifikat</p>
+                            </a>
+                        </li>
+                    @endif
+
                     @if (Route::has('operasional.monitoring'))
                         <li class="nav-header">OPERASIONAL</li>
                         <li class="nav-item">
