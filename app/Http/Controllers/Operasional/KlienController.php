@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -35,7 +37,9 @@ class KlienController extends Controller
             'pic_telp' => ['bail', 'required', 'string', 'max:15'],
             'pic_email' => ['nullable', 'email', 'max:100'],
             'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
-        ], $this->validationMessages());
+        ] + $this->aturanTitikAbsensi(), $this->validationMessages());
+
+        $validated = $this->siapkanTitikAbsensi($validated);
 
         try {
             DB::table('tbl_klien')->insert($validated);
@@ -70,7 +74,9 @@ class KlienController extends Controller
             'pic_telp' => ['bail', 'required', 'string', 'max:15'],
             'pic_email' => ['nullable', 'email', 'max:100'],
             'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
-        ], $this->validationMessages());
+        ] + $this->aturanTitikAbsensi(), $this->validationMessages());
+
+        $validated = $this->siapkanTitikAbsensi($validated);
 
         try {
             DB::table('tbl_klien')->where('id', $existingClient->id)->update($validated);
@@ -103,6 +109,37 @@ class KlienController extends Controller
     }
 
     /**
+     * Titik lokasi kerja klien untuk geofencing absensi (diisi opsional).
+     *
+     * @return array<string, list<string>>
+     */
+    private function aturanTitikAbsensi(): array
+    {
+        return [
+            'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
+            'radius_meter' => ['nullable', 'integer', 'between:25,5000'],
+        ];
+    }
+
+    /**
+     * Radius kosong memakai bawaan 200 m. Kolom titik dilewati bila migrasi geofence belum dijalankan.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function siapkanTitikAbsensi(array $validated): array
+    {
+        if (! Schema::hasColumn('tbl_klien', 'latitude')) {
+            return Arr::except($validated, ['latitude', 'longitude', 'radius_meter']);
+        }
+
+        $validated['radius_meter'] = $validated['radius_meter'] ?? 200;
+
+        return $validated;
+    }
+
+    /**
      * @return array<string, string>
      */
     private function validationMessages(): array
@@ -123,6 +160,11 @@ class KlienController extends Controller
             'pic_email.max' => 'Alamat email PIC maksimal 100 karakter.',
             'status.required' => 'Status klien wajib dipilih.',
             'status.in' => 'Status klien tidak valid.',
+            'latitude.between' => 'Latitude harus antara -90 dan 90.',
+            'latitude.required_with' => 'Latitude wajib diisi bersama longitude.',
+            'longitude.between' => 'Longitude harus antara -180 dan 180.',
+            'longitude.required_with' => 'Longitude wajib diisi bersama latitude.',
+            'radius_meter.between' => 'Radius absensi harus antara 25 dan 5000 meter.',
         ];
     }
 }
