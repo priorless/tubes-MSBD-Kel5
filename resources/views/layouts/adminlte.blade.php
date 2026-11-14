@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@yield('title', 'Operasional') | SJI</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'SJI') | SJI</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
@@ -19,18 +20,46 @@
                 </a>
             </li>
             <li class="nav-item d-none d-sm-inline-block">
+                <a href="{{ route('operasional.monitoring') }}" class="nav-link">Operasional</a>
                 <span class="nav-link">@yield('modul', 'SJI')</span>
             </li>
         </ul>
     </nav>
 
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
+        <a href="{{ route('operasional.monitoring') }}" class="brand-link">
+            <span class="brand-text font-weight-light ml-3">SJI Operasional</span>
         <a href="{{ url('/') }}" class="brand-link">
             <span class="brand-text font-weight-light ml-3">SJI Outsourcing</span>
         </a>
         <div class="sidebar">
             <nav class="mt-2">
                 <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu">
+                    <li class="nav-header">OPERASIONAL</li>
+                    <li class="nav-item">
+                        <a href="{{ route('operasional.monitoring') }}" class="nav-link {{ request()->routeIs('operasional.monitoring') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-map-marked-alt"></i>
+                            <p>Monitoring Sebaran</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('operasional.klien.index') }}" class="nav-link {{ request()->routeIs('operasional.klien.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-building"></i>
+                            <p>Data Klien</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('operasional.penempatan.create') }}" class="nav-link {{ request()->routeIs('operasional.penempatan.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-user-plus"></i>
+                            <p>Penempatan</p>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('operasional.rotasi.create') }}" class="nav-link {{ request()->routeIs('operasional.rotasi.*') ? 'active' : '' }}">
+                            <i class="nav-icon fas fa-sync-alt"></i>
+                            <p>Rotasi Karyawan</p>
+                        </a>
+                    </li>
                     @if (Route::has('hrd.dashboard'))
                         <li class="nav-header">HRD</li>
                         <li class="nav-item">
@@ -118,6 +147,11 @@
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-8">
+                        <h1>@yield('heading', 'Operasional')</h1>
+                    </div>
+                    <div class="col-sm-4">
+                        <ol class="breadcrumb float-sm-right">
+                            <li class="breadcrumb-item"><a href="{{ route('operasional.monitoring') }}">Operasional</a></li>
                         <h1>@yield('heading', 'SJI')</h1>
                     </div>
                     <div class="col-sm-4">
@@ -161,6 +195,7 @@
     </div>
 
     <footer class="main-footer">
+        <strong>SJI</strong> &mdash; Sistem Operasional Perusahaan Outsourcing.
         <strong>SJI</strong> &mdash; Sistem Informasi Perusahaan Outsourcing.
     </footer>
 </div>

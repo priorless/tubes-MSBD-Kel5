@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Operasional\KlienController;
+use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\KeuanganController;
 use App\Http\Controllers\Hrd\DashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
@@ -11,6 +13,18 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::prefix('operasional')->name('operasional.')->group(function () {
+    Route::resource('klien', KlienController::class)->except('show');
+
+    Route::get('penempatan', [OperasionalController::class, 'createPenempatan'])->name('penempatan.create');
+    Route::get('penempatan/create', [OperasionalController::class, 'createPenempatan']);
+    Route::post('penempatan', [OperasionalController::class, 'storePenempatan'])->name('penempatan.store');
+
+    Route::get('rotasi', [OperasionalController::class, 'createRotasi'])->name('rotasi.create');
+    Route::get('rotasi/create', [OperasionalController::class, 'createRotasi']);
+    Route::post('rotasi', [OperasionalController::class, 'storeRotasi'])->name('rotasi.store');
+
+    Route::get('monitoring', [OperasionalController::class, 'monitoring'])->name('monitoring');
 Route::prefix('keuangan')->name('keuangan.')->controller(KeuanganController::class)->group(function () {
     Route::get('payroll', 'payroll')->name('payroll.index');
     Route::post('payroll/generate', 'generatePayroll')->name('payroll.generate');
