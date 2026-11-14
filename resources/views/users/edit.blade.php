@@ -1,30 +1,23 @@
-@extends('layouts.admin')
+@extends('layouts.app')
 
 @section('title', 'Ubah User')
-@section('heading', 'Ubah User')
 
 @section('content')
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card card-warning">
-            <div class="card-header">
-                <h3 class="card-title">Ubah Akun: {{ $user->username }}</h3>
-            </div>
+    <form method="POST" action="{{ route('users.update', $user) }}" class="card max-w-2xl" novalidate>
+        @csrf
+        @method('PUT')
 
-            <form method="POST" action="{{ route('users.update', $user) }}" novalidate>
-                @csrf
-                @method('PUT')
-
-                <div class="card-body">
-                    @include('users._form', ['roles' => $roles, 'user' => $user, 'isEditingSelf' => $isEditingSelf])
-                </div>
-
-                <div class="card-footer">
-                    <button type="submit" class="btn btn-warning"><i class="fas fa-save mr-1"></i> Simpan Perubahan</button>
-                    <a href="{{ route('users.index') }}" class="btn btn-default">Batal</a>
-                </div>
-            </form>
+        <div class="card-header">
+            <h2 class="card-title">Ubah Akun: <span class="font-mono">{{ $user->username }}</span></h2>
         </div>
-    </div>
-</div>
+
+        <div class="card-body space-y-4">
+            @include('users._form', ['roles' => $roles, 'user' => $user, 'isEditingSelf' => $isEditingSelf])
+        </div>
+
+        <div class="card-footer justify-end">
+            <a href="{{ route('users.index') }}" class="btn-secondary">Batal</a>
+            <button type="submit" class="btn-primary">Simpan Perubahan</button>
+        </div>
+    </form>
 @endsection

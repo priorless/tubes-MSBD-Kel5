@@ -14,6 +14,9 @@ abstract class TestCase extends BaseTestCase
      */
     protected function setUpTraits(): array
     {
+        // Tes tidak bergantung pada hasil `npm run build`.
+        $this->withoutVite();
+
         $uses = parent::setUpTraits();
 
         if (isset($uses[CreatesSjiAuthTables::class])) {

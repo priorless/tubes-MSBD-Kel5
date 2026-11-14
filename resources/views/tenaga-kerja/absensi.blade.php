@@ -12,130 +12,119 @@
 @endphp
 
 @section('content')
-<div class="row g-4">
+<div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
 
-    {{-- ===================== HERO: sapaan + jam digital ===================== --}}
-    <div class="col-12 col-xl-7 tk-reveal">
-        <section class="tk-hero">
-            <div class="tk-hero-pola"></div>
-            <div class="tk-hero-isi">
-                <div class="tk-hero-sapa"><span id="tkSapaan">Halo</span>, {{ $namaKaryawan }} <span class="tk-wave">👋</span></div>
-                <div class="tk-hero-tanggal" id="tkTanggal">{{ FormatKolom::tanggal($waktuServer, 'l, d F Y') }}</div>
+    {{-- ===================== Sapaan + jam digital (waktu server) ===================== --}}
+    <section class="tk-reveal relative overflow-hidden rounded-lg bg-sji-biru-tua p-6 text-white shadow-sm sm:p-8 xl:col-span-7">
+        <div class="absolute inset-y-0 left-0 w-1.5 bg-sji-merah"></div>
+        <img src="{{ asset('images/logo-sji.png') }}" alt="" class="pointer-events-none absolute -right-6 -bottom-8 w-48 opacity-10">
 
-                <div class="tk-clock" id="tkClock" data-server="{{ $waktuServer }}" aria-label="Jam saat ini">
-                    <span class="tk-digit" data-i="0">0</span><span class="tk-digit" data-i="1">0</span>
-                    <span class="tk-clock-sep">:</span>
-                    <span class="tk-digit" data-i="2">0</span><span class="tk-digit" data-i="3">0</span>
-                    <span class="tk-clock-sep">:</span>
-                    <span class="tk-digit tk-digit-kecil" data-i="4">0</span><span class="tk-digit tk-digit-kecil" data-i="5">0</span>
-                </div>
-                <div class="tk-hero-catatan">
-                    <i class="bi bi-broadcast"></i> Waktu disinkronkan dengan server · WIB
-                </div>
-            </div>
-        </section>
-    </div>
+        <p class="text-lg font-semibold"><span id="tkSapaan">Halo</span>, {{ $namaKaryawan }}</p>
+        <p class="mt-1 text-sm text-blue-200" id="tkTanggal">{{ FormatKolom::tanggal($waktuServer, 'l, d F Y') }}</p>
 
-    {{-- ===================== STATUS ABSENSI HARI INI ===================== --}}
-    <div class="col-12 col-xl-5 tk-reveal">
-        <section class="tk-card tk-status-card h-100" id="tkStatusCard" data-status="{{ $status }}" data-masuk="{{ $masukIso }}">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2 class="tk-card-title mb-0"><i class="bi bi-activity"></i> Status Hari Ini</h2>
-                <span class="tk-badge tk-badge-status" id="tkStatusBadge">
-                    <span class="tk-dot"></span><span id="tkStatusLabel">{{ $label[$status] }}</span>
-                </span>
-            </div>
+        <div class="mt-6 flex items-end gap-1 font-mono text-5xl font-bold tabular-nums sm:text-6xl" id="tkClock" data-server="{{ $waktuServer }}" aria-label="Jam saat ini">
+            <span class="tk-digit" data-i="0">0</span><span class="tk-digit" data-i="1">0</span>
+            <span class="text-blue-300">:</span>
+            <span class="tk-digit" data-i="2">0</span><span class="tk-digit" data-i="3">0</span>
+            <span class="text-blue-300">:</span>
+            <span class="tk-digit text-3xl text-blue-200 sm:text-4xl" data-i="4">0</span><span class="tk-digit text-3xl text-blue-200 sm:text-4xl" data-i="5">0</span>
+        </div>
+        <p class="mt-3 text-xs text-blue-200">Waktu disinkronkan dengan server &middot; WIB</p>
+    </section>
 
-            {{-- Panel: belum check-in --}}
-            <div class="tk-panel" data-panel="belum">
-                <div class="tk-panel-ikon tk-ikon-netral"><i class="bi bi-door-open"></i></div>
-                <p class="tk-panel-judul">Anda belum check-in hari ini</p>
-                <p class="tk-panel-sub">Tekan tombol di bawah saat Anda mulai bekerja.</p>
-                <form method="POST" action="{{ route('tenaga-kerja.absensi.check-in') }}" class="tk-form-absen">
-                    @csrf
-                    <button type="submit" class="tk-btn tk-btn-utama tk-btn-besar w-100">
-                        <span class="tk-btn-teks"><i class="bi bi-box-arrow-in-right"></i> Check-in Sekarang</span>
-                        <span class="tk-btn-loading"><span class="tk-spinner"></span> Memproses…</span>
-                    </button>
-                </form>
-            </div>
+    {{-- ===================== Status absensi hari ini ===================== --}}
+    <section class="tk-reveal card p-6 xl:col-span-5" id="tkStatusCard" data-status="{{ $status }}" data-masuk="{{ $masukIso }}">
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="card-title">Status Hari Ini</h2>
+            <span class="badge" id="tkStatusBadge"><span id="tkStatusLabel">{{ $label[$status] }}</span></span>
+        </div>
 
-            {{-- Panel: sudah check-in, belum check-out --}}
-            <div class="tk-panel" data-panel="masuk">
-                <div class="tk-panel-ikon tk-ikon-aktif"><i class="bi bi-briefcase"></i><span class="tk-ping"></span></div>
-                <p class="tk-panel-judul">Anda sedang bekerja</p>
-                <p class="tk-panel-sub">Durasi sejak check-in</p>
-                <div class="tk-durasi" id="tkDurasi">00:00:00</div>
-                <form method="POST" action="{{ route('tenaga-kerja.absensi.check-out') }}" class="tk-form-absen" data-konfirmasi="Yakin ingin check-out sekarang?">
-                    @csrf
-                    <button type="submit" class="tk-btn tk-btn-sekunder tk-btn-besar w-100">
-                        <span class="tk-btn-teks"><i class="bi bi-box-arrow-right"></i> Check-out</span>
-                        <span class="tk-btn-loading"><span class="tk-spinner"></span> Memproses…</span>
-                    </button>
-                </form>
-            </div>
+        {{-- Panel: belum check-in --}}
+        <div data-panel="belum" class="text-center">
+            <p class="font-semibold text-gray-800">Anda belum check-in hari ini</p>
+            <p class="mt-1 text-sm text-gray-500">Tekan tombol di bawah saat Anda mulai bekerja.</p>
+            <form method="POST" action="{{ route('tenaga-kerja.absensi.check-in') }}" class="tk-form-absen mt-4">
+                @csrf
+                <button type="submit" class="tk-btn btn-primary w-full py-3 text-base">
+                    <span class="tk-btn-teks">Check-in Sekarang</span>
+                    <span class="tk-btn-loading"><span class="tk-spinner"></span> Memproses…</span>
+                </button>
+            </form>
+        </div>
 
-            {{-- Panel: selesai --}}
-            <div class="tk-panel" data-panel="selesai">
-                <div class="tk-panel-ikon tk-ikon-sukses">
-                    <svg class="tk-centang" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27l7 7 15-15"/></svg>
-                </div>
-                <p class="tk-panel-judul">Absensi hari ini selesai</p>
-                <p class="tk-panel-sub">Terima kasih, sampai jumpa besok!</p>
-            </div>
+        {{-- Panel: sudah check-in, belum check-out --}}
+        <div data-panel="masuk" class="text-center">
+            <p class="font-semibold text-gray-800">Anda sedang bekerja</p>
+            <p class="mt-1 text-sm text-gray-500">Durasi sejak check-in</p>
+            <p class="mt-2 font-mono text-3xl font-bold text-sji-biru tabular-nums" id="tkDurasi">00:00:00</p>
+            <form method="POST" action="{{ route('tenaga-kerja.absensi.check-out') }}" class="tk-form-absen mt-4" data-konfirmasi="Yakin ingin check-out sekarang?">
+                @csrf
+                <button type="submit" class="tk-btn btn-danger w-full py-3 text-base">
+                    <span class="tk-btn-teks">Check-out</span>
+                    <span class="tk-btn-loading"><span class="tk-spinner"></span> Memproses…</span>
+                </button>
+            </form>
+        </div>
 
-            {{-- Linimasa hari ini --}}
-            <ol class="tk-timeline">
-                <li class="tk-tl-item" data-tl="masuk">
-                    <span class="tk-tl-titik"><i class="bi bi-box-arrow-in-right"></i></span>
-                    <span class="tk-tl-label">Check-in</span>
-                    <span class="tk-tl-jam" id="tkJamMasuk">{{ $jamMasuk ?? '—' }}</span>
-                </li>
-                <li class="tk-tl-garis"></li>
-                <li class="tk-tl-item" data-tl="keluar">
-                    <span class="tk-tl-titik"><i class="bi bi-box-arrow-right"></i></span>
-                    <span class="tk-tl-label">Check-out</span>
-                    <span class="tk-tl-jam" id="tkJamKeluar">{{ $jamKeluar ?? '—' }}</span>
-                </li>
-            </ol>
-            @if ($statusDb)
-                <div class="tk-status-db">Keterangan sistem: <span class="tk-badge tk-badge-{{ FormatKolom::warnaStatus($statusDb) }}">{{ $statusDb }}</span></div>
-            @endif
-        </section>
-    </div>
+        {{-- Panel: selesai --}}
+        <div data-panel="selesai" class="text-center">
+            <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-100 text-2xl text-emerald-600">&#10003;</div>
+            <p class="mt-3 font-semibold text-gray-800">Absensi hari ini selesai</p>
+            <p class="mt-1 text-sm text-gray-500">Terima kasih, sampai jumpa besok!</p>
+        </div>
 
-    {{-- ===================== AKSES CEPAT ===================== --}}
-    <div class="col-12">
-        <div class="row g-4">
-            @foreach ([
-                ['route' => 'tenaga-kerja.riwayat',   'ikon' => 'bi-calendar2-week', 'judul' => 'Riwayat Absensi', 'sub' => 'Lihat catatan kehadiran Anda', 'warna' => 'teal'],
-                ['route' => 'tenaga-kerja.slip-gaji', 'ikon' => 'bi-receipt-cutoff', 'judul' => 'Slip Gaji',       'sub' => 'Rincian penghasilan per periode', 'warna' => 'petrol'],
-                ['route' => 'tenaga-kerja.profil',    'ikon' => 'bi-person-badge',   'judul' => 'Profil Saya',     'sub' => 'Data diri & informasi pekerjaan', 'warna' => 'arang'],
-            ] as $q)
-                <div class="col-12 col-md-4 tk-reveal">
-                    <a href="{{ route($q['route']) }}" class="tk-card tk-quick tk-quick-{{ $q['warna'] }}">
-                        <div class="tk-quick-ikon"><i class="bi {{ $q['ikon'] }}"></i></div>
-                        <div>
-                            <div class="tk-quick-judul">{{ $q['judul'] }}</div>
-                            <div class="tk-quick-sub">{{ $q['sub'] }}</div>
-                        </div>
-                        <i class="bi bi-arrow-right tk-quick-panah"></i>
-                    </a>
+        {{-- Linimasa hari ini --}}
+        <dl class="mt-6 grid grid-cols-2 gap-4 border-t border-gray-100 pt-4 text-center">
+            @foreach (['masuk' => ['Check-in', 'tkJamMasuk', $jamMasuk], 'keluar' => ['Check-out', 'tkJamKeluar', $jamKeluar]] as $jenis => [$labelJam, $idJam, $nilaiJam])
+                <div>
+                    <dt class="text-xs text-gray-500">{{ $labelJam }}</dt>
+                    <dd class="mt-1 font-mono text-lg font-semibold text-gray-800" id="{{ $idJam }}">{{ $nilaiJam ?? '—' }}</dd>
+                    <dd class="mt-1 text-xs text-gray-500" data-lokasi="{{ $jenis }}" data-lokasi-awal='@json($lokasi[$jenis] ?? null)'></dd>
                 </div>
             @endforeach
-        </div>
+        </dl>
+
+        <p class="mt-4 rounded-md bg-gray-50 px-3 py-2 text-center text-xs text-gray-500" id="tkInfoLokasi">
+            Lokasi (GPS) Anda akan diminta saat check-in dan check-out. Lokasi hanya ditampilkan, tidak disimpan ke database.
+        </p>
+        @if ($statusDb)
+            <p class="mt-4 text-center text-xs text-gray-500">Keterangan sistem: <span class="tk-badge-{{ FormatKolom::warnaStatus($statusDb) }}">{{ $statusDb }}</span></p>
+        @endif
+    </section>
+
+    {{-- ===================== Akses cepat ===================== --}}
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3 xl:col-span-12">
+        @foreach ([
+            ['route' => 'tenaga-kerja.riwayat',   'judul' => 'Riwayat Absensi', 'sub' => 'Lihat catatan kehadiran Anda'],
+            ['route' => 'tenaga-kerja.slip-gaji', 'judul' => 'Slip Gaji',       'sub' => 'Rincian penghasilan per periode'],
+            ['route' => 'tenaga-kerja.profil',    'judul' => 'Profil Saya',     'sub' => 'Data diri & informasi pekerjaan'],
+        ] as $tautan)
+            <a href="{{ route($tautan['route']) }}" class="tk-reveal card group flex items-center justify-between p-5 transition hover:border-sji-biru hover:shadow-md">
+                <div>
+                    <p class="font-semibold text-gray-800">{{ $tautan['judul'] }}</p>
+                    <p class="text-sm text-gray-500">{{ $tautan['sub'] }}</p>
+                </div>
+                <span class="text-gray-400 transition group-hover:translate-x-1 group-hover:text-sji-biru">&rarr;</span>
+            </a>
+        @endforeach
     </div>
 
-    {{-- ===================== PANDUAN ===================== --}}
-    <div class="col-12 tk-reveal">
-        <section class="tk-card tk-panduan">
-            <h2 class="tk-card-title"><i class="bi bi-lightbulb"></i> Panduan Absensi</h2>
-            <div class="row g-3">
-                <div class="col-md-4"><div class="tk-langkah"><span>1</span> Tekan <b>Check-in</b> saat mulai bekerja.</div></div>
-                <div class="col-md-4"><div class="tk-langkah"><span>2</span> Tekan <b>Check-out</b> saat selesai bekerja.</div></div>
-                <div class="col-md-4"><div class="tk-langkah"><span>3</span> Absensi hanya dapat dilakukan <b>satu kali</b> per hari.</div></div>
-            </div>
-        </section>
-    </div>
+    {{-- ===================== Panduan ===================== --}}
+    <section class="tk-reveal card p-6 xl:col-span-12">
+        <h2 class="card-title">Panduan Absensi</h2>
+        <ol class="mt-4 grid grid-cols-1 gap-3 text-sm text-gray-600 md:grid-cols-2 xl:grid-cols-4">
+            @foreach ([
+                'Tekan <b>Check-in</b> saat mulai bekerja.',
+                'Tekan <b>Check-out</b> saat selesai bekerja.',
+                'Pilih <b>Izinkan</b> saat browser meminta akses lokasi. Absensi tidak bisa dilakukan tanpa lokasi.',
+                'Absensi hanya dapat dilakukan <b>satu kali</b> per hari.',
+            ] as $nomor => $langkah)
+                <li class="flex items-start gap-3 rounded-md bg-gray-50 p-3">
+                    <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-sji-biru text-xs font-bold text-white">{{ $nomor + 1 }}</span>
+                    <span>{!! $langkah !!}</span>
+                </li>
+            @endforeach
+        </ol>
+    </section>
 </div>
 @endsection

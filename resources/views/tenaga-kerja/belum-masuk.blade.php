@@ -3,38 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ auth()->check() ? 'Akun Belum Terhubung' : 'Sesi Tidak Dikenali' }} · SJI</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link href="{{ asset('css/tenaga-kerja.css') }}?v=1" rel="stylesheet">
+    <title>{{ auth()->check() ? 'Akun Belum Terhubung' : 'Sesi Tidak Dikenali' }} - SJI</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/logo-sji.png') }}">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="tk-body tk-body-tengah">
-    <section class="tk-card tk-gerbang tk-reveal tampil">
-        <div class="tk-brand-logo tk-brand-logo-besar mx-auto mb-3">SJI</div>
-        <div class="tk-kosong-ilustrasi"><i class="bi bi-shield-lock"></i></div>
+<body class="flex min-h-screen items-center justify-center bg-gray-50 px-4 font-sans text-gray-800 antialiased">
+    <section class="card w-full max-w-md p-8 text-center">
+        <img src="{{ asset('images/logo-sji.png') }}" alt="Logo PT Satu Jaya Indonesia" class="mx-auto w-24">
         @auth
             {{-- Sudah login, tetapi akun tidak memiliki id_karyawan (mis. akun staf/CEO) --}}
-            <h1 class="tk-panel-judul">Akun Anda belum terhubung dengan data karyawan</h1>
-            <p class="tk-panel-sub">Portal Karyawan hanya dapat dibuka oleh akun yang terhubung ke data karyawan. Hubungi bagian HRD.</p>
-            <form method="POST" action="{{ route('logout') }}" class="mt-3">
-                @csrf
-                <button type="submit" class="tk-btn tk-btn-garis"><i class="bi bi-box-arrow-right"></i> Keluar</button>
-            </form>
+            <h1 class="mt-6 text-lg font-semibold">Akun Anda belum terhubung dengan data karyawan</h1>
+            <p class="mt-2 text-sm text-gray-500">Portal Karyawan hanya dapat dibuka oleh akun yang terhubung ke data karyawan. Hubungi bagian HRD.</p>
+            <div class="mt-6 flex justify-center gap-3">
+                <a href="{{ auth()->user()->homeUrl() }}" class="btn-secondary">Kembali</a>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="btn-outline-danger">Keluar</button>
+                </form>
+            </div>
         @else
-            <h1 class="tk-panel-judul">Sesi Anda tidak dikenali</h1>
-            <p class="tk-panel-sub">Halaman Portal Karyawan hanya dapat dibuka oleh karyawan yang sudah masuk (login).</p>
-            @if (Route::has('login'))
-                <a href="{{ route('login') }}" class="tk-btn tk-btn-utama mt-2"><i class="bi bi-box-arrow-in-right"></i> Masuk</a>
-            @endif
-            @if (app()->environment('local'))
-                <div class="tk-catatan text-start mt-3">
-                    <i class="bi bi-wrench"></i>
-                    <span><b>Untuk pengembang:</b> saat belum login, tambahkan
-                    <code>TK_DEV_ID_KARYAWAN=&lt;id_karyawan&gt;</code> di file <code>.env</code>, lalu jalankan
-                    <code>php artisan config:clear</code>. Nilai ini diabaikan setelah user login.</span>
-                </div>
-            @endif
+            <h1 class="mt-6 text-lg font-semibold">Sesi Anda tidak dikenali</h1>
+            <p class="mt-2 text-sm text-gray-500">Halaman Portal Karyawan hanya dapat dibuka oleh karyawan yang sudah masuk (login).</p>
+            <a href="{{ route('login') }}" class="btn-primary mt-6">Masuk</a>
         @endauth
     </section>
 </body>

@@ -37,28 +37,33 @@ class LoginTest extends TestCase
             ->assertRedirect(route('tenaga-kerja.absensi'));
     }
 
-    /**
-     * Modul HRD/Operasional/Keuangan belum memiliki route dashboard, jadi diarahkan ke beranda umum.
-     */
-    #[DataProvider('roleWithoutDashboardProvider')]
-    public function test_role_without_registered_dashboard_falls_back_to_beranda(string $namaRole): void
+    #[DataProvider('halamanAwalModulProvider')]
+    public function test_staff_is_redirected_to_their_module_after_login(string $namaRole, string $namaRoute): void
     {
         User::factory()->withRole($namaRole)->create(['username' => 'staff01']);
 
         $this->post('/login', ['username' => 'staff01', 'password' => 'password'])
-            ->assertRedirect(route('beranda'));
+            ->assertRedirect(route($namaRoute));
     }
 
     /**
-     * @return array<string, array{string}>
+     * @return array<string, array{string, string}>
      */
-    public static function roleWithoutDashboardProvider(): array
+    public static function halamanAwalModulProvider(): array
     {
         return [
-            'HRD' => [Role::Hrd],
-            'Operasional' => [Role::Operasional],
-            'Keuangan' => [Role::Keuangan],
+            'HRD' => [Role::Hrd, 'hrd.dashboard'],
+            'Operasional' => [Role::Operasional, 'operasional.monitoring'],
+            'Keuangan' => [Role::Keuangan, 'keuangan.payroll.index'],
         ];
+    }
+
+    public function test_role_without_registered_home_route_falls_back_to_beranda(): void
+    {
+        User::factory()->withRole('Auditor')->create(['username' => 'auditor01']);
+
+        $this->post('/login', ['username' => 'auditor01', 'password' => 'password'])
+            ->assertRedirect(route('beranda'));
     }
 
     public function test_login_fails_with_wrong_password(): void

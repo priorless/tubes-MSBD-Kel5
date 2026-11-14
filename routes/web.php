@@ -2,6 +2,13 @@
 
 use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\CeoController;
+use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
+use App\Http\Controllers\Hrd\KaryawanController;
+use App\Http\Controllers\Hrd\PoolKaryawanController;
+use App\Http\Controllers\Hrd\SertifikatController;
+use App\Http\Controllers\KeuanganController;
+use App\Http\Controllers\Operasional\KlienController;
+use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\TenagaKerjaController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Middleware\PastikanKaryawan;
@@ -16,6 +23,7 @@ Route::redirect('/', '/login');
 |--------------------------------------------------------------------------
 | Semua route di sini wajib login dan diblokir jika user belum mengganti password (must_change_password).
 | Batasi akses per modul dengan middleware role:<nama_role>,... (nama_role dari tbl_roles).
+| Route login, logout, dan ganti password ada di routes/auth.php.
 */
 Route::middleware(['auth', 'password.changed'])->group(function () {
     Route::get('/beranda', BerandaController::class)->name('beranda');
@@ -39,12 +47,53 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
     });
 
     /* =====================================================================
-     * Tenaga Kerja (Karyawan Lapangan) — Modul Orang 4
-     * role:Karyawan Lapangan  → hanya role ini, dan akun Nonaktif dikeluarkan.
-     * PastikanKaryawan        → akun wajib terhubung ke tbl_karyawan (id_karyawan).
+     * HRD
+     * ===================================================================== */
+    Route::middleware('role:'.Role::Hrd)->prefix('hrd')->name('hrd.')->group(function () {
+        Route::get('/', HrdDashboardController::class)->name('dashboard');
+        Route::resource('karyawan', KaryawanController::class)->except('show');
+        Route::get('pool-karyawan', PoolKaryawanController::class)->name('pool');
+        Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
+    });
+
+    /* =====================================================================
+     * Operasional
+     * ===================================================================== */
+    Route::middleware('role:'.Role::Operasional)->prefix('operasional')->name('operasional.')->group(function () {
+        Route::resource('klien', KlienController::class)->except('show');
+
+        Route::get('penempatan', [OperasionalController::class, 'createPenempatan'])->name('penempatan.create');
+        Route::get('penempatan/create', [OperasionalController::class, 'createPenempatan']);
+        Route::post('penempatan', [OperasionalController::class, 'storePenempatan'])->name('penempatan.store');
+
+        Route::get('rotasi', [OperasionalController::class, 'createRotasi'])->name('rotasi.create');
+        Route::get('rotasi/create', [OperasionalController::class, 'createRotasi']);
+        Route::post('rotasi', [OperasionalController::class, 'storeRotasi'])->name('rotasi.store');
+
+        Route::get('monitoring', [OperasionalController::class, 'monitoring'])->name('monitoring');
+    });
+
+    /* =====================================================================
+     * Keuangan
+     * ===================================================================== */
+    Route::middleware('role:'.Role::Keuangan)->prefix('keuangan')->name('keuangan.')->controller(KeuanganController::class)->group(function () {
+        Route::get('payroll', 'payroll')->name('payroll.index');
+        Route::post('payroll/generate', 'generatePayroll')->name('payroll.generate');
+        Route::patch('payroll/{id}/cair', 'tandaiPayrollCair')->whereNumber('id')->name('payroll.cair');
+
+        Route::get('invoice', 'invoice')->name('invoice.index');
+        Route::post('invoice', 'generateInvoice')->name('invoice.generate');
+        Route::patch('invoice/{id}/lunas', 'tandaiInvoiceLunas')->whereNumber('id')->name('invoice.lunas');
+
+        Route::get('mutasi', 'mutasi')->name('mutasi.index');
+    });
+
+    /* =====================================================================
+     * Tenaga Kerja (Employee Self-Service untuk Karyawan Lapangan)
      * ===================================================================== */
     Route::middleware(['role:'.Role::KaryawanLapangan, PastikanKaryawan::class])
-        ->prefix('tenaga-kerja')->name('tenaga-kerja.')
+        ->prefix('tenaga-kerja')
+        ->name('tenaga-kerja.')
         ->controller(TenagaKerjaController::class)
         ->group(function () {
             Route::redirect('/', '/tenaga-kerja/absensi')->name('index');

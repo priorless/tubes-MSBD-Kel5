@@ -20,9 +20,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class TenagaKerjaController extends Controller
 {
-    public function __construct(private TenagaKerjaService $db)
-    {
-    }
+    public function __construct(private TenagaKerjaService $db) {}
 
     /* =====================================================================
      * Absensi
@@ -44,11 +42,19 @@ class TenagaKerjaController extends Controller
             session()->now('gagal', $e->getMessage());
         }
 
+        $data['lokasi'] = $this->lokasiHariIni();
+
         return view('tenaga-kerja.absensi', $data + $this->dataUmum() + $this->kolomAbsensi());
     }
 
     public function checkIn(Request $request): JsonResponse|RedirectResponse
     {
+        $lokasi = $this->lokasiDariRequest($request);
+
+        if ($lokasi === null) {
+            return $this->balasAbsensi($request, false, self::PESAN_LOKASI_WAJIB);
+        }
+
         try {
             $this->db->checkIn(KaryawanAktif::id());
         } catch (QueryException $e) {
@@ -64,11 +70,19 @@ class TenagaKerjaController extends Controller
             return $this->balasAbsensi($request, false, $e->getMessage());
         }
 
+        $this->simpanLokasiHariIni('masuk', $lokasi);
+
         return $this->balasAbsensi($request, true, 'Check-in berhasil. Selamat bekerja!');
     }
 
     public function checkOut(Request $request): JsonResponse|RedirectResponse
     {
+        $lokasi = $this->lokasiDariRequest($request);
+
+        if ($lokasi === null) {
+            return $this->balasAbsensi($request, false, self::PESAN_LOKASI_WAJIB);
+        }
+
         try {
             $jumlah = $this->db->checkOut(KaryawanAktif::id());
         } catch (QueryException $e) {
@@ -82,7 +96,72 @@ class TenagaKerjaController extends Controller
                 'Tidak ada data check-in hari ini yang dapat di-check-out. Pastikan Anda sudah check-in dan belum check-out.');
         }
 
+        $this->simpanLokasiHariIni('keluar', $lokasi);
+
         return $this->balasAbsensi($request, true, 'Check-out berhasil. Terima kasih atas kerja keras Anda hari ini!');
+    }
+
+    /* =====================================================================
+     * Lokasi check-in / check-out
+     * Lokasi hanya ditampilkan (disimpan di sesi login untuk hari ini), TIDAK ke database.
+     * ===================================================================== */
+
+    private const string PESAN_LOKASI_WAJIB = 'Lokasi Anda belum terdeteksi. Izinkan akses lokasi (GPS) di browser, lalu coba lagi.';
+
+    /**
+     * Koordinat dari browser (navigator.geolocation). Null jika kosong atau tidak valid.
+     *
+     * @return array{latitude: float, longitude: float, akurasi: int|null, waktu: string}|null
+     */
+    private function lokasiDariRequest(Request $request): ?array
+    {
+        $validator = validator($request->only(['latitude', 'longitude', 'akurasi']), [
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'akurasi' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        if ($validator->fails()) {
+            return null;
+        }
+
+        $data = $validator->validated();
+
+        return [
+            'latitude' => round((float) $data['latitude'], 6),
+            'longitude' => round((float) $data['longitude'], 6),
+            'akurasi' => isset($data['akurasi']) ? (int) round((float) $data['akurasi']) : null,
+            'waktu' => now()->timezone('Asia/Jakarta')->format('H:i'),
+        ];
+    }
+
+    /**
+     * @param  'masuk'|'keluar'  $jenis
+     * @param  array{latitude: float, longitude: float, akurasi: int|null, waktu: string}  $lokasi
+     */
+    private function simpanLokasiHariIni(string $jenis, array $lokasi): void
+    {
+        session()->put($this->kunciSesiLokasi().'.'.$jenis, $lokasi);
+    }
+
+    /**
+     * @return array{masuk?: array<string, mixed>, keluar?: array<string, mixed>}
+     */
+    private function lokasiHariIni(): array
+    {
+        return (array) session($this->kunciSesiLokasi(), []);
+    }
+
+    /** Kunci sesi per karyawan per tanggal server database, agar lokasi kemarin tidak ikut tampil. */
+    private function kunciSesiLokasi(): string
+    {
+        try {
+            $tanggal = substr($this->db->waktuServer(), 0, 10);
+        } catch (QueryException) {
+            $tanggal = now()->toDateString();
+        }
+
+        return 'tenaga_kerja_lokasi.'.KaryawanAktif::id().'.'.$tanggal;
     }
 
     /** Balasan JSON (untuk tombol AJAX) atau redirect + notifikasi (tanpa JavaScript). */
@@ -98,12 +177,13 @@ class TenagaKerjaController extends Controller
             $kolom = $this->kolomAbsensi();
 
             return response()->json([
-                'ok'         => $ok,
-                'pesan'      => $pesan,
-                'status'     => $this->statusAbsensi($hariIni),
-                'jam_masuk'  => $hariIni && $kolom['kolomMasuk'] ? FormatKolom::jam($hariIni->{$kolom['kolomMasuk']}) : null,
+                'ok' => $ok,
+                'pesan' => $pesan,
+                'status' => $this->statusAbsensi($hariIni),
+                'jam_masuk' => $hariIni && $kolom['kolomMasuk'] ? FormatKolom::jam($hariIni->{$kolom['kolomMasuk']}) : null,
                 'jam_keluar' => $hariIni && $kolom['kolomKeluar'] ? FormatKolom::jam($hariIni->{$kolom['kolomKeluar']}) : null,
-                'masuk_iso'  => $this->isoMasuk($hariIni),
+                'masuk_iso' => $this->isoMasuk($hariIni),
+                'lokasi' => $this->lokasiHariIni(),
             ], $ok ? 200 : 422);
         }
 
@@ -127,9 +207,9 @@ class TenagaKerjaController extends Controller
             $tabel = $this->db->tabel('absensi');
 
             return [
-                'kolomMasuk'   => $this->db->kolom($tabel, 'jam_masuk'),
-                'kolomKeluar'  => $this->db->kolom($tabel, 'jam_keluar'),
-                'kolomStatus'  => $this->db->kolom($tabel, 'status'),
+                'kolomMasuk' => $this->db->kolom($tabel, 'jam_masuk'),
+                'kolomKeluar' => $this->db->kolom($tabel, 'jam_keluar'),
+                'kolomStatus' => $this->db->kolom($tabel, 'status'),
                 'kolomTanggal' => $this->db->kolom($tabel, 'tanggal'),
             ];
         } catch (QueryException) {
@@ -250,11 +330,11 @@ class TenagaKerjaController extends Controller
             $view = $this->db->tabel('slip_gaji');
             $daftar = $this->db->slipGaji($id);
             $kolom = [
-                'bulan'   => $this->db->kolom($view, 'periode_bulan'),
-                'tahun'   => $this->db->kolom($view, 'periode_tahun'),
+                'bulan' => $this->db->kolom($view, 'periode_bulan'),
+                'tahun' => $this->db->kolom($view, 'periode_tahun'),
                 'periode' => $this->db->kolom($view, 'periode'),
-                'kunci'   => $this->db->kolom($view, 'id_payroll'),
-                'total'   => $this->db->kolom($view, 'total_gaji'),
+                'kunci' => $this->db->kolom($view, 'id_payroll'),
+                'total' => $this->db->kolom($view, 'total_gaji'),
             ];
         } catch (QueryException $e) {
             session()->now('gagal', TenagaKerjaService::pesanError($e));
@@ -275,9 +355,9 @@ class TenagaKerjaController extends Controller
         $rincian = $slip ? $this->rincianSlip($slip, $kolom) : null;
 
         return view('tenaga-kerja.slip-gaji', [
-            'periode'      => $periode,
-            'slip'         => $slip,
-            'rincian'      => $rincian,
+            'periode' => $periode,
+            'slip' => $slip,
+            'rincian' => $rincian,
             'kunciDipilih' => $slip ? $periode[$indeks]['kunci'] : null,
             'labelPeriode' => $slip ? $periode[$indeks]['label'] : null,
         ] + $this->dataUmum());
@@ -336,8 +416,8 @@ class TenagaKerjaController extends Controller
 
         if ($kolom['total']) {
             $hasil['total'] = [
-                'label'  => FormatKolom::label($kolom['total']),
-                'nilai'  => FormatKolom::rupiah($slip->{$kolom['total']}),
+                'label' => FormatKolom::label($kolom['total']),
+                'nilai' => FormatKolom::rupiah($slip->{$kolom['total']}),
                 'mentah' => (float) $slip->{$kolom['total']},
             ];
         }
@@ -370,7 +450,7 @@ class TenagaKerjaController extends Controller
                 $kelompok[$grup][] = [
                     'label' => FormatKolom::label($k),
                     'nilai' => FormatKolom::nilai($k, $v),
-                    'ikon'  => FormatKolom::ikon($k),
+                    'ikon' => FormatKolom::ikon($k),
                 ];
             }
         }
@@ -416,13 +496,13 @@ class TenagaKerjaController extends Controller
         $nama = $ambil('nama') ?: 'Karyawan';
 
         return $this->dataUmumCache = [
-            'karyawan'     => $karyawan,
+            'karyawan' => $karyawan,
             'namaKaryawan' => $nama,
-            'kategori'     => $ambil('kategori'),
-            'jabatan'      => $ambil('jabatan'),
-            'inisial'      => collect(explode(' ', trim($nama)))->filter()->take(2)
+            'kategori' => $ambil('kategori'),
+            'jabatan' => $ambil('jabatan'),
+            'inisial' => collect(explode(' ', trim($nama)))->filter()->take(2)
                 ->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode(''),
-            'modeUjiCoba'  => KaryawanAktif::modeUjiCoba(),
+            'modeUjiCoba' => KaryawanAktif::modeUjiCoba(),
         ];
     }
 
