@@ -114,4 +114,66 @@
         </div>
     @endif
 </section>
+
+{{-- ===================== Detail harian (v_absensi_harian) ===================== --}}
+@if ($periodeHarian)
+    <section class="tk-reveal card mt-6">
+        <div class="card-header">
+            <h2 class="card-title">
+                Detail Harian
+                <span class="font-normal text-gray-400">({{ FormatKolom::namaBulan($periodeHarian['bulan']) }} {{ $periodeHarian['tahun'] }})</span>
+            </h2>
+        </div>
+
+        @if ($harian->isNotEmpty())
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Lokasi Kerja</th>
+                            <th>Masuk</th>
+                            <th>Keluar</th>
+                            <th>Status</th>
+                            <th>Jam Kerja</th>
+                            <th>Lembur</th>
+                            <th>Jarak Masuk / Keluar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($harian as $hari)
+                            <tr>
+                                <td class="whitespace-nowrap">{{ FormatKolom::tanggal($hari->tgl, 'D, d M Y') }}</td>
+                                <td>{{ $hari->nama_klien ?? '—' }}</td>
+                                <td class="font-mono">{{ FormatKolom::jam($hari->jam_masuk) }}</td>
+                                <td class="font-mono">
+                                    @if ($hari->lupa_check_out)
+                                        <span class="tk-badge-bahaya">Lupa check-out</span>
+                                    @else
+                                        {{ FormatKolom::jam($hari->jam_keluar) }}
+                                    @endif
+                                </td>
+                                <td>
+                                    <span class="tk-badge-{{ FormatKolom::warnaStatus($hari->status_kehadiran) }}">{{ $hari->status_kehadiran }}</span>
+                                    @if ((int) $hari->menit_terlambat > 0)
+                                        <span class="block text-xs text-gray-500">{{ (int) $hari->menit_terlambat }} menit</span>
+                                    @endif
+                                </td>
+                                <td>{{ $hari->jam_kerja !== null && $hari->jam_keluar !== null ? $hari->jam_kerja.' jam' : '—' }}</td>
+                                <td>{{ (int) $hari->jam_lembur > 0 ? $hari->jam_lembur.' jam' : '—' }}</td>
+                                <td class="whitespace-nowrap">
+                                    @foreach ([$hari->jarak_masuk_meter, $hari->jarak_keluar_meter] as $jarak)
+                                        {{ $jarak !== null ? number_format((int) $jarak, 0, ',', '.').' m' : '—' }}@if ($loop->first) / @endif
+                                    @endforeach
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="table-empty">Belum ada absensi pada bulan ini.</p>
+        @endif
+    </section>
+@endif
 @endsection

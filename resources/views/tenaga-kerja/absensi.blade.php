@@ -9,6 +9,10 @@
     $jamKeluar = $hariIni && $kolomKeluar ? FormatKolom::jam($hariIni->{$kolomKeluar}) : null;
     $statusDb  = $hariIni && $kolomStatus ? ($hariIni->{$kolomStatus} ?? null) : null;
     $label = ['belum' => 'Belum Check-in', 'masuk' => 'Sedang Bekerja', 'selesai' => 'Selesai'];
+    $menitTerlambat = (int) ($hariIni->menit_terlambat ?? 0);
+    $adaTitik = $penugasan && filled($penugasan->latitude ?? null) && filled($penugasan->longitude ?? null);
+    $modeBergerak = ($penugasan->mode_lokasi ?? 'Tetap') === 'Bergerak';
+    $radius = (int) ($penugasan->radius_meter ?? 0);
 @endphp
 
 @section('content')
@@ -33,7 +37,7 @@
     </section>
 
     {{-- ===================== Status absensi hari ini ===================== --}}
-    <section class="tk-reveal card p-6 xl:col-span-5" id="tkStatusCard" data-status="{{ $status }}" data-masuk="{{ $masukIso }}">
+    <section class="tk-reveal card p-6 xl:col-span-5" id="tkStatusCard" data-status="{{ $status }}" data-masuk="{{ $masukIso }}" data-akurasi-peringatan="{{ $akurasiPeringatan }}">
         <div class="mb-4 flex items-center justify-between">
             <h2 class="card-title">Status Hari Ini</h2>
             <span class="badge" id="tkStatusBadge"><span id="tkStatusLabel">{{ $label[$status] }}</span></span>
@@ -85,10 +89,72 @@
         </dl>
 
         <p class="mt-4 rounded-md bg-gray-50 px-3 py-2 text-center text-xs text-gray-500" id="tkInfoLokasi">
-            Lokasi (GPS) Anda akan diminta saat check-in dan check-out. Lokasi hanya ditampilkan, tidak disimpan ke database.
+            Lokasi (GPS) Anda dicatat saat check-in dan check-out, lalu dicocokkan dengan titik lokasi kerja.
         </p>
-        @if ($statusDb)
-            <p class="mt-4 text-center text-xs text-gray-500">Keterangan sistem: <span class="tk-badge-{{ FormatKolom::warnaStatus($statusDb) }}">{{ $statusDb }}</span></p>
+        <p @class(['mt-4 text-center text-xs text-gray-500', 'hidden' => ! $statusDb]) id="tkKeteranganStatus">
+            Keterangan sistem: <span class="tk-badge-{{ FormatKolom::warnaStatus($statusDb) }}" id="tkStatusDb">{{ $statusDb }}</span>
+            @if ($menitTerlambat > 0)
+                <span class="ml-1">({{ $menitTerlambat }} menit)</span>
+            @endif
+        </p>
+    </section>
+
+    {{-- ===================== Penugasan, jadwal shift, & aturan lokasi ===================== --}}
+    <section class="tk-reveal card p-6 xl:col-span-12">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 class="card-title">Penugasan &amp; Jadwal Hari Ini</h2>
+            @if ($penugasan?->nama_layanan)
+                <span class="badge">{{ $penugasan->nama_layanan }}</span>
+            @endif
+        </div>
+
+        @if (! $penugasan)
+            <div class="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <p class="font-semibold">Anda belum memiliki penempatan aktif.</p>
+                <p class="mt-1">Absensi dapat dilakukan setelah bagian Operasional menempatkan Anda di lokasi klien. Hubungi HRD jika ini keliru.</p>
+            </div>
+        @else
+            <dl class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-md bg-gray-50 p-4">
+                    <dt class="text-xs text-gray-500">Lokasi Kerja</dt>
+                    <dd class="mt-1 font-semibold text-gray-800">{{ $penugasan->nama_klien }}</dd>
+                    <dd class="text-gray-600">{{ $penugasan->lokasi_kerja }}</dd>
+                    @if ($adaTitik)
+                        <dd class="mt-1">
+                            <a href="https://www.google.com/maps?q={{ $penugasan->latitude }},{{ $penugasan->longitude }}" target="_blank" rel="noopener"
+                               class="font-medium text-sji-biru hover:underline" data-no-transisi>Lihat titik di peta</a>
+                        </dd>
+                    @endif
+                </div>
+                <div class="rounded-md bg-gray-50 p-4">
+                    <dt class="text-xs text-gray-500">Jadwal Shift</dt>
+                    <dd class="mt-1 font-mono text-lg font-semibold text-gray-800">
+                        {{ FormatKolom::jam($penugasan->jam_masuk_shift) }}&ndash;{{ FormatKolom::jam($penugasan->jam_keluar_shift) }}
+                    </dd>
+                    <dd class="text-gray-600">Toleransi terlambat {{ (int) $penugasan->toleransi_terlambat_menit }} menit</dd>
+                </div>
+                <div class="rounded-md bg-gray-50 p-4">
+                    <dt class="text-xs text-gray-500">Aturan Lokasi</dt>
+                    <dd class="mt-1 font-semibold text-gray-800">{{ $modeBergerak ? 'Bergerak' : 'Tetap' }}</dd>
+                    <dd class="text-gray-600">
+                        @if ($modeBergerak)
+                            Check-in di titik kumpul/pool klien. Check-out boleh di mana saja, lokasinya tetap dicatat.
+                        @else
+                            Check-in dan check-out wajib di area lokasi kerja.
+                        @endif
+                    </dd>
+                </div>
+                <div class="rounded-md bg-gray-50 p-4">
+                    <dt class="text-xs text-gray-500">Radius Area Kerja</dt>
+                    @if ($adaTitik)
+                        <dd class="mt-1 font-mono text-lg font-semibold text-gray-800">{{ number_format($radius, 0, ',', '.') }} m</dd>
+                        <dd class="text-gray-600">Di luar radius, absensi ditolak sistem.</dd>
+                    @else
+                        <dd class="mt-1 font-semibold text-gray-800">Belum diatur</dd>
+                        <dd class="text-gray-600">Titik lokasi klien belum diisi Operasional. Lokasi Anda tetap dicatat.</dd>
+                    @endif
+                </div>
+            </dl>
         @endif
     </section>
 
@@ -116,8 +182,8 @@
             @foreach ([
                 'Tekan <b>Check-in</b> saat mulai bekerja.',
                 'Tekan <b>Check-out</b> saat selesai bekerja.',
-                'Pilih <b>Izinkan</b> saat browser meminta akses lokasi. Absensi tidak bisa dilakukan tanpa lokasi.',
-                'Absensi hanya dapat dilakukan <b>satu kali</b> per hari.',
+                'Pilih <b>Izinkan</b> saat browser meminta akses lokasi. Absensi hanya diterima di <b>area lokasi kerja</b>.',
+                'Absensi <b>satu kali</b> per hari, check-out minimal <b>30 menit</b> setelah check-in. Shift malam boleh check-out keesokan harinya.',
             ] as $nomor => $langkah)
                 <li class="flex items-start gap-3 rounded-md bg-gray-50 p-3">
                     <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-sji-biru text-xs font-bold text-white">{{ $nomor + 1 }}</span>
