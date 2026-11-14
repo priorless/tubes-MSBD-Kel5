@@ -32,18 +32,19 @@ class UserManagementController extends Controller
         ]);
 
         $cari = $request->string('cari')->trim()->toString();
+        $adaKolomNama = User::punyaKolom('nama');
 
         $users = User::query()
             ->internal()
             ->with('role')
             ->when($cari !== '', fn (Builder $query) => $query->where(
                 fn (Builder $searchQuery) => $searchQuery
-                    ->where('nama', 'like', "%{$cari}%")
+                    ->when($adaKolomNama, fn (Builder $namaQuery) => $namaQuery->where('nama', 'like', "%{$cari}%"))
                     ->orWhere('username', 'like', "%{$cari}%"),
             ))
             ->when($request->filled('role'), fn (Builder $query) => $query->where('id_role', $request->integer('role')))
             ->when($request->filled('status'), fn (Builder $query) => $query->where('status', $request->string('status')->toString()))
-            ->orderBy('nama')
+            ->when($adaKolomNama, fn (Builder $query) => $query->orderBy('nama'))
             ->orderBy('username')
             ->paginate(15)
             ->withQueryString();
