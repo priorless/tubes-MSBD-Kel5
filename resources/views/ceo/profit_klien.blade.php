@@ -1,5 +1,4 @@
-{{-- resources/views/ceo/profit_klien.blade.php — sesuaikan @extends dengan layout AdminLTE kelompokmu --}}
-@extends('layouts.app')
+@extends('layouts.admin')
 
 @section('title', 'Profit Klien')
 
@@ -14,9 +13,6 @@
         <p>Hitung laba/rugi per klien per periode langsung dari database</p>
     </div>
 
-    @if(session('error'))
-        <div class="alert alert-danger ceo-alert">{{ session('error') }}</div>
-    @endif
     @if($errors->any())
         <div class="alert alert-warning ceo-alert">{{ $errors->first() }}</div>
     @endif
@@ -68,7 +64,7 @@
 
 @push('js')
 @if($selectedKlienId && $profitResult !== null)
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (() => {
     const rupiah = n => (n < 0 ? '-Rp ' : 'Rp ') + Math.abs(Number(n)).toLocaleString('id-ID');
@@ -89,7 +85,7 @@
         options: {
             responsive: true, maintainAspectRatio: false,
             animation: { duration: 1500, easing: 'easeOutQuart' },
-            plugins: { legend: { display: false }, title: { display: true, text: 'Tren Profit 6 Bulan Terakhir' }, tooltip: { callbacks: { label: c => ' ' + rupiah(c.parsed.y) } } },
+            plugins: { legend: { display: false }, title: { display: true, text: 'Tren Profit 6 Bulan' }, tooltip: { callbacks: { label: c => ' ' + rupiah(c.parsed.y) } } },
             scales: { y: { ticks: { callback: v => rupiah(v) }, grid: { color: 'rgba(148,163,184,.2)' } }, x: { grid: { display: false } } }
         }
     });
