@@ -24,7 +24,7 @@
         el.className = 'tk-toast tk-toast-' + (sukses ? 'sukses' : 'gagal');
         el.setAttribute('role', sukses ? 'status' : 'alert');
         el.innerHTML =
-            '<div class="tk-toast-ikon"><i class="bi ' + (sukses ? 'bi-check2' : 'bi-exclamation-lg') + '"></i></div>' +
+            '<div class="tk-toast-ikon">' + (sukses ? '&#10003;' : '!') + '</div>' +
             '<div><div class="tk-toast-judul">' + (sukses ? 'Berhasil' : 'Gagal') + '</div>' +
             '<div class="tk-toast-pesan"></div></div>' +
             '<button type="button" class="tk-toast-tutup" aria-label="Tutup">&times;</button>' +
@@ -187,6 +187,7 @@
         if (data.jam_masuk !== undefined) $('#tkJamMasuk').textContent = data.jam_masuk || '—';
         if (data.jam_keluar !== undefined) $('#tkJamKeluar').textContent = data.jam_keluar || '—';
         if (data.masuk_iso) kartu.dataset.masuk = data.masuk_iso;
+        if (data.lokasi) tampilkanSemuaLokasi(data.lokasi);
         if (kartu.dataset.status !== data.status) {
             kartu.dataset.status = data.status;
             $('#tkStatusLabel').textContent = LABEL[data.status] || data.status;
@@ -195,6 +196,66 @@
         }
         jalankanDurasi();
     };
+
+    /* ------------------------------------------------------------------
+     * 6a. Lokasi (GPS) saat check-in/check-out — wajib, hanya ditampilkan
+     * ------------------------------------------------------------------ */
+    const PESAN_LOKASI = {
+        1: 'Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini di pengaturan browser, lalu coba lagi.',
+        2: 'Lokasi tidak dapat ditentukan. Pastikan GPS/lokasi perangkat aktif, lalu coba lagi.',
+        3: 'Waktu mengambil lokasi habis. Pastikan sinyal GPS baik, lalu coba lagi.',
+    };
+
+    const ambilLokasi = () => new Promise((resolve, reject) => {
+        if (!window.isSecureContext) {
+            reject(new Error('Akses lokasi hanya bisa dipakai lewat HTTPS atau localhost. Hubungi admin sistem.'));
+            return;
+        }
+        if (!('geolocation' in navigator)) {
+            reject(new Error('Browser ini tidak mendukung akses lokasi. Gunakan browser lain (Chrome/Firefox/Safari terbaru).'));
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (posisi) => resolve(posisi.coords),
+            (galat) => reject(new Error(PESAN_LOKASI[galat.code] || 'Lokasi tidak dapat diambil. Silakan coba lagi.')),
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+        );
+    });
+
+    const tampilkanLokasi = (el, lokasi) => {
+        el.textContent = '';
+        const lat = Number(lokasi?.latitude);
+        const lng = Number(lokasi?.longitude);
+        if (!lokasi || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+        const koordinat = document.createElement('span');
+        koordinat.className = 'block font-mono';
+        koordinat.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+        el.appendChild(koordinat);
+
+        if (Number.isFinite(Number(lokasi.akurasi)) && lokasi.akurasi !== null) {
+            const akurasi = document.createElement('span');
+            akurasi.className = 'block';
+            akurasi.textContent = 'Akurasi ±' + Math.round(lokasi.akurasi) + ' m';
+            el.appendChild(akurasi);
+        }
+
+        const peta = document.createElement('a');
+        peta.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+        peta.target = '_blank';
+        peta.rel = 'noopener';
+        peta.className = 'font-medium text-sji-biru hover:underline';
+        peta.textContent = 'Lihat di peta';
+        el.appendChild(peta);
+    };
+
+    const tampilkanSemuaLokasi = (lokasi) => {
+        $$('[data-lokasi]').forEach((el) => tampilkanLokasi(el, lokasi[el.dataset.lokasi]));
+    };
+
+    $$('[data-lokasi-awal]').forEach((el) => {
+        try { tampilkanLokasi(el, JSON.parse(el.dataset.lokasiAwal)); } catch (_) { /* tidak ada lokasi */ }
+    });
 
     const konfeti = (asal) => {
         if (kurangiGerak) return;
@@ -226,7 +287,23 @@
 
                 tombol.classList.add('memuat');
                 tombol.disabled = true;
+
+                // Lokasi wajib: ambil dulu sebelum mengirim absensi.
+                let koordinat;
+                try {
+                    koordinat = await ambilLokasi();
+                } catch (galat) {
+                    TK.toast('gagal', galat.message);
+                    tombol.classList.remove('memuat');
+                    tombol.disabled = false;
+                    return;
+                }
+
                 const minimal = new Promise((r) => setTimeout(r, 600)); // agar loading terlihat halus
+                const isian = new FormData(form);
+                isian.append('latitude', koordinat.latitude);
+                isian.append('longitude', koordinat.longitude);
+                if (Number.isFinite(koordinat.accuracy)) isian.append('akurasi', koordinat.accuracy);
 
                 try {
                     const res = await fetch(form.action, {
@@ -236,7 +313,7 @@
                             'X-Requested-With': 'XMLHttpRequest',
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').content,
                         },
-                        body: new FormData(form),
+                        body: isian,
                         credentials: 'same-origin',
                     });
                     await minimal;
@@ -296,7 +373,7 @@
                         td.innerHTML = td.dataset.asli.replace(re, '<mark>$1</mark>');
                     });
                 });
-                $('#tkKosongCari')?.classList.toggle('d-none', terlihat > 0);
+                $('#tkKosongCari')?.classList.toggle('hidden', terlihat > 0);
             }, 150);
         });
     }

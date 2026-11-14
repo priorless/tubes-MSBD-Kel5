@@ -3,45 +3,36 @@
 @section('title', 'Masuk')
 
 @section('content')
-<div class="card card-outline card-primary">
-    <div class="card-body login-card-body">
-        <p class="login-box-msg">Silakan masuk untuk memulai sesi Anda</p>
+    <div class="card p-6 sm:p-8">
+        <h1 class="text-xl font-semibold text-gray-800">Masuk</h1>
+        <p class="mt-1 text-sm text-gray-500">Silakan masuk untuk memulai sesi Anda.</p>
 
-        <form method="POST" action="{{ route('login.store') }}" novalidate>
+        <form method="POST" action="{{ route('login.store') }}" class="mt-6 space-y-4" novalidate>
             @csrf
 
-            <div class="input-group mb-3">
-                <input type="text" name="username" value="{{ old('username') }}"
-                       class="form-control @error('username') is-invalid @enderror"
-                       placeholder="Username" autocomplete="username" autofocus required>
-                <div class="input-group-append">
-                    <div class="input-group-text"><span class="fas fa-user"></span></div>
-                </div>
+            <div>
+                <label for="username" class="form-label">Username</label>
+                <input type="text" id="username" name="username" value="{{ old('username') }}"
+                       @class(['form-input', 'form-input-error' => $errors->has('username')])
+                       autocomplete="username" autofocus required>
                 @error('username')
-                    <span class="invalid-feedback" role="alert">{{ $message }}</span>
+                    <p class="form-error">{{ $message }}</p>
                 @enderror
             </div>
 
-            <div class="input-group mb-3">
-                <input type="password" name="password"
-                       class="form-control @error('password') is-invalid @enderror"
-                       placeholder="Password" autocomplete="current-password" required>
-                <div class="input-group-append">
-                    <div class="input-group-text"><span class="fas fa-lock"></span></div>
-                </div>
+            <div>
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" name="password"
+                       @class(['form-input', 'form-input-error' => $errors->has('password')])
+                       autocomplete="current-password" required>
                 @error('password')
-                    <span class="invalid-feedback" role="alert">{{ $message }}</span>
+                    <p class="form-error">{{ $message }}</p>
                 @enderror
             </div>
 
-            <button type="submit" class="btn btn-primary btn-block">
-                <i class="fas fa-sign-in-alt mr-1"></i> Masuk
-            </button>
+            <button type="submit" class="btn-primary w-full">Masuk</button>
         </form>
-
-        <p class="mt-3 mb-0 text-muted small text-center">
-            Belum punya akun atau lupa password? Hubungi bagian HRD.
-        </p>
     </div>
-</div>
+
+    <p class="mt-4 text-center text-sm text-gray-500">Belum punya akun atau lupa password? Hubungi bagian HRD.</p>
 @endsection

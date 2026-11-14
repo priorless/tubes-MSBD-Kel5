@@ -2,19 +2,33 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PDOException;
+use Tests\Concerns\CreatesSjiAuthTables;
 use Tests\TestCase;
 
 class OperasionalFeatureTest extends TestCase
 {
+    use CreatesSjiAuthTables;
+
+    /**
+     * Semua route Operasional wajib login sebagai role Operasional.
+     */
+    private function loginOperasional(int $idUser = 56): void
+    {
+        $this->actingAs(User::factory()->withRole(Role::Operasional)->create(['id' => $idUser]));
+    }
+
     public function test_client_form_reports_required_fields_in_indonesian(): void
     {
+        $this->loginOperasional();
+
         $response = $this->from(route('operasional.klien.create'))
             ->post(route('operasional.klien.store'), []);
 
@@ -35,11 +49,11 @@ class OperasionalFeatureTest extends TestCase
     public function test_penempatan_calls_database_procedure_with_logged_in_user_id(): void
     {
         $this->createReferenceTables();
+        $this->loginOperasional(56);
         DB::table('tbl_karyawan')->insert(['id' => 12]);
         DB::table('tbl_klien')->insert(['id' => 34]);
         $connection = DB::connection();
 
-        Auth::shouldReceive('id')->once()->andReturn(56);
         DB::shouldReceive('connection')->andReturn($connection)->byDefault();
         DB::shouldReceive('statement')
             ->once()
@@ -61,6 +75,7 @@ class OperasionalFeatureTest extends TestCase
     public function test_database_signal_message_is_shown_as_a_friendly_notification(): void
     {
         $this->createReferenceTables();
+        $this->loginOperasional(56);
         DB::table('tbl_karyawan')->insert(['id' => 12]);
         DB::table('tbl_klien')->insert(['id' => 34]);
         $connection = DB::connection();
@@ -74,7 +89,6 @@ class OperasionalFeatureTest extends TestCase
             $databaseError,
         );
 
-        Auth::shouldReceive('id')->once()->andReturn(56);
         DB::shouldReceive('connection')->andReturn($connection)->byDefault();
         DB::shouldReceive('statement')->once()->andThrow($queryException);
 

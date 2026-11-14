@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -33,6 +35,9 @@ class HrdModulTest extends TestCase
 
         DB::beginTransaction();
         Storage::fake('public');
+
+        // Semua route HRD wajib login sebagai role HRD; akun ini ikut di-rollback di tearDown().
+        $this->actingAs(User::factory()->withRole(Role::Hrd)->create());
     }
 
     protected function tearDown(): void

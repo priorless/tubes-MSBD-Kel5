@@ -1,38 +1,25 @@
-@extends('layouts.adminlte')
+@extends('layouts.app')
 
 @section('title', 'Dokumen Sertifikat')
-@section('modul', 'HRD')
-@section('heading', 'Dokumen Sertifikat')
-@section('breadcrumb', 'Dokumen Sertifikat')
 
 @section('content')
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">Masa berlaku dokumen karyawan</h3>
-            <div class="card-tools">
-                <a href="{{ route('hrd.sertifikat.create') }}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus mr-1"></i> Tambah Dokumen
-                </a>
-            </div>
+            <h2 class="card-title">Masa berlaku dokumen karyawan</h2>
+            <a href="{{ route('hrd.sertifikat.create') }}" class="btn-primary btn-sm">+ Tambah Dokumen</a>
         </div>
-        <div class="card-body border-bottom">
-            <form method="GET" action="{{ route('hrd.sertifikat.index') }}" class="form-row align-items-center">
-                <div class="col-md-6 mb-2">
-                    <input type="search" name="q" value="{{ request('q') }}" class="form-control form-control-sm" placeholder="Cari nama karyawan, NIP, atau nama dokumen" aria-label="Cari dokumen">
-                </div>
-                <div class="col-md-4 mb-2">
-                    <div class="custom-control custom-checkbox">
-                        <input type="checkbox" class="custom-control-input" id="hampir_habis" name="hampir_habis" value="1" @checked(request()->boolean('hampir_habis'))>
-                        <label class="custom-control-label" for="hampir_habis">Hanya sisa &lt; {{ $batasHari }} hari</label>
-                    </div>
-                </div>
-                <div class="col-md-2 mb-2">
-                    <button type="submit" class="btn btn-default btn-sm btn-block"><i class="fas fa-filter mr-1"></i> Terapkan</button>
-                </div>
-            </form>
-        </div>
-        <div class="card-body table-responsive p-0">
-            <table class="table table-hover text-nowrap">
+
+        <form method="GET" action="{{ route('hrd.sertifikat.index') }}" class="grid grid-cols-1 items-center gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4 md:grid-cols-12">
+            <input type="search" name="q" value="{{ request('q') }}" class="form-input md:col-span-6" placeholder="Cari nama karyawan, NIP, atau nama dokumen" aria-label="Cari dokumen">
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700 md:col-span-4">
+                <input type="checkbox" class="form-check" name="hampir_habis" value="1" @checked(request()->boolean('hampir_habis'))>
+                Hanya sisa &lt; {{ $batasHari }} hari
+            </label>
+            <button type="submit" class="btn-secondary md:col-span-2">Terapkan</button>
+        </form>
+
+        <div class="overflow-x-auto">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>Karyawan</th>
@@ -48,13 +35,13 @@
                     @forelse ($sertifikat as $item)
                         <tr>
                             <td>
-                                <strong>{{ $item->nama }}</strong>
-                                <div class="text-muted small">NIP {{ $item->nip }}</div>
+                                <p class="font-medium text-gray-800">{{ $item->nama }}</p>
+                                <p class="text-xs text-gray-400">NIP {{ $item->nip }}</p>
                             </td>
                             <td>
                                 {{ $item->nama_dokumen }}
                                 @if ($item->nomor_dokumen)
-                                    <div class="text-muted small">No. {{ $item->nomor_dokumen }}</div>
+                                    <p class="text-xs text-gray-400">No. {{ $item->nomor_dokumen }}</p>
                                 @endif
                             </td>
                             <td>{{ \Illuminate\Support\Carbon::parse($item->tgl_terbit)->format('d/m/Y') }}</td>
@@ -68,35 +55,34 @@
                             </td>
                             <td>
                                 @if ($item->file_upload)
-                                    <a href="{{ asset('storage/'.$item->file_upload) }}" target="_blank" rel="noopener"><i class="fas fa-file-alt mr-1"></i> Lihat</a>
+                                    <a href="{{ asset('storage/'.$item->file_upload) }}" target="_blank" rel="noopener" class="font-medium text-sji-biru hover:underline">Lihat</a>
                                 @else
-                                    <span class="text-muted">&mdash;</span>
+                                    <span class="text-gray-400">&mdash;</span>
                                 @endif
                             </td>
                             <td class="text-right">
-                                <form action="{{ route('hrd.sertifikat.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus dokumen ini?')">
+                                <form action="{{ route('hrd.sertifikat.destroy', $item->id) }}" method="POST" class="inline" onsubmit="return confirm('Hapus dokumen ini?')">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-outline-danger btn-sm">Hapus</button>
+                                    <button type="submit" class="btn-outline-danger btn-sm">Hapus</button>
                                 </form>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-muted p-4">Belum ada dokumen sertifikat.</td>
+                            <td colspan="7" class="table-empty">Belum ada dokumen sertifikat.</td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-        <div class="card-footer clearfix">
-            <span class="text-muted">
+
+        <div class="card-footer">
+            <span>
                 Menampilkan {{ $sertifikat->firstItem() ?? 0 }}&ndash;{{ $sertifikat->lastItem() ?? 0 }} dari {{ $sertifikat->total() }} dokumen.
                 <span class="badge badge-danger">merah</span> = sisa kurang dari {{ $batasHari }} hari.
             </span>
-            <div class="float-right">
-                @include('partials.pagination', ['paginator' => $sertifikat])
-            </div>
+            @include('partials.pagination', ['paginator' => $sertifikat])
         </div>
     </div>
 @endsection

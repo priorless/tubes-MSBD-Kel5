@@ -1,21 +1,16 @@
-@extends('layouts.adminlte')
+@extends('layouts.app')
 
 @section('title', 'Data Klien')
-@section('heading', 'Data Klien')
-@section('breadcrumb', 'Data Klien')
 
 @section('content')
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">Daftar klien SJI</h3>
-            <div class="card-tools">
-                <a href="{{ route('operasional.klien.create') }}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus mr-1"></i> Tambah Klien
-                </a>
-            </div>
+            <h2 class="card-title">Daftar klien SJI</h2>
+            <a href="{{ route('operasional.klien.create') }}" class="btn-primary btn-sm">+ Tambah Klien</a>
         </div>
-        <div class="card-body table-responsive p-0">
-            <table class="table table-hover text-nowrap">
+
+        <div class="overflow-x-auto">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>Kode</th>
@@ -29,50 +24,49 @@
                 <tbody>
                     @forelse ($klien as $item)
                         <tr>
-                            <td>{{ $item->kode_klien }}</td>
+                            <td class="font-mono text-gray-600">{{ $item->kode_klien }}</td>
                             <td>
-                                <strong>{{ $item->nama_perusahaan }}</strong>
-                                <div class="text-muted small">{{ $item->alamat }}</div>
+                                <p class="font-medium text-gray-800">{{ $item->nama_perusahaan }}</p>
+                                <p class="text-xs text-gray-400">{{ $item->alamat }}</p>
                             </td>
                             <td>
                                 {{ $item->pic_nama }}
                                 @if ($item->pic_jabatan)
-                                    <div class="text-muted small">{{ $item->pic_jabatan }}</div>
+                                    <p class="text-xs text-gray-400">{{ $item->pic_jabatan }}</p>
                                 @endif
                             </td>
-                            <td>
+                            <td class="whitespace-nowrap">
                                 {{ $item->pic_telp }}
                                 @if ($item->pic_email)
-                                    <div class="text-muted small">{{ $item->pic_email }}</div>
+                                    <p class="text-xs text-gray-400">{{ $item->pic_email }}</p>
                                 @endif
                             </td>
                             <td>
-                                <span class="badge badge-{{ $item->status === 'Aktif' ? 'success' : 'secondary' }}">
-                                    {{ $item->status }}
-                                </span>
+                                <span class="badge badge-{{ $item->status === 'Aktif' ? 'success' : 'secondary' }}">{{ $item->status }}</span>
                             </td>
-                            <td class="text-right">
-                                <a href="{{ route('operasional.klien.edit', $item->id) }}" class="btn btn-outline-primary btn-sm">Ubah</a>
-                                <form action="{{ route('operasional.klien.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus data klien ini?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-outline-danger btn-sm">Hapus</button>
-                                </form>
+                            <td>
+                                <div class="flex justify-end gap-2">
+                                    <a href="{{ route('operasional.klien.edit', $item->id) }}" class="btn-secondary btn-sm">Ubah</a>
+                                    <form action="{{ route('operasional.klien.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Hapus data klien ini?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn-outline-danger btn-sm">Hapus</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-muted p-4">Belum ada data klien.</td>
+                            <td colspan="6" class="table-empty">Belum ada data klien.</td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-        <div class="card-footer clearfix">
-            <span class="text-muted">Menampilkan {{ $klien->firstItem() ?? 0 }}&ndash;{{ $klien->lastItem() ?? 0 }} dari {{ $klien->total() }} klien</span>
-            <div class="float-right">
-                @include('partials.pagination', ['paginator' => $klien])
-            </div>
+
+        <div class="card-footer">
+            <span>Menampilkan {{ $klien->firstItem() ?? 0 }}&ndash;{{ $klien->lastItem() ?? 0 }} dari {{ $klien->total() }} klien</span>
+            @include('partials.pagination', ['paginator' => $klien])
         </div>
     </div>
 @endsection

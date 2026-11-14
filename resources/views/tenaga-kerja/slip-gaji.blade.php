@@ -1,157 +1,108 @@
 @extends('layouts.tenaga-kerja')
 
 @section('title', 'Slip Gaji')
-@section('heading', 'Slip Gaji')
-
-@section('content')
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Riwayat slip gaji</h3>
-        </div>
-        <div class="card-body table-responsive">
-            <table class="table table-bordered table-striped">
-                <thead>
-                    <tr>
-                        <th>Periode</th>
-                        <th>Gaji pokok</th>
-                        <th>Tunjangan</th>
-                        <th>Lembur</th>
-                        <th>Potongan absensi</th>
-                        <th>Total gaji</th>
-                        <th>Status pembayaran</th>
-                        <th>Tanggal dibayar</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($slipGaji as $slip)
-                        <tr>
-                            <td>{{ sprintf('%02d/%d', $slip->periode_bulan, $slip->periode_tahun) }}</td>
-                            <td>Rp {{ number_format((float) $slip->gaji_pokok, 0, ',', '.') }}</td>
-                            <td>Rp {{ number_format((float) $slip->tunjangan, 0, ',', '.') }}</td>
-                            <td>Rp {{ number_format((float) $slip->total_lembur, 0, ',', '.') }}</td>
-                            <td>Rp {{ number_format((float) $slip->potongan_absen, 0, ',', '.') }}</td>
-                            <td><strong>Rp {{ number_format((float) $slip->total_gaji, 0, ',', '.') }}</strong></td>
-                            <td>{{ $slip->status_bayar }}</td>
-                            <td>{{ $slip->tgl_bayar ?? '-' }}</td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="text-center">Belum ada data slip gaji.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
 
 @section('content')
 @if ($periode->isEmpty())
-    <section class="tk-card tk-reveal">
-        <div class="tk-kosong">
-            <div class="tk-kosong-ilustrasi"><i class="bi bi-receipt"></i></div>
-            <p class="tk-panel-judul">Belum ada slip gaji</p>
-            <p class="tk-panel-sub">Slip gaji akan tersedia setelah bagian keuangan memproses penggajian periode Anda.</p>
-        </div>
+    <section class="tk-reveal card px-6 py-12 text-center">
+        <p class="font-semibold text-gray-800">Belum ada slip gaji</p>
+        <p class="mt-1 text-sm text-gray-500">Slip gaji akan tersedia setelah bagian keuangan memproses penggajian periode Anda.</p>
     </section>
 @else
-<div class="row g-4">
-    {{-- ===================== DAFTAR PERIODE ===================== --}}
-    <div class="col-12 col-lg-3 tk-reveal tk-no-print">
-        <section class="tk-card tk-periode">
-            <h2 class="tk-card-title"><i class="bi bi-clock-history"></i> Periode</h2>
-            <select class="form-select tk-input d-lg-none mb-2" id="tkPilihPeriode" aria-label="Pilih periode">
-                @foreach ($periode as $p)
-                    <option value="{{ route('tenaga-kerja.slip-gaji', ['periode' => $p['kunci']]) }}" @selected($p['kunci'] === $kunciDipilih)>{{ $p['label'] }}</option>
-                @endforeach
-            </select>
-            <div class="tk-periode-list d-none d-lg-flex">
-                @foreach ($periode as $p)
-                    <a href="{{ route('tenaga-kerja.slip-gaji', ['periode' => $p['kunci']]) }}"
-                       class="tk-periode-item {{ $p['kunci'] === $kunciDipilih ? 'aktif' : '' }}">
-                        <i class="bi bi-file-earmark-text"></i>
-                        <span>{{ $p['label'] }}</span>
-                        @if ($loop->first)<span class="tk-badge tk-badge-sukses ms-auto">Terbaru</span>@endif
-                    </a>
-                @endforeach
-            </div>
-        </section>
-    </div>
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
+    {{-- ===================== Daftar periode ===================== --}}
+    <section class="tk-reveal tk-no-print card self-start p-4">
+        <h2 class="card-title mb-3 px-2">Periode</h2>
+        <select class="form-input lg:hidden" id="tkPilihPeriode" aria-label="Pilih periode">
+            @foreach ($periode as $p)
+                <option value="{{ route('tenaga-kerja.slip-gaji', ['periode' => $p['kunci']]) }}" @selected($p['kunci'] === $kunciDipilih)>{{ $p['label'] }}</option>
+            @endforeach
+        </select>
+        <nav class="hidden flex-col gap-1 lg:flex">
+            @foreach ($periode as $p)
+                <a href="{{ route('tenaga-kerja.slip-gaji', ['periode' => $p['kunci']]) }}"
+                   @class([
+                       'flex items-center justify-between rounded-md px-3 py-2 text-sm',
+                       'bg-blue-50 font-medium text-sji-biru' => $p['kunci'] === $kunciDipilih,
+                       'text-gray-600 hover:bg-gray-50' => $p['kunci'] !== $kunciDipilih,
+                   ])>
+                    <span>{{ $p['label'] }}</span>
+                    @if ($loop->first)<span class="badge badge-success">Terbaru</span>@endif
+                </a>
+            @endforeach
+        </nav>
+    </section>
 
-    {{-- ===================== DOKUMEN SLIP ===================== --}}
-    <div class="col-12 col-lg-9 tk-reveal">
-        @if (!$slip)
-            <section class="tk-card">
-                <div class="tk-kosong">
-                    <div class="tk-kosong-ilustrasi"><i class="bi bi-question-circle"></i></div>
-                    <p class="tk-panel-judul">Periode tidak ditemukan</p>
-                    <p class="tk-panel-sub">Silakan pilih periode lain di daftar.</p>
-                </div>
+    {{-- ===================== Dokumen slip ===================== --}}
+    <div class="tk-reveal lg:col-span-3">
+        @if (! $slip)
+            <section class="card px-6 py-12 text-center">
+                <p class="font-semibold text-gray-800">Periode tidak ditemukan</p>
+                <p class="mt-1 text-sm text-gray-500">Silakan pilih periode lain di daftar.</p>
             </section>
         @else
-        <article class="tk-slip" id="tkSlip">
-            <header class="tk-slip-head">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="tk-brand-logo tk-brand-logo-besar">SJI</div>
+            <article class="card overflow-hidden" id="tkSlip">
+                <header class="flex flex-wrap items-center justify-between gap-4 border-b-4 border-sji-merah bg-sji-biru-tua px-6 py-5 text-white">
+                    <div class="flex items-center gap-3">
+                        <img src="{{ asset('images/logo-sji.png') }}" alt="Logo PT Satu Jaya Indonesia" class="size-14 object-contain">
+                        <div>
+                            <p class="text-lg font-bold tracking-wide">PT SATU JAYA INDONESIA</p>
+                            <p class="text-xs text-blue-200">Penyedia Jasa Tenaga Kerja</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xl font-bold tracking-widest text-sji-emas">SLIP GAJI</p>
+                        <p class="text-sm text-blue-200">Periode {{ $labelPeriode }}</p>
+                    </div>
+                </header>
+
+                <dl class="grid grid-cols-1 gap-x-6 gap-y-3 border-b border-gray-200 px-6 py-5 text-sm sm:grid-cols-2">
+                    <div class="flex justify-between gap-4"><dt class="text-gray-500">Nama Karyawan</dt><dd class="font-semibold text-gray-800">{{ $namaKaryawan }}</dd></div>
+                    @if ($jabatan)<div class="flex justify-between gap-4"><dt class="text-gray-500">Jabatan</dt><dd class="font-semibold text-gray-800">{{ $jabatan }}</dd></div>@endif
+                    @if ($kategori)<div class="flex justify-between gap-4"><dt class="text-gray-500">Kategori</dt><dd class="font-semibold text-gray-800">{{ $kategori }}</dd></div>@endif
+                    @foreach ($rincian['info'] as $info)
+                        <div class="flex justify-between gap-4"><dt class="text-gray-500">{{ $info['label'] }}</dt><dd class="font-semibold text-gray-800">{{ $info['nilai'] }}</dd></div>
+                    @endforeach
+                </dl>
+
+                <div class="grid grid-cols-1 gap-6 px-6 py-5 md:grid-cols-2">
                     <div>
-                        <div class="tk-slip-perusahaan">PT SJI</div>
-                        <div class="tk-slip-sub">Penyedia Jasa Tenaga Kerja</div>
+                        <h3 class="mb-2 text-sm font-semibold tracking-wide text-emerald-700 uppercase">Penghasilan</h3>
+                        @forelse ($rincian['penghasilan'] as $item)
+                            <div class="flex justify-between border-b border-dashed border-gray-200 py-2 text-sm"><span class="text-gray-600">{{ $item['label'] }}</span><span class="font-medium tabular-nums">{{ $item['nilai'] }}</span></div>
+                        @empty
+                            <p class="text-sm text-gray-400">Tidak ada rincian penghasilan.</p>
+                        @endforelse
+                    </div>
+                    <div>
+                        <h3 class="mb-2 text-sm font-semibold tracking-wide text-red-700 uppercase">Potongan</h3>
+                        @forelse ($rincian['potongan'] as $item)
+                            <div class="flex justify-between border-b border-dashed border-gray-200 py-2 text-sm"><span class="text-gray-600">{{ $item['label'] }}</span><span class="font-medium text-red-600 tabular-nums">{{ $item['nilai'] }}</span></div>
+                        @empty
+                            <p class="text-sm text-gray-400">Tidak ada potongan.</p>
+                        @endforelse
                     </div>
                 </div>
-                <div class="text-md-end">
-                    <div class="tk-slip-judul">SLIP GAJI</div>
-                    <div class="tk-slip-periode"><i class="bi bi-calendar-month"></i> Periode {{ $labelPeriode }}</div>
-                </div>
-            </header>
 
-            <div class="tk-slip-identitas">
-                <div><span>Nama Karyawan</span><strong>{{ $namaKaryawan }}</strong></div>
-                @if ($jabatan)<div><span>Jabatan</span><strong>{{ $jabatan }}</strong></div>@endif
-                @if ($kategori)<div><span>Kategori</span><strong>{{ $kategori }}</strong></div>@endif
-                @foreach ($rincian['info'] as $info)
-                    <div><span>{{ $info['label'] }}</span><strong>{{ $info['nilai'] }}</strong></div>
-                @endforeach
-            </div>
-
-            <div class="row g-4 tk-slip-rincian">
-                <div class="col-md-6">
-                    <h3 class="tk-slip-kolom-judul tk-plus"><i class="bi bi-plus-circle"></i> Penghasilan</h3>
-                    @forelse ($rincian['penghasilan'] as $item)
-                        <div class="tk-slip-baris"><span>{{ $item['label'] }}</span><span>{{ $item['nilai'] }}</span></div>
-                    @empty
-                        <div class="tk-muted small">Tidak ada rincian penghasilan.</div>
-                    @endforelse
-                </div>
-                <div class="col-md-6">
-                    <h3 class="tk-slip-kolom-judul tk-minus"><i class="bi bi-dash-circle"></i> Potongan</h3>
-                    @forelse ($rincian['potongan'] as $item)
-                        <div class="tk-slip-baris"><span>{{ $item['label'] }}</span><span class="text-danger-emphasis">{{ $item['nilai'] }}</span></div>
-                    @empty
-                        <div class="tk-muted small">Tidak ada potongan.</div>
-                    @endforelse
-                </div>
-            </div>
-
-            @if ($rincian['total'])
-                <div class="tk-slip-total">
-                    <div>
-                        <div class="tk-slip-total-label">{{ $rincian['total']['label'] }}</div>
-                        <div class="tk-slip-total-sub">Dihitung otomatis oleh sistem penggajian</div>
+                @if ($rincian['total'])
+                    <div class="mx-6 mb-5 flex flex-wrap items-center justify-between gap-4 rounded-lg bg-blue-50 px-5 py-4">
+                        <div>
+                            <p class="font-semibold text-sji-biru-tua">{{ $rincian['total']['label'] }}</p>
+                            <p class="text-xs text-gray-500">Dihitung otomatis oleh sistem penggajian</p>
+                        </div>
+                        <p class="text-2xl font-bold text-sji-biru tabular-nums" data-rupiah="{{ $rincian['total']['mentah'] }}">{{ $rincian['total']['nilai'] }}</p>
                     </div>
-                    <div class="tk-slip-total-nilai" data-rupiah="{{ $rincian['total']['mentah'] }}">{{ $rincian['total']['nilai'] }}</div>
-                </div>
-            @endif
+                @endif
 
-            <footer class="tk-slip-foot">
-                <div><i class="bi bi-shield-check"></i> Dokumen ini dibuat secara elektronik dan sah tanpa tanda tangan.</div>
-                <div>Dicetak: {{ now()->locale('id')->translatedFormat('d F Y, H:i') }}</div>
-            </footer>
-        </article>
+                <footer class="flex flex-wrap justify-between gap-2 border-t border-gray-200 bg-gray-50 px-6 py-3 text-xs text-gray-500">
+                    <span>Dokumen ini dibuat secara elektronik dan sah tanpa tanda tangan.</span>
+                    <span>Dicetak: {{ now()->locale('id')->translatedFormat('d F Y, H:i') }}</span>
+                </footer>
+            </article>
 
-        <div class="d-flex gap-2 justify-content-end mt-3 tk-no-print">
-            <button type="button" class="tk-btn tk-btn-utama" onclick="window.print()">
-                <i class="bi bi-printer"></i> Cetak / Simpan PDF
-            </button>
-        </div>
+            <div class="tk-no-print mt-4 flex justify-end">
+                <button type="button" class="tk-btn btn-primary" onclick="window.print()">Cetak / Simpan PDF</button>
+            </div>
         @endif
     </div>
 </div>

@@ -40,7 +40,7 @@ class ForceChangePasswordTest extends TestCase
                 'password' => 'RahasiaBaru123',
                 'password_confirmation' => 'RahasiaBaru123',
             ])
-            ->assertRedirect(route('beranda'))
+            ->assertRedirect(route('hrd.dashboard'))
             ->assertSessionHas('success');
 
         $user->refresh();

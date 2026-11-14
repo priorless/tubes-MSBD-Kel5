@@ -1,15 +1,17 @@
 @if ($paginator->hasPages())
-    <nav aria-label="Navigasi halaman">
-        <ul class="pagination pagination-sm m-0">
-            <li class="page-item {{ $paginator->onFirstPage() ? 'disabled' : '' }}">
-                <a class="page-link" href="{{ $paginator->previousPageUrl() ?? '#' }}" aria-label="Halaman sebelumnya">Sebelumnya</a>
-            </li>
-            <li class="page-item disabled">
-                <span class="page-link">Halaman {{ $paginator->currentPage() }} dari {{ $paginator->lastPage() }}</span>
-            </li>
-            <li class="page-item {{ $paginator->hasMorePages() ? '' : 'disabled' }}">
-                <a class="page-link" href="{{ $paginator->nextPageUrl() ?? '#' }}" aria-label="Halaman berikutnya">Berikutnya</a>
-            </li>
-        </ul>
+    <nav aria-label="Navigasi halaman" class="flex items-center gap-2">
+        @if ($paginator->onFirstPage())
+            <span class="btn-secondary btn-sm cursor-not-allowed opacity-50" aria-disabled="true">Sebelumnya</span>
+        @else
+            <a href="{{ $paginator->previousPageUrl() }}" class="btn-secondary btn-sm" rel="prev">Sebelumnya</a>
+        @endif
+
+        <span class="text-xs text-gray-500">Halaman {{ $paginator->currentPage() }} dari {{ $paginator->lastPage() }}</span>
+
+        @if ($paginator->hasMorePages())
+            <a href="{{ $paginator->nextPageUrl() }}" class="btn-secondary btn-sm" rel="next">Berikutnya</a>
+        @else
+            <span class="btn-secondary btn-sm cursor-not-allowed opacity-50" aria-disabled="true">Berikutnya</span>
+        @endif
     </nav>
 @endif
