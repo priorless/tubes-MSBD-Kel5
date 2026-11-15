@@ -20,7 +20,7 @@
                     <option value="">Pilih penempatan</option>
                     @foreach ($penempatan as $item)
                         <option value="{{ $item->id }}" @selected((string) old('id_penempatan_lama') === (string) $item->id)>
-                            {{ $item->nip }} &mdash; {{ $item->nama_karyawan }} | {{ $item->nama_perusahaan }} ({{ $item->lokasi_kerja }})
+                            {{ $item->nip }} &mdash; {{ $item->nama_karyawan }} | {{ $item->nama_perusahaan }} ({{ $item->lokasi_kerja }}@if ($item->jam_datang && $item->jam_pulang), {{ substr($item->jam_datang, 0, 5) }}&ndash;{{ substr($item->jam_pulang, 0, 5) }}@endif)
                         </option>
                     @endforeach
                 </select>
@@ -58,6 +58,21 @@
                     @error('lokasi_baru') <p class="form-error">{{ $message }}</p> @enderror
                 </div>
             </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label for="jam_datang_baru" class="form-label">Jam Datang Baru</label>
+                    <input id="jam_datang_baru" name="jam_datang_baru" type="time"
+                        @class(['form-input', 'form-input-error' => $errors->has('jam_datang_baru')]) value="{{ old('jam_datang_baru') }}">
+                    @error('jam_datang_baru') <p class="form-error">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label for="jam_pulang_baru" class="form-label">Jam Pulang Baru</label>
+                    <input id="jam_pulang_baru" name="jam_pulang_baru" type="time"
+                        @class(['form-input', 'form-input-error' => $errors->has('jam_pulang_baru')]) value="{{ old('jam_pulang_baru') }}">
+                    @error('jam_pulang_baru') <p class="form-error">{{ $message }}</p> @enderror
+                </div>
+            </div>
+            <p class="form-hint">Kosongkan jam datang dan jam pulang untuk tetap memakai jadwal kerja penempatan lama.</p>
         </div>
 
         <div class="card-footer justify-start">

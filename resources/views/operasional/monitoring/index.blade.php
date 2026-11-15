@@ -23,6 +23,8 @@
                         <th>Jenis Layanan</th>
                         <th>Klien</th>
                         <th>Lokasi</th>
+                        <th>Jam Datang</th>
+                        <th>Jam Pulang</th>
                         <th>Periode</th>
                         <th>Sisa Kontrak</th>
                     </tr>
@@ -35,6 +37,8 @@
                             <td>{{ $item->nama_layanan }}</td>
                             <td>{{ $item->nama_perusahaan }}</td>
                             <td>{{ $item->lokasi_kerja }}</td>
+                            <td class="whitespace-nowrap font-mono">{{ $item->jam_datang ? substr($item->jam_datang, 0, 5) : '-' }}</td>
+                            <td class="whitespace-nowrap font-mono">{{ $item->jam_pulang ? substr($item->jam_pulang, 0, 5) : '-' }}</td>
                             <td class="whitespace-nowrap">
                                 {{ \Illuminate\Support\Carbon::parse($item->tgl_mulai)->format('d/m/Y') }}
                                 &ndash;
@@ -52,7 +56,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="table-empty">Belum ada penempatan aktif.</td>
+                            <td colspan="9" class="table-empty">Belum ada penempatan aktif.</td>
                         </tr>
                     @endforelse
                 </tbody>

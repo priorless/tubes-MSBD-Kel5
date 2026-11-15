@@ -34,6 +34,8 @@ class OperasionalController extends Controller
             'tgl_mulai' => ['bail', 'required', 'date'],
             'tgl_selesai' => ['nullable', 'date'],
             'lokasi' => ['bail', 'required', 'string', 'max:255'],
+            'jam_datang' => ['bail', 'required', 'date_format:H:i'],
+            'jam_pulang' => ['bail', 'required', 'date_format:H:i', 'different:jam_datang'],
         ], $this->operationValidationMessages());
 
         $userId = Auth::id();
@@ -43,12 +45,14 @@ class OperasionalController extends Controller
         }
 
         try {
-            DB::statement('CALL sp_assign_penempatan(?, ?, ?, ?, ?, ?)', [
+            DB::statement('CALL sp_assign_penempatan(?, ?, ?, ?, ?, ?, ?, ?)', [
                 $validated['id_karyawan'],
                 $validated['id_klien'],
                 $validated['tgl_mulai'],
                 $validated['tgl_selesai'] ?? null,
                 $validated['lokasi'],
+                $validated['jam_datang'],
+                $validated['jam_pulang'],
                 $userId,
             ]);
         } catch (QueryException $exception) {
@@ -75,6 +79,8 @@ class OperasionalController extends Controller
                 ->get([
                     'p.id',
                     'p.lokasi_kerja',
+                    'p.jam_datang',
+                    'p.jam_pulang',
                     'k.nip',
                     'k.nama as nama_karyawan',
                     'kl.nama_perusahaan',
@@ -93,6 +99,8 @@ class OperasionalController extends Controller
             'id_klien_baru' => ['bail', 'required', 'integer', 'exists:tbl_klien,id'],
             'tgl_mulai_baru' => ['bail', 'required', 'date'],
             'lokasi_baru' => ['bail', 'required', 'string', 'max:255'],
+            'jam_datang_baru' => ['bail', 'nullable', 'required_with:jam_pulang_baru', 'date_format:H:i'],
+            'jam_pulang_baru' => ['bail', 'nullable', 'required_with:jam_datang_baru', 'date_format:H:i', 'different:jam_datang_baru'],
         ], $this->operationValidationMessages());
 
         $userId = Auth::id();
@@ -102,11 +110,13 @@ class OperasionalController extends Controller
         }
 
         try {
-            DB::statement('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?)', [
+            DB::statement('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?, ?, ?)', [
                 $validated['id_penempatan_lama'],
                 $validated['id_klien_baru'],
                 $validated['tgl_mulai_baru'],
                 $validated['lokasi_baru'],
+                $validated['jam_datang_baru'] ?? null,
+                $validated['jam_pulang_baru'] ?? null,
                 $userId,
             ]);
         } catch (QueryException $exception) {
@@ -158,6 +168,16 @@ class OperasionalController extends Controller
             'lokasi.max' => 'Lokasi kerja maksimal 255 karakter.',
             'lokasi_baru.required' => 'Lokasi kerja baru wajib diisi.',
             'lokasi_baru.max' => 'Lokasi kerja baru maksimal 255 karakter.',
+            'jam_datang.required' => 'Jam datang wajib diisi.',
+            'jam_datang.date_format' => 'Format jam datang tidak valid (JJ:MM).',
+            'jam_pulang.required' => 'Jam pulang wajib diisi.',
+            'jam_pulang.date_format' => 'Format jam pulang tidak valid (JJ:MM).',
+            'jam_pulang.different' => 'Jam pulang tidak boleh sama dengan jam datang.',
+            'jam_datang_baru.required_with' => 'Jam datang baru wajib diisi bila jam pulang baru diisi.',
+            'jam_datang_baru.date_format' => 'Format jam datang baru tidak valid (JJ:MM).',
+            'jam_pulang_baru.required_with' => 'Jam pulang baru wajib diisi bila jam datang baru diisi.',
+            'jam_pulang_baru.date_format' => 'Format jam pulang baru tidak valid (JJ:MM).',
+            'jam_pulang_baru.different' => 'Jam pulang baru tidak boleh sama dengan jam datang baru.',
         ];
     }
 
