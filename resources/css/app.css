@@ -409,3 +409,67 @@
         transform: scaleX(0);
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Invoice digital (modul Keuangan) — stempel LUNAS & cetak struk dari modal
+|--------------------------------------------------------------------------
+*/
+.struk-stempel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-14deg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.6rem 1.75rem;
+    border: 4px double #047857;
+    border-radius: 0.75rem;
+    color: #047857;
+    opacity: 0.82;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    letter-spacing: 0.35em;
+}
+
+.struk-stempel-teks {
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1;
+    padding-left: 0.35em;
+}
+
+.struk-stempel-tanggal {
+    margin-top: 0.35rem;
+    padding-top: 0.3rem;
+    border-top: 1px solid currentColor;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+}
+
+#areaCetakStruk {
+    display: none;
+}
+
+@media print {
+    body.cetak-struk > *:not(#areaCetakStruk) {
+        display: none !important;
+    }
+
+    body.cetak-struk {
+        background: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    body.cetak-struk dialog,
+    body.cetak-struk dialog::backdrop {
+        display: none !important;
+    }
+
+    body.cetak-struk #areaCetakStruk {
+        display: block;
+    }
+}

@@ -108,6 +108,8 @@ CREATE TABLE tbl_penempatan (
   id_karyawan INT NOT NULL,
   id_klien INT NOT NULL,
   lokasi_kerja VARCHAR(255) NOT NULL,
+  jam_datang TIME NULL,
+  jam_pulang TIME NULL,
   tgl_mulai DATE NOT NULL,
   tgl_selesai DATE NULL,
   status ENUM('Aktif','Selesai','Rotasi') NOT NULL DEFAULT 'Aktif',

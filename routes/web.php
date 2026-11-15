@@ -84,6 +84,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('invoice', 'invoice')->name('invoice.index');
         Route::post('invoice', 'generateInvoice')->name('invoice.generate');
         Route::patch('invoice/{id}/lunas', 'tandaiInvoiceLunas')->whereNumber('id')->name('invoice.lunas');
+        Route::get('invoice/{id}/struk', 'strukInvoice')->whereNumber('id')->name('invoice.struk');
 
         Route::get('mutasi', 'mutasi')->name('mutasi.index');
     });

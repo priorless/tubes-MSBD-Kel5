@@ -5,7 +5,8 @@ DELIMITER //
 
 CREATE PROCEDURE sp_assign_penempatan(
   IN p_id_karyawan INT, IN p_id_klien INT, IN p_tgl_mulai DATE,
-  IN p_tgl_selesai DATE, IN p_lokasi VARCHAR(255), IN p_dibuat_oleh INT)
+  IN p_tgl_selesai DATE, IN p_lokasi VARCHAR(255),
+  IN p_jam_datang TIME, IN p_jam_pulang TIME, IN p_dibuat_oleh INT)
 BEGIN
   DECLARE v_kategori VARCHAR(10);
   DECLARE v_status VARCHAR(20);
@@ -31,9 +32,9 @@ BEGIN
 
   START TRANSACTION;
     INSERT INTO tbl_penempatan
-      (id_karyawan, id_klien, lokasi_kerja, tgl_mulai, tgl_selesai, status, dibuat_oleh)
+      (id_karyawan, id_klien, lokasi_kerja, jam_datang, jam_pulang, tgl_mulai, tgl_selesai, status, dibuat_oleh)
     VALUES
-      (p_id_karyawan, p_id_klien, p_lokasi, p_tgl_mulai, p_tgl_selesai, 'Aktif', p_dibuat_oleh);
+      (p_id_karyawan, p_id_klien, p_lokasi, p_jam_datang, p_jam_pulang, p_tgl_mulai, p_tgl_selesai, 'Aktif', p_dibuat_oleh);
     SET v_pen_id = LAST_INSERT_ID();
     INSERT INTO tbl_kontrak (id_penempatan, gaji_pokok, tunjangan)
     VALUES (v_pen_id, v_tarif, 0);
@@ -43,15 +44,21 @@ END //
 
 CREATE PROCEDURE sp_rotasi_karyawan(
   IN p_id_penempatan_lama INT, IN p_id_klien_baru INT,
-  IN p_tgl_mulai_baru DATE, IN p_lokasi_baru VARCHAR(255), IN p_dibuat_oleh INT)
+  IN p_tgl_mulai_baru DATE, IN p_lokasi_baru VARCHAR(255),
+  IN p_jam_datang_baru TIME, IN p_jam_pulang_baru TIME, IN p_dibuat_oleh INT)
 BEGIN
   DECLARE v_karyawan INT;
   DECLARE v_gaji DECIMAL(12,2);
   DECLARE v_tunjangan DECIMAL(12,2);
+  DECLARE v_jam_datang TIME;
+  DECLARE v_jam_pulang TIME;
   DECLARE v_pen_id INT;
   DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
 
-  SELECT id_karyawan INTO v_karyawan FROM tbl_penempatan WHERE id = p_id_penempatan_lama;
+  -- Jadwal baru kosong -> mewarisi jadwal penempatan lama (baris lama tidak diubah).
+  SELECT id_karyawan, jam_datang, jam_pulang
+  INTO v_karyawan, v_jam_datang, v_jam_pulang
+  FROM tbl_penempatan WHERE id = p_id_penempatan_lama;
   SELECT gaji_pokok, tunjangan INTO v_gaji, v_tunjangan
   FROM tbl_kontrak WHERE id_penempatan = p_id_penempatan_lama;
 
@@ -61,9 +68,11 @@ BEGIN
     UPDATE tbl_kontrak SET status = 'Selesai'
     WHERE id_penempatan = p_id_penempatan_lama;
     INSERT INTO tbl_penempatan
-      (id_karyawan, id_klien, lokasi_kerja, tgl_mulai, tgl_selesai, status, dibuat_oleh)
+      (id_karyawan, id_klien, lokasi_kerja, jam_datang, jam_pulang, tgl_mulai, tgl_selesai, status, dibuat_oleh)
     VALUES
-      (v_karyawan, p_id_klien_baru, p_lokasi_baru, p_tgl_mulai_baru, NULL, 'Aktif', p_dibuat_oleh);
+      (v_karyawan, p_id_klien_baru, p_lokasi_baru,
+       IFNULL(p_jam_datang_baru, v_jam_datang), IFNULL(p_jam_pulang_baru, v_jam_pulang),
+       p_tgl_mulai_baru, NULL, 'Aktif', p_dibuat_oleh);
     SET v_pen_id = LAST_INSERT_ID();
     INSERT INTO tbl_kontrak (id_penempatan, gaji_pokok, tunjangan)
     VALUES (v_pen_id, v_gaji, v_tunjangan);
@@ -72,7 +81,8 @@ END //
 
 CREATE VIEW v_monitoring_sebaran_operasional AS
 SELECT p.id AS id_penempatan, k.nip, k.nama, jl.nama_layanan,
-       kl.nama_perusahaan, p.lokasi_kerja, p.tgl_mulai, p.tgl_selesai,
+       kl.nama_perusahaan, p.lokasi_kerja, p.jam_datang, p.jam_pulang,
+       p.tgl_mulai, p.tgl_selesai,
        IFNULL(DATEDIFF(p.tgl_selesai, CURDATE()), 9999) AS sisa_hari_kontrak
 FROM tbl_penempatan p
 JOIN tbl_karyawan k ON p.id_karyawan = k.id

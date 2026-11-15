@@ -64,6 +64,20 @@
                     @class(['form-input', 'form-input-error' => $errors->has('lokasi')]) value="{{ old('lokasi') }}">
                 @error('lokasi') <p class="form-error">{{ $message }}</p> @enderror
             </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label for="jam_datang" class="form-label">Jam Datang</label>
+                    <input id="jam_datang" name="jam_datang" type="time" required
+                        @class(['form-input', 'form-input-error' => $errors->has('jam_datang')]) value="{{ old('jam_datang') }}">
+                    @error('jam_datang') <p class="form-error">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label for="jam_pulang" class="form-label">Jam Pulang</label>
+                    <input id="jam_pulang" name="jam_pulang" type="time" required
+                        @class(['form-input', 'form-input-error' => $errors->has('jam_pulang')]) value="{{ old('jam_pulang') }}">
+                    @error('jam_pulang') <p class="form-error">{{ $message }}</p> @enderror
+                </div>
+            </div>
         </div>
 
         <div class="card-footer justify-start">
