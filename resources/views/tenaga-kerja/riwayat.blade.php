@@ -10,7 +10,7 @@
         'rekap_hadir'       => ['label' => 'Hari Hadir',       'warna' => 'text-emerald-600'],
         'rekap_terlambat'   => ['label' => 'Hari Terlambat',   'warna' => 'text-amber-600'],
         'rekap_tidak_hadir' => ['label' => 'Hari Tidak Hadir', 'warna' => 'text-red-500'],
-        'rekap_lembur'      => ['label' => 'Total Jam Lembur', 'warna' => 'text-sji-biru'],
+        'rekap_lembur'      => ['label' => 'Indikasi Lembur (Jam)', 'warna' => 'text-sji-biru'],
     ];
     $adaFilter = $tahun || $bulan;
     $labelPeriode = trim(($bulan ? FormatKolom::namaBulan($bulan) : 'Semua bulan').' '.($tahun ?: ''));
@@ -132,19 +132,33 @@
                         <tr>
                             <th>Tanggal</th>
                             <th>Lokasi Kerja</th>
+                            <th>Jadwal</th>
                             <th>Masuk</th>
                             <th>Keluar</th>
                             <th>Status</th>
                             <th>Jam Kerja</th>
-                            <th>Lembur</th>
-                            <th>Jarak Masuk / Keluar</th>
+                            <th title="Bekerja melewati jadwal pulang penempatan; belum melalui persetujuan lembur">Indikasi Lembur</th>
+                            <th>Foto Check-in</th>
+                            <th>Foto Check-out</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($harian as $hari)
                             <tr>
                                 <td class="whitespace-nowrap">{{ FormatKolom::tanggal($hari->tgl, 'D, d M Y') }}</td>
-                                <td>{{ $hari->nama_klien ?? '—' }}</td>
+                                <td>
+                                    {{ $hari->nama_klien ?? '—' }}
+                                    @if ($hari->lokasi_kerja)
+                                        <span class="block text-xs text-gray-500">{{ $hari->lokasi_kerja }}</span>
+                                    @endif
+                                </td>
+                                <td class="whitespace-nowrap">
+                                    @if ($hari->jadwal_datang || $hari->jadwal_pulang)
+                                        <span class="font-mono">{{ FormatKolom::jam($hari->jadwal_datang) }}&ndash;{{ FormatKolom::jam($hari->jadwal_pulang) }}</span>
+                                    @else
+                                        <span class="text-xs text-gray-500">Jadwal belum ditentukan</span>
+                                    @endif
+                                </td>
                                 <td class="font-mono">{{ FormatKolom::jam($hari->jam_masuk) }}</td>
                                 <td class="font-mono">
                                     @if ($hari->lupa_check_out)
@@ -161,11 +175,18 @@
                                 </td>
                                 <td>{{ $hari->jam_kerja !== null && $hari->jam_keluar !== null ? $hari->jam_kerja.' jam' : '—' }}</td>
                                 <td>{{ (int) $hari->jam_lembur > 0 ? $hari->jam_lembur.' jam' : '—' }}</td>
-                                <td class="whitespace-nowrap">
-                                    @foreach ([$hari->jarak_masuk_meter, $hari->jarak_keluar_meter] as $jarak)
-                                        {{ $jarak !== null ? number_format((int) $jarak, 0, ',', '.').' m' : '—' }}@if ($loop->first) / @endif
-                                    @endforeach
-                                </td>
+                                @foreach (['masuk' => 'check-in', 'keluar' => 'check-out'] as $jenis => $labelFoto)
+                                    <td>
+                                        @if ($hari->{'foto_'.$jenis})
+                                            @php $urlFoto = route('absensi.foto', ['absensi' => $hari->id_absensi, 'jenis' => $jenis]); @endphp
+                                            <a href="{{ $urlFoto }}" target="_blank" rel="noopener" data-no-transisi title="Buka foto {{ $labelFoto }}">
+                                                <img src="{{ $urlFoto }}" alt="Foto {{ $labelFoto }}" loading="lazy" class="h-12 w-16 rounded border border-gray-200 object-cover">
+                                            </a>
+                                        @else
+                                            <span class="text-gray-400">—</span>
+                                        @endif
+                                    </td>
+                                @endforeach
                             </tr>
                         @endforeach
                     </tbody>

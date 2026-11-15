@@ -32,6 +32,7 @@
                 ['Dashboard HRD', 'hrd.dashboard', 'hrd.dashboard'],
                 ['Data Karyawan', 'hrd.karyawan.index', 'hrd.karyawan.*'],
                 ['Pool Karyawan', 'hrd.pool', 'hrd.pool'],
+                ['Absensi Karyawan', 'hrd.absensi', 'hrd.absensi'],
                 ['Dokumen Sertifikat', 'hrd.sertifikat.index', 'hrd.sertifikat.*'],
             ];
         }

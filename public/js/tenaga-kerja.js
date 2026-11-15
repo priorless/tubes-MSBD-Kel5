@@ -187,7 +187,15 @@
         if (data.jam_masuk !== undefined) $('#tkJamMasuk').textContent = data.jam_masuk || '—';
         if (data.jam_keluar !== undefined) $('#tkJamKeluar').textContent = data.jam_keluar || '—';
         if (data.masuk_iso) kartu.dataset.masuk = data.masuk_iso;
-        if (data.lokasi) tampilkanSemuaLokasi(data.lokasi);
+        if (data.foto) tampilkanFoto(data.foto);
+        if (data.status_kehadiran) {
+            const status = $('#tkStatusDb');
+            if (status) {
+                status.textContent = data.status_kehadiran;
+                status.className = /terlambat/i.test(data.status_kehadiran) ? 'tk-badge-peringatan' : 'tk-badge-sukses';
+                $('#tkKeteranganStatus')?.classList.remove('hidden');
+            }
+        }
         if (kartu.dataset.status !== data.status) {
             kartu.dataset.status = data.status;
             $('#tkStatusLabel').textContent = LABEL[data.status] || data.status;
@@ -198,64 +206,98 @@
     };
 
     /* ------------------------------------------------------------------
-     * 6a. Lokasi (GPS) saat check-in/check-out — wajib, hanya ditampilkan
+     * 6a. Foto absensi: unggah dari galeri/kamera perangkat
+     *     Sistem hanya menerima foto. Keterangan tanggal, jam, dan lokasi pada foto
+     *     dibuat oleh aplikasi kamera karyawan (pengingat ada di dialog).
      * ------------------------------------------------------------------ */
-    const PESAN_LOKASI = {
-        1: 'Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini di pengaturan browser, lalu coba lagi.',
-        2: 'Lokasi tidak dapat ditentukan. Pastikan GPS/lokasi perangkat aktif, lalu coba lagi.',
-        3: 'Waktu mengambil lokasi habis. Pastikan sinyal GPS baik, lalu coba lagi.',
+    const dialogFoto = $('#tkDialogFoto');
+    const berkasFoto = $('#tkFotoBerkas');
+    const wadahPratinjau = $('#tkFotoPratinjauWadah');
+    const pratinjauFoto = $('#tkFotoPratinjau');
+    const statusFoto = $('#tkFotoStatus');
+    const aksiFoto = (nama) => $('[data-foto-aksi="' + nama + '"]', dialogFoto);
+    const UKURAN_MAKS_KB = Number(dialogFoto?.dataset.ukuranMaksKb) || 15360;
+    const TIPE_FOTO = ['image/jpeg', 'image/png', 'image/webp'];
+    const teksAwalStatus = statusFoto?.textContent.trim() ?? '';
+
+    const tampilkanFoto = (foto) => {
+        $$('[data-foto]').forEach((tautan) => {
+            const url = foto?.[tautan.dataset.foto];
+            tautan.classList.toggle('hidden', !url);
+            if (url) {
+                tautan.href = url;
+                $('img', tautan).src = url;
+            }
+        });
     };
 
-    const ambilLokasi = () => new Promise((resolve, reject) => {
-        if (!window.isSecureContext) {
-            reject(new Error('Akses lokasi hanya bisa dipakai lewat HTTPS atau localhost. Hubungi admin sistem.'));
-            return;
-        }
-        if (!('geolocation' in navigator)) {
-            reject(new Error('Browser ini tidak mendukung akses lokasi. Gunakan browser lain (Chrome/Firefox/Safari terbaru).'));
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            (posisi) => resolve(posisi.coords),
-            (galat) => reject(new Error(PESAN_LOKASI[galat.code] || 'Lokasi tidak dapat diambil. Silakan coba lagi.')),
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-        );
-    });
-
-    const tampilkanLokasi = (el, lokasi) => {
-        el.textContent = '';
-        const lat = Number(lokasi?.latitude);
-        const lng = Number(lokasi?.longitude);
-        if (!lokasi || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-        const koordinat = document.createElement('span');
-        koordinat.className = 'block font-mono';
-        koordinat.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
-        el.appendChild(koordinat);
-
-        if (Number.isFinite(Number(lokasi.akurasi)) && lokasi.akurasi !== null) {
-            const akurasi = document.createElement('span');
-            akurasi.className = 'block';
-            akurasi.textContent = 'Akurasi ±' + Math.round(lokasi.akurasi) + ' m';
-            el.appendChild(akurasi);
-        }
-
-        const peta = document.createElement('a');
-        peta.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
-        peta.target = '_blank';
-        peta.rel = 'noopener';
-        peta.className = 'font-medium text-sji-biru hover:underline';
-        peta.textContent = 'Lihat di peta';
-        el.appendChild(peta);
+    const aturStatusFoto = (pesan, galat = false) => {
+        statusFoto.textContent = pesan;
+        statusFoto.classList.toggle('text-red-600', galat);
+        statusFoto.classList.toggle('text-gray-500', !galat);
     };
 
-    const tampilkanSemuaLokasi = (lokasi) => {
-        $$('[data-lokasi]').forEach((el) => tampilkanLokasi(el, lokasi[el.dataset.lokasi]));
-    };
+    /** Buka dialog unggah. Hasil: { blob, nama } saat dikirim, atau null bila dibatalkan. */
+    const ambilFoto = (judul) => {
+        if (!dialogFoto || typeof dialogFoto.showModal !== 'function') {
+            throw new Error('Browser ini tidak mendukung unggah foto. Gunakan Chrome/Firefox/Safari terbaru.');
+        }
 
-    $$('[data-lokasi-awal]').forEach((el) => {
-        try { tampilkanLokasi(el, JSON.parse(el.dataset.lokasiAwal)); } catch (_) { /* tidak ada lokasi */ }
-    });
+        $('#tkFotoJudul').textContent = judul;
+        berkasFoto.value = '';
+        wadahPratinjau.classList.add('hidden');
+        pratinjauFoto.removeAttribute('src');
+        aksiFoto('kirim').disabled = true;
+        aturStatusFoto(teksAwalStatus);
+        dialogFoto.showModal();
+
+        return new Promise((resolve) => {
+            const henti = new AbortController();
+            let berkas = null;
+            let urlPratinjau = null;
+
+            const selesai = (nilai) => {
+                henti.abort();
+                if (urlPratinjau) URL.revokeObjectURL(urlPratinjau);
+                pratinjauFoto.removeAttribute('src');
+                if (dialogFoto.open) dialogFoto.close();
+                resolve(nilai);
+            };
+
+            berkasFoto.addEventListener('change', () => {
+                berkas = null;
+                aksiFoto('kirim').disabled = true;
+                wadahPratinjau.classList.add('hidden');
+                const dipilih = berkasFoto.files?.[0];
+                if (!dipilih) {
+                    aturStatusFoto(teksAwalStatus);
+                    return;
+                }
+                if (!TIPE_FOTO.includes(dipilih.type)) {
+                    aturStatusFoto('Format file tidak didukung. Pilih foto JPG, PNG, atau WEBP.', true);
+                    return;
+                }
+                if (dipilih.size > UKURAN_MAKS_KB * 1024) {
+                    aturStatusFoto('Ukuran foto melebihi ' + Math.floor(UKURAN_MAKS_KB / 1024) + ' MB. Pilih foto lain.', true);
+                    return;
+                }
+                berkas = dipilih;
+                if (urlPratinjau) URL.revokeObjectURL(urlPratinjau);
+                urlPratinjau = URL.createObjectURL(dipilih);
+                pratinjauFoto.src = urlPratinjau;
+                wadahPratinjau.classList.remove('hidden');
+                aksiFoto('kirim').disabled = false;
+                aturStatusFoto('Periksa kembali: wajah terlihat jelas serta ada keterangan tanggal, jam, dan lokasi.');
+            }, { signal: henti.signal });
+
+            aksiFoto('kirim').addEventListener('click', () => {
+                if (berkas) selesai({ blob: berkas, nama: berkas.name || 'absensi.jpg' });
+            }, { signal: henti.signal });
+
+            aksiFoto('batal').addEventListener('click', () => selesai(null), { signal: henti.signal });
+            dialogFoto.addEventListener('cancel', (e) => { e.preventDefault(); selesai(null); }, { signal: henti.signal });
+        });
+    };
 
     const konfeti = (asal) => {
         if (kurangiGerak) return;
@@ -275,6 +317,26 @@
         }
     };
 
+    const kirimAbsensi = async (form, foto) => {
+        const isian = new FormData(form);
+        isian.append('foto', foto.blob, foto.nama);
+
+        const res = await fetch(form.action, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').content,
+            },
+            body: isian,
+            credentials: 'same-origin',
+        });
+        let data = {};
+        try { data = await res.json(); } catch (_) { /* bukan JSON */ }
+
+        return { res, data };
+    };
+
     if (kartu) {
         jalankanDurasi();
 
@@ -288,38 +350,27 @@
                 tombol.classList.add('memuat');
                 tombol.disabled = true;
 
-                // Lokasi wajib: ambil dulu sebelum mengirim absensi.
-                let koordinat;
+                // Foto wajib: unggah sebelum mengirim absensi.
+                let foto;
                 try {
-                    koordinat = await ambilLokasi();
+                    foto = await ambilFoto(form.dataset.judul || 'Foto Absensi');
                 } catch (galat) {
                     TK.toast('gagal', galat.message);
                     tombol.classList.remove('memuat');
                     tombol.disabled = false;
                     return;
                 }
+                if (!foto) {
+                    tombol.classList.remove('memuat');
+                    tombol.disabled = false;
+                    return;
+                }
 
                 const minimal = new Promise((r) => setTimeout(r, 600)); // agar loading terlihat halus
-                const isian = new FormData(form);
-                isian.append('latitude', koordinat.latitude);
-                isian.append('longitude', koordinat.longitude);
-                if (Number.isFinite(koordinat.accuracy)) isian.append('akurasi', koordinat.accuracy);
 
                 try {
-                    const res = await fetch(form.action, {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').content,
-                        },
-                        body: isian,
-                        credentials: 'same-origin',
-                    });
+                    const { res, data } = await kirimAbsensi(form, foto);
                     await minimal;
-
-                    let data = {};
-                    try { data = await res.json(); } catch (_) { /* bukan JSON */ }
 
                     if (res.status === 419) {
                         TK.toast('gagal', 'Sesi halaman sudah kedaluwarsa. Halaman akan dimuat ulang.');
@@ -330,8 +381,12 @@
                         TK.toast('gagal', 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.');
                         return;
                     }
+                    if (res.status === 413) {
+                        TK.toast('gagal', 'Ukuran foto terlalu besar untuk server. Pilih foto yang lebih kecil lalu coba lagi.');
+                        return;
+                    }
 
-                    TK.toast(data.ok ? 'sukses' : 'gagal', data.pesan || (data.ok ? 'Berhasil.' : 'Terjadi kesalahan. Silakan coba lagi.'));
+                    TK.toast(data.ok ? 'sukses' : 'gagal', data.pesan || (data.ok ? 'Berhasil.' : 'Terjadi kesalahan. Silakan coba lagi.'), data.ok ? 6000 : 5000);
                     if (data.ok) konfeti(tombol);
                     gantiStatus(data);
                 } catch (_) {
