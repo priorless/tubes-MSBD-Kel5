@@ -353,7 +353,7 @@
     @media print {
         .tk-no-print,
         aside,
-        header {
+        body:not(.cetak-struk) header {
             display: none !important;
         }
     }

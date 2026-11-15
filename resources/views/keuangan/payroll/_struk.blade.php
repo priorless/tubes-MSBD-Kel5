@@ -6,7 +6,7 @@
     $tanggalIndonesia = fn ($tanggal): string => Carbon::parse($tanggal)->locale('id')->translatedFormat('d F Y');
 @endphp
 <article class="struk-dokumen overflow-hidden rounded-lg bg-white text-gray-800" data-judul="Slip Gaji {{ $payroll->nama }} - {{ $labelPeriode }}">
-    <header class="flex flex-wrap items-center justify-between gap-6 bg-sji-biru-tua px-8 py-6 text-white">
+    <div class="flex flex-wrap items-center justify-between gap-6 bg-sji-biru-tua px-8 py-6 text-white">
         <div class="flex items-center gap-4">
             <img src="{{ asset('images/logo-sji.png') }}" alt="Logo PT Satu Jaya Indonesia" class="size-16 rounded-md bg-white object-contain p-1.5">
             <div>
@@ -18,7 +18,7 @@
             <p class="text-2xl font-extrabold tracking-widest text-sji-emas">SLIP GAJI</p>
             <p class="mt-1 text-sm text-blue-100">Periode {{ $labelPeriode }}</p>
         </div>
-    </header>
+    </div>
     <div class="flex h-1.5" aria-hidden="true">
         <span class="flex-3 bg-sji-merah"></span>
         <span class="flex-1 bg-sji-emas"></span>
