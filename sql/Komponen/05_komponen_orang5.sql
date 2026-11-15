@@ -10,7 +10,6 @@ BEGIN
   DECLARE v_id INT;
   DECLARE v_kategori VARCHAR(10);
   DECLARE v_gaji DECIMAL(12,2);
-  DECLARE v_tunjangan DECIMAL(12,2);
   DECLARE v_hari_kerja INT;
   DECLARE v_jumlah_absen INT;
   DECLARE v_jam_lembur INT;
@@ -35,13 +34,13 @@ BEGIN
     WHERE id_karyawan = v_id AND periode_bulan = p_bulan AND periode_tahun = p_tahun;
     IF v_ada = 0 THEN
       IF v_kategori = 'Lapangan' THEN
-        SELECT c.gaji_pokok, c.tunjangan, c.hari_kerja_per_bulan
-        INTO v_gaji, v_tunjangan, v_hari_kerja
+        SELECT c.gaji_pokok, c.hari_kerja_per_bulan
+        INTO v_gaji, v_hari_kerja
         FROM tbl_kontrak c JOIN tbl_penempatan p ON c.id_penempatan = p.id
         WHERE p.id_karyawan = v_id AND p.status = 'Aktif' LIMIT 1;
       ELSE
-        SELECT gaji_pokok, IFNULL(tunjangan, 0), 25
-        INTO v_gaji, v_tunjangan, v_hari_kerja
+        SELECT gaji_pokok, 25
+        INTO v_gaji, v_hari_kerja
         FROM tbl_karyawan WHERE id = v_id;
       END IF;
 
@@ -53,13 +52,13 @@ BEGIN
 
       SET v_lembur = fn_hitung_lembur(v_jam_lembur);
       SET v_potongan = fn_hitung_potongan_absen(v_gaji, v_hari_kerja, v_jumlah_absen);
-      SET v_total = v_gaji + v_tunjangan + v_lembur - v_potongan;
+      SET v_total = v_gaji + v_lembur - v_potongan;
 
       INSERT INTO tbl_payroll
-        (id_karyawan, periode_bulan, periode_tahun, gaji_pokok, tunjangan,
+        (id_karyawan, periode_bulan, periode_tahun, gaji_pokok,
          total_lembur, potongan_absen, total_gaji)
       VALUES
-        (v_id, p_bulan, p_tahun, v_gaji, v_tunjangan, v_lembur, v_potongan, v_total);
+        (v_id, p_bulan, p_tahun, v_gaji, v_lembur, v_potongan, v_total);
     END IF;
   END LOOP;
   CLOSE cur;

@@ -2,8 +2,474 @@
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../../public/js/*.js';
 
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Warna merek PT Satu Jaya Indonesia (dari logo: biru, merah, emas). */
+    --color-sji-biru: #1e40af;
+    --color-sji-biru-tua: #172554;
+    --color-sji-merah: #e11d24;
+    --color-sji-emas: #e8b923;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Komponen bersama semua modul (CEO, HRD, Operasional, Keuangan, Tenaga Kerja)
+|--------------------------------------------------------------------------
+*/
+@layer components {
+    /* Kartu */
+    .card {
+        @apply rounded-lg border border-gray-200 bg-white shadow-sm;
+    }
+
+    .card-header {
+        @apply flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4;
+    }
+
+    .card-title {
+        @apply text-base font-semibold text-gray-800;
+    }
+
+    .card-body {
+        @apply p-6;
+    }
+
+    .card-footer {
+        @apply flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-6 py-4 text-sm text-gray-500;
+    }
+
+    /* Kartu statistik */
+    .stat-card {
+        @apply rounded-lg border border-gray-200 bg-white p-6 shadow-sm;
+    }
+
+    .stat-label {
+        @apply text-sm font-medium text-gray-500;
+    }
+
+    .stat-value {
+        @apply mt-2 text-3xl font-bold text-gray-800 tabular-nums;
+    }
+
+    /* Tabel */
+    .table {
+        @apply min-w-full divide-y divide-gray-200 text-sm;
+    }
+
+    .table thead {
+        @apply bg-gray-50;
+    }
+
+    .table th {
+        @apply px-4 py-3 text-left text-xs font-semibold tracking-wider whitespace-nowrap text-gray-500 uppercase;
+    }
+
+    .table td {
+        @apply px-4 py-3 align-middle text-gray-700;
+    }
+
+    .table tbody {
+        @apply divide-y divide-gray-100;
+    }
+
+    .table tbody tr {
+        @apply hover:bg-gray-50;
+    }
+
+    .table tbody tr.table-danger {
+        @apply bg-red-50 hover:bg-red-100;
+    }
+
+    .table-empty {
+        @apply px-4 py-10 text-center text-sm text-gray-500;
+    }
+
+    /* Badge */
+    .badge,
+    .tk-badge-sukses,
+    .tk-badge-peringatan,
+    .tk-badge-bahaya,
+    .tk-badge-netral {
+        @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap;
+    }
+
+    .badge-success,
+    .tk-badge-sukses {
+        @apply bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20 ring-inset;
+    }
+
+    .badge-danger,
+    .tk-badge-bahaya {
+        @apply bg-red-50 text-red-700 ring-1 ring-red-600/20 ring-inset;
+    }
+
+    .badge-warning,
+    .tk-badge-peringatan {
+        @apply bg-amber-50 text-amber-800 ring-1 ring-amber-600/20 ring-inset;
+    }
+
+    .badge-info {
+        @apply bg-sky-50 text-sky-700 ring-1 ring-sky-600/20 ring-inset;
+    }
+
+    .badge-primary {
+        @apply bg-blue-50 text-blue-700 ring-1 ring-blue-600/20 ring-inset;
+    }
+
+    .badge-secondary,
+    .tk-badge-netral {
+        @apply bg-gray-100 text-gray-600 ring-1 ring-gray-500/20 ring-inset;
+    }
+
+    .badge-dark {
+        @apply bg-gray-800 text-white;
+    }
+
+    /* Tombol */
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .btn-success,
+    .btn-danger,
+    .btn-warning,
+    .btn-outline-danger {
+        @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium whitespace-nowrap shadow-sm transition-colors focus:ring-2 focus:ring-offset-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    .btn-sm {
+        @apply px-3 py-1.5 text-xs;
+    }
+
+    .btn-primary {
+        @apply bg-sji-biru text-white hover:bg-blue-900 focus:ring-blue-500;
+    }
+
+    .btn-secondary {
+        @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-300;
+    }
+
+    .btn-success {
+        @apply bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500;
+    }
+
+    .btn-danger {
+        @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+    }
+
+    .btn-warning {
+        @apply bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-400;
+    }
+
+    .btn-outline-danger {
+        @apply border border-red-200 bg-white text-red-600 shadow-none hover:bg-red-50 focus:ring-red-300;
+    }
+
+    /* Form */
+    .form-label {
+        @apply mb-1 block text-sm font-medium text-gray-700;
+    }
+
+    .form-input {
+        @apply block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none disabled:bg-gray-100 disabled:text-gray-500;
+    }
+
+    .form-input-error {
+        @apply border-red-400 focus:border-red-500 focus:ring-red-500/20;
+    }
+
+    .form-check {
+        @apply size-4 border-gray-300 text-blue-700 accent-blue-700;
+    }
+
+    .form-error {
+        @apply mt-1 text-sm text-red-600;
+    }
+
+    .form-hint {
+        @apply mt-1 text-xs text-gray-500;
+    }
+
+    /* Kotak info */
+    .callout {
+        @apply rounded-lg border px-4 py-3 text-sm;
+    }
+
+    .callout-info {
+        @apply border-sky-200 bg-sky-50 text-sky-800;
+    }
+
+    .callout-warning {
+        @apply border-amber-200 bg-amber-50 text-amber-800;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Modul Tenaga Kerja: state yang diubah oleh public/js/tenaga-kerja.js
+|--------------------------------------------------------------------------
+*/
+@layer components {
+    .tk-reveal {
+        @apply translate-y-3 opacity-0 transition duration-500 ease-out;
+        transition-delay: var(--tunda, 0ms);
+    }
+
+    .tk-reveal.tampil {
+        @apply translate-y-0 opacity-100;
+    }
+
+    /* Panel status absensi: hanya panel yang sesuai data-status yang tampil */
+    #tkStatusCard [data-panel] {
+        @apply hidden;
+    }
+
+    #tkStatusCard[data-status='belum'] [data-panel='belum'],
+    #tkStatusCard[data-status='masuk'] [data-panel='masuk'],
+    #tkStatusCard[data-status='selesai'] [data-panel='selesai'] {
+        @apply block;
+    }
+
+    #tkStatusCard[data-status='belum'] #tkStatusBadge {
+        @apply bg-gray-100 text-gray-700;
+    }
+
+    #tkStatusCard[data-status='masuk'] #tkStatusBadge {
+        @apply bg-sky-50 text-sky-700;
+    }
+
+    #tkStatusCard[data-status='selesai'] #tkStatusBadge {
+        @apply bg-emerald-50 text-emerald-700;
+    }
+
+    #tkStatusBadge.ganti {
+        animation: tk-ganti 0.6s ease-out;
+    }
+
+    .tk-btn {
+        @apply relative overflow-hidden;
+    }
+
+    .tk-btn .tk-btn-loading,
+    .tk-btn.memuat .tk-btn-teks {
+        @apply hidden;
+    }
+
+    .tk-btn.memuat .tk-btn-loading {
+        @apply inline-flex items-center gap-2;
+    }
+
+    .tk-spinner {
+        @apply inline-block size-4 animate-spin rounded-full border-2 border-white/40 border-t-white;
+    }
+
+    .tk-riak {
+        @apply pointer-events-none absolute rounded-full bg-white/40;
+        animation: tk-riak 0.6s ease-out forwards;
+    }
+
+    .tk-digit.flip {
+        animation: tk-flip 0.35s ease-out;
+    }
+
+    .tk-konfeti {
+        @apply pointer-events-none fixed z-50 size-2 rounded-sm;
+        animation: tk-konfeti 0.9s ease-out forwards;
+    }
+
+    tr.tersembunyi {
+        @apply hidden;
+    }
+
+    body.keluar {
+        @apply opacity-60 transition-opacity duration-200;
+    }
+
+    /* Toast notifikasi */
+    #tkToastWrap {
+        @apply fixed right-4 bottom-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2;
+    }
+
+    .tk-toast {
+        @apply relative flex items-start gap-3 overflow-hidden rounded-lg border bg-white p-4 pr-8 text-sm shadow-lg;
+        animation: tk-masuk 0.25s ease-out;
+    }
+
+    .tk-toast.keluar {
+        animation: tk-keluar 0.2s ease-in forwards;
+    }
+
+    .tk-toast-sukses {
+        @apply border-emerald-200;
+    }
+
+    .tk-toast-gagal {
+        @apply border-red-200;
+    }
+
+    .tk-toast-ikon {
+        @apply flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white;
+    }
+
+    .tk-toast-sukses .tk-toast-ikon {
+        @apply bg-emerald-600;
+    }
+
+    .tk-toast-gagal .tk-toast-ikon {
+        @apply bg-red-600;
+    }
+
+    .tk-toast-judul {
+        @apply font-semibold text-gray-800;
+    }
+
+    .tk-toast-pesan {
+        @apply text-gray-600;
+    }
+
+    .tk-toast-tutup {
+        @apply absolute top-2 right-3 text-lg leading-none text-gray-400 hover:text-gray-700;
+    }
+
+    .tk-toast-bar {
+        @apply absolute bottom-0 left-0 h-0.5 w-full origin-left;
+        animation-name: tk-habis;
+        animation-timing-function: linear;
+        animation-fill-mode: forwards;
+    }
+
+    .tk-toast-sukses .tk-toast-bar {
+        @apply bg-emerald-500;
+    }
+
+    .tk-toast-gagal .tk-toast-bar {
+        @apply bg-red-500;
+    }
+
+    @media print {
+        .tk-no-print,
+        aside,
+        body:not(.cetak-struk) header {
+            display: none !important;
+        }
+    }
+}
+
+@keyframes tk-ganti {
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+@keyframes tk-riak {
+    from {
+        transform: scale(0);
+        opacity: 1;
+    }
+    to {
+        transform: scale(2.5);
+        opacity: 0;
+    }
+}
+
+@keyframes tk-flip {
+    from {
+        transform: translateY(-30%);
+        opacity: 0.3;
+    }
+}
+
+@keyframes tk-konfeti {
+    to {
+        transform: translate(var(--x), var(--y)) rotate(var(--r));
+        opacity: 0;
+    }
+}
+
+@keyframes tk-masuk {
+    from {
+        transform: translateY(0.5rem);
+        opacity: 0;
+    }
+}
+
+@keyframes tk-keluar {
+    to {
+        transform: translateX(1rem);
+        opacity: 0;
+    }
+}
+
+@keyframes tk-habis {
+    to {
+        transform: scaleX(0);
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Invoice digital (modul Keuangan) — stempel LUNAS & cetak struk dari modal
+|--------------------------------------------------------------------------
+*/
+.struk-stempel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-14deg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.6rem 1.75rem;
+    border: 4px double #047857;
+    border-radius: 0.75rem;
+    color: #047857;
+    opacity: 0.82;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    letter-spacing: 0.35em;
+}
+
+.struk-stempel-teks {
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1;
+    padding-left: 0.35em;
+}
+
+.struk-stempel-tanggal {
+    margin-top: 0.35rem;
+    padding-top: 0.3rem;
+    border-top: 1px solid currentColor;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+}
+
+#areaCetakStruk {
+    display: none;
+}
+
+@media print {
+    body.cetak-struk > *:not(#areaCetakStruk) {
+        display: none !important;
+    }
+
+    body.cetak-struk {
+        background: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    body.cetak-struk dialog,
+    body.cetak-struk dialog::backdrop {
+        display: none !important;
+    }
+
+    body.cetak-struk #areaCetakStruk {
+        display: block;
+    }
 }

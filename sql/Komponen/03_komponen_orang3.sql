@@ -34,7 +34,7 @@ END //
 CREATE VIEW v_slip_gaji_detail AS
 SELECT p.id, k.nip, k.nama, k.kategori,
        p.periode_bulan, p.periode_tahun,
-       p.gaji_pokok, p.tunjangan, p.total_lembur, p.potongan_absen,
+       p.gaji_pokok, p.total_lembur, p.potongan_absen,
        p.total_gaji, p.status_bayar, p.tgl_bayar
 FROM tbl_payroll p
 JOIN tbl_karyawan k ON p.id_karyawan = k.id //
