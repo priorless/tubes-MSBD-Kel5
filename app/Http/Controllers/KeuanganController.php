@@ -94,6 +94,9 @@ class KeuanganController extends Controller
                     'k.nama_perusahaan',
                 ])
                 ->paginate(15),
+            'invoiceBaru' => session()->has('invoice_baru')
+                ? DB::table('tbl_invoice')->where('id', session('invoice_baru'))->first(['id', 'nomor_invoice'])
+                : null,
             'klien' => DB::table('tbl_klien')
                 ->where('status', 'Aktif')
                 ->orderBy('nama_perusahaan')
@@ -118,9 +121,62 @@ class KeuanganController extends Controller
             $validated['tahun'],
         ]);
 
-        return $gagal ?? redirect()
+        if ($gagal !== null) {
+            return $gagal;
+        }
+
+        $idInvoiceBaru = DB::table('tbl_invoice')
+            ->where('id_klien', $validated['id_klien'])
+            ->where('periode_bulan', $validated['bulan'])
+            ->where('periode_tahun', $validated['tahun'])
+            ->value('id');
+
+        return redirect()
             ->route('keuangan.invoice.index')
-            ->with('success', 'Invoice periode '.self::DAFTAR_BULAN[(int) $validated['bulan']].' '.$validated['tahun'].' berhasil dibuat.');
+            ->with('success', 'Invoice periode '.self::DAFTAR_BULAN[(int) $validated['bulan']].' '.$validated['tahun'].' berhasil dibuat.')
+            ->with('invoice_baru', $idInvoiceBaru);
+    }
+
+    /**
+     * Isi struk invoice digital untuk modal di halaman Invoice. Data dan
+     * status selalu dibaca langsung dari tbl_invoice sehingga mengikuti
+     * kondisi terbaru. Akses langsung (bukan fetch) diarahkan ke halaman
+     * Invoice yang akan membuka modal struk tersebut.
+     */
+    public function strukInvoice(Request $request, int $id): View|RedirectResponse
+    {
+        if (! $request->ajax()) {
+            return redirect()->route('keuangan.invoice.index', ['struk' => $id]);
+        }
+
+        $invoice = DB::table('tbl_invoice as i')
+            ->join('tbl_klien as k', 'k.id', '=', 'i.id_klien')
+            ->where('i.id', $id)
+            ->first([
+                'i.id',
+                'i.nomor_invoice',
+                'i.periode_bulan',
+                'i.periode_tahun',
+                'i.jumlah_tenaga',
+                'i.total_tagihan',
+                'i.status',
+                'i.tgl_pembayaran',
+                'i.created_at',
+                'k.kode_klien',
+                'k.nama_perusahaan',
+                'k.alamat',
+                'k.pic_nama',
+                'k.pic_jabatan',
+                'k.pic_telp',
+                'k.pic_email',
+            ]);
+
+        abort_if($invoice === null, 404);
+
+        return view('keuangan.invoice._struk', [
+            'invoice' => $invoice,
+            'labelPeriode' => (self::DAFTAR_BULAN[(int) $invoice->periode_bulan] ?? $invoice->periode_bulan).' '.$invoice->periode_tahun,
+        ]);
     }
 
     public function tandaiInvoiceLunas(Request $request, int $id): RedirectResponse
