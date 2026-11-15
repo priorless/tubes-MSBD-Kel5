@@ -73,6 +73,37 @@ class KeuanganController extends Controller
         return $gagal ?? back()->with('success', 'Status payroll berhasil ditandai cair.');
     }
 
+    public function strukPayroll(Request $request, int $id): View|RedirectResponse
+    {
+        if (! $request->ajax()) {
+            return redirect()->route('keuangan.payroll.index', ['struk' => $id]);
+        }
+
+        $payroll = DB::table('v_slip_gaji_detail')
+            ->where('id', $id)
+            ->first([
+                'id',
+                'nip',
+                'nama',
+                'kategori',
+                'periode_bulan',
+                'periode_tahun',
+                'gaji_pokok',
+                'total_lembur',
+                'potongan_absen',
+                'total_gaji',
+                'status_bayar',
+                'tgl_bayar',
+            ]);
+
+        abort_if($payroll === null, 404);
+
+        return view('keuangan.payroll._struk', [
+            'payroll' => $payroll,
+            'labelPeriode' => (self::DAFTAR_BULAN[(int) $payroll->periode_bulan] ?? $payroll->periode_bulan).' '.$payroll->periode_tahun,
+        ]);
+    }
+
     public function invoice(): View
     {
         return view('keuangan.invoice.index', [

@@ -80,6 +80,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('payroll', 'payroll')->name('payroll.index');
         Route::post('payroll/generate', 'generatePayroll')->name('payroll.generate');
         Route::patch('payroll/{id}/cair', 'tandaiPayrollCair')->whereNumber('id')->name('payroll.cair');
+        Route::get('payroll/{id}/struk', 'strukPayroll')->whereNumber('id')->name('payroll.struk');
 
         Route::get('invoice', 'invoice')->name('invoice.index');
         Route::post('invoice', 'generateInvoice')->name('invoice.generate');

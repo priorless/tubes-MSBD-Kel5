@@ -11,6 +11,10 @@
                 Payroll dihitung otomatis oleh database untuk karyawan Internal berstatus Aktif dan karyawan Lapangan berstatus Ditempatkan,
                 termasuk lembur dan potongan absensi. Karyawan yang sudah memiliki payroll pada periode ini akan dilewati.
             </p>
+            <p class="mt-2 text-sm">
+                Gunakan <span class="font-semibold">Lihat Struk</span> untuk memeriksa atau mencetak rincian gaji.
+                Gunakan <span class="font-semibold">Tandai Cair</span> setelah gaji benar-benar dibayarkan.
+            </p>
         </div>
         <form method="POST" action="{{ route('keuangan.payroll.generate') }}"
               onsubmit="return confirm(@js('Generate payroll untuk '.$daftarBulan[$bulanIni].' '.$tahunIni.'?'));">
@@ -45,7 +49,6 @@
                         <th>Nama</th>
                         <th>Kategori</th>
                         <th class="text-right">Gaji Pokok</th>
-                        <th class="text-right">Tunjangan</th>
                         <th class="text-right">Lembur</th>
                         <th class="text-right">Potongan Absen</th>
                         <th class="text-right">Total Gaji</th>
@@ -64,7 +67,6 @@
                                 </span>
                             </td>
                             <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->gaji_pokok, 0, ',', '.') }}</td>
-                            <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->tunjangan, 0, ',', '.') }}</td>
                             <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->total_lembur, 0, ',', '.') }}</td>
                             <td class="text-right whitespace-nowrap text-red-600 tabular-nums">Rp {{ number_format((float) $item->potongan_absen, 0, ',', '.') }}</td>
                             <td class="text-right font-semibold whitespace-nowrap text-gray-800 tabular-nums">Rp {{ number_format((float) $item->total_gaji, 0, ',', '.') }}</td>
@@ -77,21 +79,23 @@
                                 @endif
                             </td>
                             <td class="text-center">
-                                @if ($item->status_bayar !== 'Sudah Dibayar')
-                                    <form method="POST" action="{{ route('keuangan.payroll.cair', $item->id) }}"
-                                          onsubmit="return confirm(@js('Tandai gaji '.$item->nama.' sudah cair hari ini?'));">
-                                        @csrf
-                                        @method('PATCH')
-                                        <button type="submit" class="btn-success btn-sm">Tandai Cair</button>
-                                    </form>
-                                @else
-                                    <span class="text-gray-400">&mdash;</span>
-                                @endif
+                                <div class="flex flex-wrap items-center justify-center gap-2">
+                                    <button type="button" class="btn-secondary btn-sm whitespace-nowrap"
+                                            data-struk-url="{{ route('keuangan.payroll.struk', $item->id) }}">Lihat Struk</button>
+                                    @if ($item->status_bayar !== 'Sudah Dibayar')
+                                        <form method="POST" action="{{ route('keuangan.payroll.cair', $item->id) }}"
+                                              onsubmit="return confirm(@js('Tandai gaji '.$item->nama.' sudah cair hari ini?'));">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="btn-success btn-sm whitespace-nowrap">Tandai Cair</button>
+                                        </form>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="table-empty">Belum ada data payroll untuk periode {{ $daftarBulan[$bulan] }} {{ $tahun }}.</td>
+                            <td colspan="9" class="table-empty">Belum ada data payroll untuk periode {{ $daftarBulan[$bulan] }} {{ $tahun }}.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -103,4 +107,89 @@
             @include('partials.pagination', ['paginator' => $payroll])
         </div>
     </div>
+
+    <dialog id="strukModal" aria-labelledby="strukModalJudul"
+            class="m-auto max-h-[92vh] w-[calc(100%-2rem)] max-w-3xl overflow-hidden rounded-xl bg-gray-100 p-0 shadow-2xl backdrop:bg-gray-900/60">
+        <div class="flex max-h-[92vh] flex-col">
+            <div class="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-5 py-3">
+                <h2 id="strukModalJudul" class="text-sm font-semibold text-gray-800">Slip Gaji Digital</h2>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-primary btn-sm" data-struk-cetak disabled>Cetak / Simpan PDF</button>
+                    <button type="button" class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800" data-struk-tutup aria-label="Tutup struk">
+                        <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-y-auto p-4 sm:p-6" id="strukModalIsi" aria-live="polite"></div>
+        </div>
+    </dialog>
+
+    <div id="areaCetakStruk"></div>
 @endsection
+
+@push('scripts')
+    <script>
+        (() => {
+            const modal = document.getElementById('strukModal');
+            const isi = document.getElementById('strukModalIsi');
+            const judul = document.getElementById('strukModalJudul');
+            const tombolCetak = modal.querySelector('[data-struk-cetak]');
+            const areaCetak = document.getElementById('areaCetakStruk');
+            document.body.appendChild(areaCetak);
+
+            const tampilkanPesan = (pesan, kelas) => {
+                isi.innerHTML = '';
+                const p = document.createElement('p');
+                p.className = 'rounded-lg bg-white px-6 py-12 text-center text-sm ' + kelas;
+                p.textContent = pesan;
+                isi.appendChild(p);
+            };
+
+            const bukaStruk = async (url) => {
+                judul.textContent = 'Slip Gaji Digital';
+                tombolCetak.disabled = true;
+                tampilkanPesan('Memuat slip gaji...', 'text-gray-500');
+                if (!modal.open) modal.showModal();
+
+                try {
+                    const respons = await fetch(url, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+                        cache: 'no-store',
+                    });
+                    if (!respons.ok) throw new Error(String(respons.status));
+                    isi.innerHTML = await respons.text();
+                    judul.textContent = isi.querySelector('[data-judul]')?.dataset.judul ?? 'Slip Gaji Digital';
+                    tombolCetak.disabled = false;
+                } catch (galat) {
+                    tampilkanPesan(galat.message === '404'
+                        ? 'Slip gaji tidak ditemukan.'
+                        : 'Slip gaji gagal dimuat. Silakan coba lagi.', 'text-red-600');
+                }
+            };
+
+            document.querySelectorAll('[data-struk-url]').forEach((tombol) => {
+                tombol.addEventListener('click', () => bukaStruk(tombol.dataset.strukUrl));
+            });
+
+            modal.querySelector('[data-struk-tutup]').addEventListener('click', () => modal.close());
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+
+            tombolCetak.addEventListener('click', () => {
+                areaCetak.innerHTML = isi.innerHTML;
+                document.body.classList.add('cetak-struk');
+                window.print();
+            });
+            window.addEventListener('afterprint', () => {
+                document.body.classList.remove('cetak-struk');
+                areaCetak.innerHTML = '';
+            });
+
+            const idStrukDiminta = new URLSearchParams(window.location.search).get('struk');
+            if (idStrukDiminta && /^\d+$/.test(idStrukDiminta)) {
+                bukaStruk(@js(url('keuangan/payroll')) + '/' + idStrukDiminta + '/struk');
+            }
+        })();
+    </script>
+@endpush
