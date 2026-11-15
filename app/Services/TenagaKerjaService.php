@@ -8,6 +8,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 /**
  * Akses database untuk modul Tenaga Kerja (Orang 4).
@@ -24,6 +25,8 @@ class TenagaKerjaService
 {
     /** @var array<string, array<string, string>> cache: tabel => [nama_kolom => tipe] */
     private array $kolomCache = [];
+
+    public function __construct(private FotoAbsensiService $foto) {}
 
     /* =====================================================================
      * Utilitas kolom & error
@@ -101,6 +104,16 @@ class TenagaKerjaService
         return DB::selectOne('SELECT NOW() AS sekarang')->sekarang;
     }
 
+    /**
+     * Satu titik waktu database untuk satu transaksi absensi (tanggal, jam, dan folder foto).
+     *
+     * @return object{sekarang: string, tgl: string, jam: string}
+     */
+    private function waktuTransaksi(): object
+    {
+        return DB::selectOne('SELECT NOW() AS sekarang, CURDATE() AS tgl, CURTIME() AS jam');
+    }
+
     public function karyawan(int $idKaryawan): ?object
     {
         $tabel = $this->tabel('karyawan');
@@ -109,6 +122,15 @@ class TenagaKerjaService
         return DB::table($tabel)
             ->where($this->kolomWajib($tabel, 'pk_karyawan'), $idKaryawan)
             ->first();
+    }
+
+    /** Jenis layanan karyawan (Satpam, Driver, Cleaning Service, ...); null untuk staf Internal. */
+    public function namaLayanan(int $idKaryawan): ?string
+    {
+        return DB::table($this->tabel('karyawan').' as k')
+            ->join('tbl_jenis_layanan as jl', 'jl.id', '=', 'k.id_jenis_layanan')
+            ->where('k.id', $idKaryawan)
+            ->value('jl.nama_layanan');
     }
 
     /* =====================================================================
@@ -123,63 +145,183 @@ class TenagaKerjaService
         return $this->kolom($tabel, 'tanggal') ?? $this->kolomWajib($tabel, 'jam_masuk');
     }
 
-    /** Baris absensi milik karyawan untuk HARI INI (menurut jam server database). */
+    /**
+     * Baris absensi yang sedang berlaku: hari ini, atau shift malam kemarin yang belum
+     * check-out (aturannya di function database fn_id_absensi_aktif).
+     * Jika function belum dipasang (migrasi belum dijalankan), kembali ke aturan lama: hari ini saja.
+     */
     public function absensiHariIni(int $idKaryawan): ?object
     {
         $tabel = $this->tabel('absensi');
-        $kolomTanggal = $this->kolomTanggalAbsensi();
         $kolomId = $this->kolom($tabel, 'id_absensi');
+        $idAktif = $kolomId ? $this->idAbsensiAktif($idKaryawan) : false;
+
+        if ($idAktif !== false) {
+            return $idAktif === null ? null : DB::table($tabel)
+                ->where($kolomId, $idAktif)
+                ->where($this->kolomWajib($tabel, 'id_karyawan'), $idKaryawan)
+                ->first();
+        }
 
         return DB::table($tabel)
             ->where($this->kolomWajib($tabel, 'id_karyawan'), $idKaryawan)
-            ->whereRaw('DATE(`'.$kolomTanggal.'`) = CURDATE()')
+            ->whereRaw('DATE(`'.$this->kolomTanggalAbsensi().'`) = CURDATE()')
             ->when($kolomId, fn ($q) => $q->orderByDesc($kolomId))
             ->first();
     }
 
-    /**
-     * Check-in: INSERT baris baru dengan waktu masuk saat ini.
-     * Penolakan absensi ganda SENGAJA tidak dicek di sini — itu tugas trigger
-     * database. Pesan SIGNAL-nya akan ditangkap controller.
-     */
-    public function checkIn(int $idKaryawan): void
+    /** Satu baris absensi berdasarkan id, tetap dibatasi milik karyawan ini. */
+    public function absensiMilik(int $idKaryawan, int $idAbsensi): ?object
     {
+        $tabel = $this->tabel('absensi');
+        $kolomId = $this->kolom($tabel, 'id_absensi');
+
+        return $kolomId ? DB::table($tabel)
+            ->where($kolomId, $idAbsensi)
+            ->where($this->kolomWajib($tabel, 'id_karyawan'), $idKaryawan)
+            ->first() : null;
+    }
+
+    /** Id absensi aktif dari fn_id_absensi_aktif; false jika function belum ada di database. */
+    private function idAbsensiAktif(int $idKaryawan): int|false|null
+    {
+        try {
+            $id = DB::selectOne('SELECT fn_id_absensi_aktif(?) AS id', [$idKaryawan])?->id;
+        } catch (QueryException $e) {
+            if ((int) ($e->errorInfo[1] ?? 0) === 1305) { // FUNCTION does not exist
+                return false;
+            }
+            throw $e;
+        }
+
+        return $id === null ? null : (int) $id;
+    }
+
+    /**
+     * Check-in berfoto: foto unggahan disiapkan lebih dulu (gagal dibaca = absensi tidak disentuh),
+     * lalu INSERT baris baru dengan waktu server database dan simpan foto dalam satu transaksi.
+     * Penolakan absensi ganda, penempatan, dan status terlambat SENGAJA tidak dicek di sini —
+     * itu tugas trigger database. Pesan SIGNAL-nya akan ditangkap controller.
+     */
+    public function checkIn(int $idKaryawan, string $isiFoto): void
+    {
+        $jpeg = $this->foto->siapkan($isiFoto);
         $tabel = $this->tabel('absensi');
         $kolomId = $this->kolomWajib($tabel, 'id_karyawan');
         $kolomMasuk = $this->kolomWajib($tabel, 'jam_masuk');
         $kolomTanggal = $this->kolom($tabel, 'tanggal');
+        $kolomFoto = $this->kolomWajib($tabel, 'foto_masuk');
+        $path = null;
 
-        $kolom = ["`$kolomId`", "`$kolomMasuk`"];
-        $nilai = ['?', $this->bertipeDatetime($tabel, $kolomMasuk) ? 'NOW()' : 'CURTIME()'];
+        try {
+            DB::transaction(function () use ($tabel, $kolomId, $kolomMasuk, $kolomTanggal, $kolomFoto, $idKaryawan, $jpeg, &$path): void {
+                $waktu = $this->waktuTransaksi();
+                $path = $this->foto->pathBaru('masuk', $waktu->tgl);
 
-        if ($kolomTanggal && $kolomTanggal !== $kolomMasuk) {
-            $kolom[] = "`$kolomTanggal`";
-            $nilai[] = $this->bertipeDatetime($tabel, $kolomTanggal) ? 'NOW()' : 'CURDATE()';
+                $data = [
+                    $kolomId => $idKaryawan,
+                    $kolomMasuk => $this->bertipeDatetime($tabel, $kolomMasuk) ? $waktu->sekarang : $waktu->jam,
+                    $kolomFoto => $path,
+                ];
+                if ($kolomTanggal && $kolomTanggal !== $kolomMasuk) {
+                    $data[$kolomTanggal] = $this->bertipeDatetime($tabel, $kolomTanggal) ? $waktu->sekarang : $waktu->tgl;
+                }
+
+                DB::table($tabel)->insert($data);
+                $this->foto->simpan($path, $jpeg);
+            });
+        } catch (Throwable $e) {
+            if ($path !== null) {
+                $this->foto->hapus($path);
+            }
+            throw $e;
         }
-
-        DB::insert(
-            "INSERT INTO `$tabel` (".implode(', ', $kolom).') VALUES ('.implode(', ', $nilai).')',
-            [$idKaryawan]
-        );
     }
 
     /**
-     * Check-out: UPDATE jam_keluar pada baris absensi hari ini yang belum check-out.
-     * Mengembalikan jumlah baris yang ter-update (0 = tidak ada yang bisa di-check-out).
+     * Check-out berfoto: UPDATE jam_keluar + foto pada baris absensi aktif yang belum check-out.
+     * Minimal durasi & lembur diperiksa trigger trg_auto_hitung_lembur.
+     * Mengembalikan jumlah baris yang ter-update (0 = tidak ada yang bisa di-check-out; foto tidak disimpan).
      */
-    public function checkOut(int $idKaryawan): int
+    public function checkOut(int $idKaryawan, string $isiFoto): int
     {
+        $jpeg = $this->foto->siapkan($isiFoto);
         $tabel = $this->tabel('absensi');
         $kolomId = $this->kolomWajib($tabel, 'id_karyawan');
         $kolomKeluar = $this->kolomWajib($tabel, 'jam_keluar');
-        $kolomTanggal = $this->kolomTanggalAbsensi();
-        $waktu = $this->bertipeDatetime($tabel, $kolomKeluar) ? 'NOW()' : 'CURTIME()';
+        $kolomPk = $this->kolom($tabel, 'id_absensi');
+        $kolomFoto = $this->kolomWajib($tabel, 'foto_keluar');
+        $path = null;
 
-        return DB::update(
-            "UPDATE `$tabel` SET `$kolomKeluar` = $waktu
-             WHERE `$kolomId` = ? AND DATE(`$kolomTanggal`) = CURDATE() AND `$kolomKeluar` IS NULL",
-            [$idKaryawan]
-        );
+        try {
+            return DB::transaction(function () use ($tabel, $kolomId, $kolomKeluar, $kolomPk, $kolomFoto, $idKaryawan, $jpeg, &$path): int {
+                $idAktif = $kolomPk ? $this->idAbsensiAktif($idKaryawan) : false;
+                if ($idAktif === null) {
+                    return 0;
+                }
+
+                $waktu = $this->waktuTransaksi();
+                $query = DB::table($tabel)->where($kolomId, $idKaryawan)->whereNull($kolomKeluar);
+                $query = $idAktif !== false
+                    ? $query->where($kolomPk, $idAktif)
+                    : $query->whereRaw('DATE(`'.$this->kolomTanggalAbsensi().'`) = ?', [$waktu->tgl]);
+
+                $path = $this->foto->pathBaru('keluar', $waktu->tgl);
+                $jumlah = $query->update([
+                    $kolomKeluar => $this->bertipeDatetime($tabel, $kolomKeluar) ? $waktu->sekarang : $waktu->jam,
+                    $kolomFoto => $path,
+                ]);
+
+                if ($jumlah === 0) {
+                    $path = null;
+
+                    return 0;
+                }
+
+                $this->foto->simpan($path, $jpeg);
+
+                return $jumlah;
+            });
+        } catch (Throwable $e) {
+            if ($path !== null) {
+                $this->foto->hapus($path);
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Penempatan aktif hari ini + jadwal kerja efektif (v_penugasan_aktif).
+     * Null jika belum ditempatkan atau view belum dipasang.
+     */
+    public function penugasanAktif(int $idKaryawan): ?object
+    {
+        $view = $this->tabel('penugasan_aktif');
+        if (! $view || ! Schema::hasView($view)) {
+            return null;
+        }
+
+        return DB::table($view)
+            ->where('id_karyawan', $idKaryawan)
+            ->orderByDesc('tgl_mulai')
+            ->orderByDesc('id_penempatan')
+            ->first();
+    }
+
+    /** Detail absensi per hari untuk satu bulan (v_absensi_harian), hanya milik karyawan ini. */
+    public function absensiHarian(int $idKaryawan, int $tahun, int $bulan): Collection
+    {
+        $view = $this->tabel('absensi_harian');
+        if (! $view || ! Schema::hasView($view)) {
+            return collect();
+        }
+
+        return DB::table($view)
+            ->where('id_karyawan', $idKaryawan)
+            ->where('tahun', $tahun)
+            ->where('bulan', $bulan)
+            ->orderByDesc('tgl')
+            ->get();
     }
 
     /* =====================================================================
@@ -227,7 +369,7 @@ class TenagaKerjaService
      * Hanya SUM tampilan atas angka yang sudah dihitung view — bukan logika bisnis.
      * Kolom yang tidak ada di view dilewati.
      *
-     * @return array<string, array{kolom: string, jumlah: float}>  kunci = rekap_hadir, dst.
+     * @return array<string, array{kolom: string, jumlah: float}> kunci = rekap_hadir, dst.
      */
     public function ringkasanRekap(int $idKaryawan, ?int $tahun, ?int $bulan): array
     {

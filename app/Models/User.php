@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Akun login dari tbl_users.
@@ -49,6 +50,37 @@ class User extends Authenticatable
      * @var string
      */
     protected $rememberTokenName = '';
+
+    /**
+     * Kolom tambahan dari migrasi add_auth_columns_to_tbl_users_table.
+     * Skema asli sql/schema_sji.sql tidak memilikinya, jadi kolom ini hanya ditulis bila memang ada.
+     *
+     * @var list<string>
+     */
+    public const array KOLOM_OPSIONAL = ['nama', 'must_change_password'];
+
+    /**
+     * Buang atribut kolom opsional yang belum ada di tbl_users sebelum INSERT/UPDATE,
+     * agar login, ganti password, dan manajemen user tetap berjalan pada skema asli.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            foreach (self::KOLOM_OPSIONAL as $kolom) {
+                if (! self::punyaKolom($kolom)) {
+                    $user->offsetUnset($kolom);
+                }
+            }
+        });
+    }
+
+    /**
+     * Apakah tbl_users pada koneksi aktif memiliki kolom tersebut.
+     */
+    public static function punyaKolom(string $kolom): bool
+    {
+        return Schema::hasColumn((new self)->getTable(), $kolom);
+    }
 
     /**
      * Get the attributes that should be cast.

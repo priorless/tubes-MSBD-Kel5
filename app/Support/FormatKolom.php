@@ -29,8 +29,8 @@ class FormatKolom
         'tgl_lahir' => 'Tanggal Lahir', 'tgl_masuk' => 'Tanggal Masuk', 'email' => 'Email',
         'jam_masuk' => 'Jam Masuk', 'jam_keluar' => 'Jam Keluar', 'thr' => 'THR',
         'nip' => 'NIP', 'no_ktp' => 'No. KTP',
-        'total_baris' => 'Hari Tercatat', 'total_jam_lembur' => 'Total Jam Lembur',
-        'hari_tidak_hadir' => 'Hari Tidak Hadir',
+        'total_baris' => 'Hari Tercatat', 'total_jam_lembur' => 'Indikasi Lembur (Jam)',
+        'hari_tidak_hadir' => 'Hari Tidak Hadir', 'total_menit_terlambat' => 'Total Menit Terlambat',
     ];
 
     public static function label(string $kolom): string
@@ -132,21 +132,21 @@ class FormatKolom
     public static function ikon(string $kolom): string
     {
         return match (true) {
-            (bool) preg_match('/nik|ktp|npwp/i', $kolom)           => 'bi-person-vcard',
-            (bool) preg_match('/email/i', $kolom)                  => 'bi-envelope',
-            (bool) preg_match('/hp|telp|telepon|phone/i', $kolom)  => 'bi-telephone',
-            (bool) preg_match('/alamat/i', $kolom)                 => 'bi-geo-alt',
-            (bool) preg_match('/lahir/i', $kolom)                  => 'bi-cake2',
-            (bool) preg_match('/kelamin|gender/i', $kolom)         => 'bi-gender-ambiguous',
-            (bool) preg_match('/jabatan|posisi/i', $kolom)         => 'bi-briefcase',
-            (bool) preg_match('/kategori|jenis/i', $kolom)         => 'bi-tags',
-            (bool) preg_match('/status/i', $kolom)                 => 'bi-patch-check',
-            (bool) preg_match('/rekening|bank/i', $kolom)          => 'bi-bank',
-            (bool) preg_match('/pendidikan/i', $kolom)             => 'bi-mortarboard',
-            (bool) preg_match('/gaji|tunjangan|upah/i', $kolom)    => 'bi-cash-stack',
-            (bool) preg_match('/tanggal|tgl|masuk/i', $kolom)      => 'bi-calendar-event',
-            (bool) preg_match('/nama/i', $kolom)                   => 'bi-person',
-            default                                                => 'bi-info-circle',
+            (bool) preg_match('/nik|ktp|npwp/i', $kolom) => 'bi-person-vcard',
+            (bool) preg_match('/email/i', $kolom) => 'bi-envelope',
+            (bool) preg_match('/hp|telp|telepon|phone/i', $kolom) => 'bi-telephone',
+            (bool) preg_match('/alamat/i', $kolom) => 'bi-geo-alt',
+            (bool) preg_match('/lahir/i', $kolom) => 'bi-cake2',
+            (bool) preg_match('/kelamin|gender/i', $kolom) => 'bi-gender-ambiguous',
+            (bool) preg_match('/jabatan|posisi/i', $kolom) => 'bi-briefcase',
+            (bool) preg_match('/kategori|jenis/i', $kolom) => 'bi-tags',
+            (bool) preg_match('/status/i', $kolom) => 'bi-patch-check',
+            (bool) preg_match('/rekening|bank/i', $kolom) => 'bi-bank',
+            (bool) preg_match('/pendidikan/i', $kolom) => 'bi-mortarboard',
+            (bool) preg_match('/gaji|tunjangan|upah/i', $kolom) => 'bi-cash-stack',
+            (bool) preg_match('/tanggal|tgl|masuk/i', $kolom) => 'bi-calendar-event',
+            (bool) preg_match('/nama/i', $kolom) => 'bi-person',
+            default => 'bi-info-circle',
         };
     }
 }

@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\CeoController;
+use App\Http\Controllers\FotoAbsensiController;
+use App\Http\Controllers\Hrd\AbsensiKaryawanController;
 use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
@@ -28,6 +30,12 @@ Route::redirect('/', '/login');
 Route::middleware(['auth', 'password.changed'])->group(function () {
     Route::get('/beranda', BerandaController::class)->name('beranda');
 
+    // Foto absensi unggahan (disk privat): hanya karyawan pemilik atau HRD — dicek di controller.
+    Route::get('/absensi/foto/{absensi}/{jenis}', FotoAbsensiController::class)
+        ->whereNumber('absensi')
+        ->whereIn('jenis', ['masuk', 'keluar'])
+        ->name('absensi.foto');
+
     /* =====================================================================
      * Manajemen User (CEO & HRD)
      * ===================================================================== */
@@ -53,6 +61,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('/', HrdDashboardController::class)->name('dashboard');
         Route::resource('karyawan', KaryawanController::class)->except('show');
         Route::get('pool-karyawan', PoolKaryawanController::class)->name('pool');
+        Route::get('absensi-karyawan', AbsensiKaryawanController::class)->name('absensi');
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
     });
 
