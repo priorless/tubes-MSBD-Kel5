@@ -4,7 +4,7 @@
 @section('page-title', 'Payroll Karyawan')
 
 @section('content')
-    <div class="callout callout-info mb-6 flex flex-wrap items-center justify-between gap-4">
+    <div class="callout callout-info mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="max-w-3xl">
             <p class="font-semibold">Generate payroll</p>
             <p class="mt-1">
@@ -16,32 +16,32 @@
                 Gunakan <span class="font-semibold">Tandai Cair</span> setelah gaji benar-benar dibayarkan.
             </p>
         </div>
-        <form method="POST" action="{{ route('keuangan.payroll.generate') }}"
+        <form method="POST" action="{{ route('keuangan.payroll.generate') }}" class="w-full sm:w-auto"
               onsubmit="return confirm(@js('Generate payroll untuk '.$daftarBulan[$bulanIni].' '.$tahunIni.'?'));">
             @csrf
-            <button type="submit" class="btn-primary">
+            <button type="submit" class="btn-primary w-full whitespace-normal text-center leading-5 sm:w-auto sm:whitespace-nowrap">
                 Generate Payroll Bulan Ini ({{ $daftarBulan[$bulanIni] }} {{ $tahunIni }})
             </button>
         </form>
     </div>
 
     <div class="card">
-        <div class="card-header">
+        <div class="card-header flex-col items-stretch sm:flex-row sm:items-center">
             <h2 class="card-title">Slip gaji periode {{ $daftarBulan[$bulan] }} {{ $tahun }}</h2>
-            <form method="GET" action="{{ route('keuangan.payroll.index') }}" class="flex flex-wrap items-center gap-2">
+            <form method="GET" action="{{ route('keuangan.payroll.index') }}" class="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                 <label for="bulan" class="sr-only">Bulan</label>
-                <select name="bulan" id="bulan" class="form-input w-auto py-1.5">
+                <select name="bulan" id="bulan" class="form-input min-w-0 py-1.5 sm:w-auto">
                     @foreach ($daftarBulan as $angka => $nama)
                         <option value="{{ $angka }}" @selected($angka === $bulan)>{{ $nama }}</option>
                     @endforeach
                 </select>
                 <label for="tahun" class="sr-only">Tahun</label>
-                <input type="number" name="tahun" id="tahun" value="{{ $tahun }}" min="2000" max="2100" class="form-input w-24 py-1.5">
-                <button type="submit" class="btn-secondary btn-sm">Tampilkan</button>
+                <input type="number" name="tahun" id="tahun" value="{{ $tahun }}" min="2000" max="2100" class="form-input min-w-0 py-1.5 sm:w-24">
+                <button type="submit" class="btn-secondary btn-sm col-span-2 sm:col-span-1">Tampilkan</button>
             </form>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="hidden overflow-x-auto lg:block">
             <table class="table">
                 <thead>
                     <tr>
@@ -102,7 +102,69 @@
             </table>
         </div>
 
-        <div class="card-footer">
+        <div class="space-y-3 p-3 lg:hidden">
+            @forelse ($payroll as $item)
+                <article class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                    <div class="flex min-w-0 items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <h3 class="font-semibold leading-5 text-gray-800">{{ $item->nama }}</h3>
+                            <p class="mt-1 break-all font-mono text-xs text-gray-500">{{ $item->nip }}</p>
+                        </div>
+                        <span @class(['badge shrink-0', 'badge-info' => $item->kategori === 'Internal', 'badge-secondary' => $item->kategori !== 'Internal'])>
+                            {{ $item->kategori }}
+                        </span>
+                    </div>
+
+                    <dl class="mt-3 space-y-2 border-t border-gray-100 pt-3 text-xs">
+                        <div class="flex justify-between gap-3">
+                            <dt class="text-gray-500">Gaji Pokok</dt>
+                            <dd class="whitespace-nowrap font-medium tabular-nums">Rp {{ number_format((float) $item->gaji_pokok, 0, ',', '.') }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-3">
+                            <dt class="text-gray-500">Lembur</dt>
+                            <dd class="whitespace-nowrap font-medium tabular-nums">Rp {{ number_format((float) $item->total_lembur, 0, ',', '.') }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-3">
+                            <dt class="text-gray-500">Potongan Absen</dt>
+                            <dd class="whitespace-nowrap font-medium text-red-600 tabular-nums">Rp {{ number_format((float) $item->potongan_absen, 0, ',', '.') }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-3 border-t border-gray-100 pt-2">
+                            <dt class="font-semibold text-gray-700">Total Gaji</dt>
+                            <dd class="whitespace-nowrap font-bold text-gray-800 tabular-nums">Rp {{ number_format((float) $item->total_gaji, 0, ',', '.') }}</dd>
+                        </div>
+                    </dl>
+
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">
+                        <div>
+                            @if ($item->status_bayar === 'Sudah Dibayar')
+                                <span class="badge badge-success">Sudah Dibayar</span>
+                                <p class="mt-1 text-xs text-gray-400">{{ \Illuminate\Support\Carbon::parse($item->tgl_bayar)->format('d/m/Y') }}</p>
+                            @else
+                                <span class="badge badge-warning">Belum Dibayar</span>
+                            @endif
+                        </div>
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <button type="button" class="btn-secondary btn-sm whitespace-nowrap"
+                                    data-struk-url="{{ route('keuangan.payroll.struk', $item->id) }}">Lihat Struk</button>
+                            @if ($item->status_bayar !== 'Sudah Dibayar')
+                                <form method="POST" action="{{ route('keuangan.payroll.cair', $item->id) }}"
+                                      onsubmit="return confirm(@js('Tandai gaji '.$item->nama.' sudah cair hari ini?'));">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit" class="btn-success btn-sm whitespace-nowrap">Tandai Cair</button>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+                </article>
+            @empty
+                <p class="table-empty rounded-lg border border-gray-200">
+                    Belum ada data payroll untuk periode {{ $daftarBulan[$bulan] }} {{ $tahun }}.
+                </p>
+            @endforelse
+        </div>
+
+        <div class="card-footer flex-col items-start sm:flex-row sm:items-center">
             <span>Menampilkan {{ $payroll->firstItem() ?? 0 }}&ndash;{{ $payroll->lastItem() ?? 0 }} dari {{ $payroll->total() }} slip gaji</span>
             @include('partials.pagination', ['paginator' => $payroll])
         </div>
