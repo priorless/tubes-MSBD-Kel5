@@ -50,7 +50,16 @@
                             <td>
                                 <div class="flex items-center gap-3">
                                     @if ($item->foto)
-                                        <img src="{{ asset('storage/'.$item->foto) }}" alt="Foto {{ $item->nama }}" class="size-9 rounded-full object-cover">
+                                        <button type="button"
+                                                class="size-9 shrink-0 cursor-zoom-in overflow-hidden rounded-full transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sji-biru"
+                                                data-foto-karyawan
+                                                data-foto-url="{{ asset('storage/'.$item->foto) }}"
+                                                data-foto-nama="{{ $item->nama }}"
+                                                aria-haspopup="dialog"
+                                                aria-controls="fotoKaryawanModal"
+                                                aria-label="Lihat foto {{ $item->nama }}">
+                                            <img src="{{ asset('storage/'.$item->foto) }}" alt="" class="size-9 rounded-full object-cover">
+                                        </button>
                                     @else
                                         <span class="flex size-9 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-500">{{ mb_substr($item->nama, 0, 1) }}</span>
                                     @endif
@@ -109,4 +118,46 @@
             @include('partials.pagination', ['paginator' => $karyawan])
         </div>
     </div>
+
+    <dialog id="fotoKaryawanModal" aria-labelledby="fotoKaryawanModalJudul"
+            class="m-auto max-h-[92vh] w-[calc(100%-2rem)] max-w-5xl overflow-hidden rounded-xl border-0 bg-white p-0 shadow-2xl backdrop:bg-gray-900/70">
+        <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
+            <h2 id="fotoKaryawanModalJudul" class="text-sm font-semibold text-gray-800">Foto profil karyawan</h2>
+            <button type="button" class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                    data-foto-modal-tutup aria-label="Tutup foto">
+                <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="flex max-h-[80vh] justify-center bg-gray-900 p-3">
+            <img id="fotoKaryawanModalGambar" alt="" class="max-h-[76vh] max-w-full object-contain">
+        </div>
+    </dialog>
 @endsection
+
+@push('scripts')
+    <script>
+        (() => {
+            const modal = document.getElementById('fotoKaryawanModal');
+            const gambar = document.getElementById('fotoKaryawanModalGambar');
+            const judul = document.getElementById('fotoKaryawanModalJudul');
+
+            document.querySelectorAll('[data-foto-karyawan]').forEach((tombol) => {
+                tombol.addEventListener('click', () => {
+                    gambar.src = tombol.dataset.fotoUrl;
+                    gambar.alt = `Foto ${tombol.dataset.fotoNama}`;
+                    judul.textContent = `Foto profil ${tombol.dataset.fotoNama}`;
+                    modal.showModal();
+                });
+            });
+
+            modal.querySelector('[data-foto-modal-tutup]').addEventListener('click', () => modal.close());
+            modal.addEventListener('click', (event) => {
+                if (event.target !== gambar) {
+                    modal.close();
+                }
+            });
+        })();
+    </script>
+@endpush
