@@ -25,3 +25,7 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Dump database berisi data pribadi: jangan pernah di-commit (repo public)
+backup_*.sql
+db_sji*.sql
