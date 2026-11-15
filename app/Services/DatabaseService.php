@@ -89,9 +89,10 @@ class DatabaseService
     */
 
     /**
-     * Procedure sp_assign_penempatan.
+     * Procedure sp_assign_penempatan (8 parameter, sama dengan OperasionalController::storePenempatan).
      *
-     * @throws QueryException SQLSTATE 45000 jika karyawan tidak valid / tidak tersedia.
+     * @throws QueryException SQLSTATE 45000 jika karyawan/klien tidak valid, klien Nonaktif,
+     *                        atau tanggal selesai sebelum tanggal mulai.
      */
     public static function callAssignPenempatan(
         int $idKaryawan,
@@ -99,28 +100,43 @@ class DatabaseService
         string $tglMulai,
         ?string $tglSelesai,
         string $lokasiKerja,
+        string $jamDatang,
+        string $jamPulang,
         int $idUserPembuat,
     ): void {
-        DB::statement('CALL sp_assign_penempatan(?, ?, ?, ?, ?, ?)', [
-            $idKaryawan, $idKlien, $tglMulai, $tglSelesai, $lokasiKerja, $idUserPembuat,
+        DB::statement('CALL sp_assign_penempatan(?, ?, ?, ?, ?, ?, ?, ?)', [
+            $idKaryawan, $idKlien, $tglMulai, $tglSelesai, $lokasiKerja, $jamDatang, $jamPulang, $idUserPembuat,
         ]);
     }
 
     /**
-     * Procedure sp_rotasi_karyawan.
+     * Procedure sp_rotasi_karyawan (7 parameter, sama dengan OperasionalController::storeRotasi).
+     * Jam datang/pulang null = tetap memakai jadwal penempatan lama.
      *
-     * @throws QueryException SQLSTATE 45000 jika penempatan lama tidak valid.
+     * @throws QueryException SQLSTATE 45000 jika penempatan lama tidak ada/bukan Aktif atau klien baru Nonaktif.
      */
     public static function callRotasiKaryawan(
         int $idPenempatanLama,
         int $idKlienBaru,
         string $tglMulaiBaru,
         string $lokasiBaru,
+        ?string $jamDatangBaru,
+        ?string $jamPulangBaru,
         int $idUserPembuat,
     ): void {
-        DB::statement('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?)', [
-            $idPenempatanLama, $idKlienBaru, $tglMulaiBaru, $lokasiBaru, $idUserPembuat,
+        DB::statement('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?, ?, ?)', [
+            $idPenempatanLama, $idKlienBaru, $tglMulaiBaru, $lokasiBaru, $jamDatangBaru, $jamPulangBaru, $idUserPembuat,
         ]);
+    }
+
+    /**
+     * Procedure sp_selesai_penempatan: penempatan & kontrak menjadi Selesai, karyawan kembali Tersedia.
+     *
+     * @throws QueryException SQLSTATE 45000 jika penempatan tidak ada, bukan Aktif, atau tanggal tidak valid.
+     */
+    public static function callSelesaiPenempatan(int $idPenempatan, string $tglSelesai): void
+    {
+        DB::statement('CALL sp_selesai_penempatan(?, ?)', [$idPenempatan, $tglSelesai]);
     }
 
     /**
