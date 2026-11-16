@@ -65,6 +65,17 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
+                    @if (($payroll->hari_wajib ?? null) !== null)
+                        <tr class="bg-gray-50/60">
+                            <td class="px-4 py-3 text-gray-700">
+                                Kehadiran
+                                <span class="block text-xs text-gray-500">Hari wajib / hari masuk (Hadir, Terlambat, Sakit) / hari absen</span>
+                            </td>
+                            <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+                                {{ $payroll->hari_wajib }} / {{ $payroll->hari_masuk ?? '—' }} / {{ $payroll->hari_absen ?? '—' }} hari
+                            </td>
+                        </tr>
+                    @endif
                     <tr>
                         <td class="px-4 py-3 text-gray-700">Gaji Pokok</td>
                         <td class="px-4 py-3 text-right tabular-nums">{{ $rupiah($payroll->gaji_pokok) }}</td>

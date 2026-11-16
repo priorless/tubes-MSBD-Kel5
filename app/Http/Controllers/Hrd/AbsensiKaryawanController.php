@@ -45,6 +45,8 @@ class AbsensiKaryawanController extends Controller
                 'belumAbsen' => collect(),
                 'daftarLayanan' => $daftarLayanan,
                 'daftarTanda' => self::TANDA,
+                'daftarKaryawan' => $this->daftarKaryawan(),
+                'lemburMenunggu' => collect(),
             ]);
         }
 
@@ -74,7 +76,28 @@ class AbsensiKaryawanController extends Controller
             'belumAbsen' => $this->belumAbsen($tanggal),
             'daftarLayanan' => $daftarLayanan,
             'daftarTanda' => self::TANDA,
+            'daftarKaryawan' => $this->daftarKaryawan(),
+            'lemburMenunggu' => $this->lemburMenunggu(),
         ]);
+    }
+
+    /**
+     * Lembur yang menunggu persetujuan HRD (semua tanggal, terlama dulu).
+     *
+     * @return Collection<int, object>
+     */
+    private function lemburMenunggu(): Collection
+    {
+        if (! Schema::hasColumn('tbl_absensi', 'status_lembur')) {
+            return collect();
+        }
+
+        return DB::table('v_absensi_harian')
+            ->where('status_lembur', 'Menunggu')
+            ->orderBy('tgl')
+            ->orderBy('nama')
+            ->limit(100)
+            ->get(['id_absensi', 'tgl', 'nip', 'nama', 'nama_klien', 'jam_masuk', 'jam_keluar', 'jadwal_pulang', 'jam_lembur']);
     }
 
     private function queryHarian(string $tanggal): Builder
@@ -102,6 +125,19 @@ class AbsensiKaryawanController extends Controller
                 ->where('a.tgl', $tanggal))
             ->orderBy('k.nama')
             ->limit(50)
-            ->get(['k.nip', 'k.nama', 'jl.nama_layanan', 'kl.nama_perusahaan', 'p.lokasi_kerja']);
+            ->get(['k.id', 'k.nip', 'k.nama', 'jl.nama_layanan', 'kl.nama_perusahaan', 'p.lokasi_kerja']);
+    }
+
+    /**
+     * Karyawan yang dapat dicatat ketidakhadirannya (semua kecuali Nonaktif).
+     *
+     * @return Collection<int, object>
+     */
+    private function daftarKaryawan(): Collection
+    {
+        return DB::table('tbl_karyawan')
+            ->where('status', '<>', 'Nonaktif')
+            ->orderBy('nama')
+            ->get(['id', 'nip', 'nama', 'kategori']);
     }
 }

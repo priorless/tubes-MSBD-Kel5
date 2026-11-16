@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\EnsurePasswordIsChanged;
+use App\Http\Middleware\SetAppUserIdDatabase;
 use App\Models\User;
 use App\Services\DatabaseService;
 use Illuminate\Database\QueryException;
@@ -21,6 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => CheckRole::class,
             'password.changed' => EnsurePasswordIsChanged::class,
         ]);
+
+        // @app_user_id dipakai trigger log aktivitas (tbl_log_aktivitas) untuk mencatat pelaku perubahan.
+        $middleware->appendToGroup('web', SetAppUserIdDatabase::class);
 
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(function (Request $request): string {

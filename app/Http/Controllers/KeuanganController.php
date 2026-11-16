@@ -94,6 +94,9 @@ class KeuanganController extends Controller
                 'total_gaji',
                 'status_bayar',
                 'tgl_bayar',
+                'hari_wajib',
+                'hari_masuk',
+                'hari_absen',
             ]);
 
         abort_if($payroll === null, 404);

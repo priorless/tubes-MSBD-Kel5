@@ -30,7 +30,7 @@ CREATE TABLE tbl_karyawan (
   kategori ENUM('Lapangan','Internal') NOT NULL DEFAULT 'Lapangan',
   id_jenis_layanan INT NULL,
   gaji_pokok DECIMAL(12,2) NULL,
-  tunjangan DECIMAL(12,2) NULL DEFAULT 0,
+  tunjangan DECIMAL(12,2) NULL DEFAULT 0, -- DIHAPUS oleh 11_lengkapi_fitur.sql (Tahap 2)
   no_ktp VARCHAR(16) NOT NULL,
   tempat_lahir VARCHAR(50) NULL,
   tgl_lahir DATE NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE tbl_karyawan (
   email VARCHAR(100) NULL,
   foto VARCHAR(255) NULL,
   status ENUM('Tersedia','Ditempatkan','Aktif','Cuti','Nonaktif') NOT NULL DEFAULT 'Tersedia',
-  rating DECIMAL(2,1) NOT NULL DEFAULT 0.0,
+  rating DECIMAL(2,1) NOT NULL DEFAULT 0.0, -- DIHAPUS oleh 11_lengkapi_fitur.sql (Tahap 1)
   tgl_masuk DATE NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -129,7 +129,7 @@ CREATE TABLE tbl_kontrak (
   id INT NOT NULL AUTO_INCREMENT,
   id_penempatan INT NOT NULL,
   gaji_pokok DECIMAL(12,2) NOT NULL,
-  tunjangan DECIMAL(12,2) NOT NULL DEFAULT 0,
+  tunjangan DECIMAL(12,2) NOT NULL DEFAULT 0, -- DIHAPUS oleh 11_lengkapi_fitur.sql (Tahap 2)
   hari_kerja_per_bulan INT NOT NULL DEFAULT 25,
   status ENUM('Aktif','Selesai') NOT NULL DEFAULT 'Aktif',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -167,7 +167,7 @@ CREATE TABLE tbl_payroll (
   periode_bulan INT NOT NULL,
   periode_tahun INT NOT NULL,
   gaji_pokok DECIMAL(12,2) NOT NULL,
-  tunjangan DECIMAL(12,2) NOT NULL DEFAULT 0,
+  tunjangan DECIMAL(12,2) NOT NULL DEFAULT 0, -- DIHAPUS oleh 11_lengkapi_fitur.sql (Tahap 2)
   total_lembur DECIMAL(12,2) NOT NULL DEFAULT 0,
   potongan_absen DECIMAL(12,2) NOT NULL DEFAULT 0,
   total_gaji DECIMAL(12,2) NOT NULL,
@@ -210,6 +210,8 @@ CREATE TABLE tbl_mutasi_keuangan (
   KEY idx_mutasi_tgl (tgl_mutasi)
 ) ENGINE=InnoDB;
 
+-- DIHAPUS oleh 11_lengkapi_fitur.sql (Tahap 1): fitur rating tidak dipakai lagi.
+-- Tetap dibuat di sini agar file 01-09 yang merujuknya tidak gagal pada instalasi baru.
 CREATE TABLE tbl_evaluasi_kinerja (
   id INT NOT NULL AUTO_INCREMENT,
   id_karyawan INT NOT NULL,

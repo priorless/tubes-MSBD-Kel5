@@ -83,7 +83,12 @@ class TenagaKerjaService
      */
     public static function pesanError(QueryException $e): string
     {
-        if ((string) $e->getCode() === '45000') {
+        // SIGNAL SQLSTATE '45000': kode bisa ada di getCode() atau hanya di errorInfo (tergantung driver).
+        if ((string) $e->getCode() === '45000' || ($e->errorInfo[0] ?? null) === '45000') {
+            if (is_string($e->errorInfo[2] ?? null) && $e->errorInfo[2] !== '') {
+                return $e->errorInfo[2];
+            }
+
             $pesan = explode(' (Connection:', $e->getMessage())[0];
 
             return trim(preg_replace('/^.*?1644\s+/s', '', $pesan));

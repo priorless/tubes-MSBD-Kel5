@@ -32,9 +32,11 @@ class KeuanganPayrollTest extends TestCase
             $table->unsignedInteger('periode_bulan');
             $table->unsignedInteger('periode_tahun');
             $table->decimal('gaji_pokok', 12, 2);
-            $table->decimal('tunjangan', 12, 2)->default(0);
             $table->decimal('total_lembur', 12, 2);
             $table->decimal('potongan_absen', 12, 2);
+            $table->unsignedSmallInteger('hari_wajib')->nullable();
+            $table->unsignedSmallInteger('hari_masuk')->nullable();
+            $table->unsignedSmallInteger('hari_absen')->nullable();
             $table->decimal('total_gaji', 12, 2);
             $table->string('status_bayar');
             $table->date('tgl_bayar')->nullable();
@@ -45,7 +47,7 @@ class KeuanganPayrollTest extends TestCase
             SELECT p.id, k.nip, k.nama, k.kategori,
                    p.periode_bulan, p.periode_tahun, p.gaji_pokok,
                    p.total_lembur, p.potongan_absen, p.total_gaji,
-                   p.status_bayar, p.tgl_bayar
+                   p.status_bayar, p.tgl_bayar, p.hari_wajib, p.hari_masuk, p.hari_absen
             FROM tbl_payroll p
             JOIN tbl_karyawan k ON p.id_karyawan = k.id
             SQL);
@@ -64,7 +66,6 @@ class KeuanganPayrollTest extends TestCase
             'periode_bulan' => 10,
             'periode_tahun' => 2026,
             'gaji_pokok' => 1200000,
-            'tunjangan' => 300000,
             'total_lembur' => 50000,
             'potongan_absen' => 80000,
             'total_gaji' => 1170000,

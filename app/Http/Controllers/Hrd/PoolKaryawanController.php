@@ -20,7 +20,6 @@ class PoolKaryawanController extends Controller
                 $kataKunci = '%'.$request->string('q').'%';
                 $query->where(fn ($sub) => $sub->where('nama', 'like', $kataKunci)->orWhere('nip', 'like', $kataKunci));
             })
-            ->orderByDesc('rating')
             ->orderBy('nama')
             ->paginate(15)
             ->withQueryString();

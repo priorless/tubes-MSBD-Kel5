@@ -39,7 +39,6 @@
                         <th>Layanan / Gaji Pokok</th>
                         <th>Kontak</th>
                         <th>Status</th>
-                        <th>Rating</th>
                         <th>Akun Login</th>
                         <th class="text-right">Aksi</th>
                     </tr>
@@ -84,7 +83,6 @@
                                 @endif
                             </td>
                             <td><span class="badge badge-{{ $warnaStatus[$item->status] ?? 'secondary' }}">{{ $item->status }}</span></td>
-                            <td class="whitespace-nowrap text-amber-600">&#9733; {{ number_format((float) $item->rating, 1) }}</td>
                             <td>
                                 @if ($item->username)
                                     <span class="font-mono text-gray-600">{{ $item->username }}</span>
@@ -106,7 +104,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="table-empty">Belum ada data karyawan.</td>
+                            <td colspan="7" class="table-empty">Belum ada data karyawan.</td>
                         </tr>
                     @endforelse
                 </tbody>

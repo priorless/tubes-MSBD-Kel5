@@ -48,6 +48,7 @@
                         <th>NIP</th>
                         <th>Nama</th>
                         <th>Kategori</th>
+                        <th class="text-center" title="Hari wajib / hari masuk / hari absen">Hari (W/M/A)</th>
                         <th class="text-right">Gaji Pokok</th>
                         <th class="text-right">Lembur</th>
                         <th class="text-right">Potongan Absen</th>
@@ -66,6 +67,7 @@
                                     {{ $item->kategori }}
                                 </span>
                             </td>
+                            <td class="text-center whitespace-nowrap tabular-nums text-gray-600">{{ $item->hari_wajib ?? '—' }} / {{ $item->hari_masuk ?? '—' }} / {{ $item->hari_absen ?? '—' }}</td>
                             <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->gaji_pokok, 0, ',', '.') }}</td>
                             <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->total_lembur, 0, ',', '.') }}</td>
                             <td class="text-right whitespace-nowrap text-red-600 tabular-nums">Rp {{ number_format((float) $item->potongan_absen, 0, ',', '.') }}</td>
@@ -95,7 +97,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="table-empty">Belum ada data payroll untuk periode {{ $daftarBulan[$bulan] }} {{ $tahun }}.</td>
+                            <td colspan="10" class="table-empty">Belum ada data payroll untuk periode {{ $daftarBulan[$bulan] }} {{ $tahun }}.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -116,6 +118,10 @@
                     </div>
 
                     <dl class="mt-3 space-y-2 border-t border-gray-100 pt-3 text-xs">
+                        <div class="flex justify-between gap-3">
+                            <dt class="text-gray-500">Hari Wajib / Masuk / Absen</dt>
+                            <dd class="whitespace-nowrap font-medium tabular-nums">{{ $item->hari_wajib ?? '—' }} / {{ $item->hari_masuk ?? '—' }} / {{ $item->hari_absen ?? '—' }}</dd>
+                        </div>
                         <div class="flex justify-between gap-3">
                             <dt class="text-gray-500">Gaji Pokok</dt>
                             <dd class="whitespace-nowrap font-medium tabular-nums">Rp {{ number_format((float) $item->gaji_pokok, 0, ',', '.') }}</dd>

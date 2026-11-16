@@ -89,10 +89,14 @@ class KaryawanController extends Controller
 
     public function edit(int $karyawan): View
     {
+        $data = DB::table('tbl_karyawan')->where('id', $karyawan)->firstOrFail();
+
         return view('hrd.karyawan.form', [
-            'karyawan' => DB::table('tbl_karyawan')->where('id', $karyawan)->firstOrFail(),
+            'karyawan' => $data,
             'jenisLayanan' => $this->daftarJenisLayanan(),
             'roles' => collect(),
+            'penempatanAktif' => UpdateKaryawanRequest::punyaPenempatanAktif($karyawan),
+            'pilihanStatus' => UpdateKaryawanRequest::pilihanStatus($data->kategori, $data->status),
         ]);
     }
 
@@ -132,7 +136,7 @@ class KaryawanController extends Controller
             });
         } catch (QueryException $exception) {
             if ($this->masihDirujuk($exception)) {
-                return back()->with('error', "Karyawan {$data->nama} tidak dapat dihapus karena sudah memiliki riwayat (sertifikat, penempatan, absensi, payroll, atau evaluasi).");
+                return back()->with('error', "Karyawan {$data->nama} tidak dapat dihapus karena sudah memiliki riwayat (sertifikat, penempatan, absensi, atau payroll).");
             }
 
             return $this->kembaliDenganError($exception);

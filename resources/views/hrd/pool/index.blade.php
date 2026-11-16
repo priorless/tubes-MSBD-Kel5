@@ -26,7 +26,6 @@
                         <th>NIP</th>
                         <th>Nama</th>
                         <th>Jenis Layanan</th>
-                        <th>Rating</th>
                         <th>Tanggal Masuk</th>
                         <th>Status</th>
                     </tr>
@@ -37,13 +36,12 @@
                             <td class="font-mono text-gray-600">{{ $item->nip }}</td>
                             <td class="font-medium text-gray-800">{{ $item->nama }}</td>
                             <td>{{ $item->nama_layanan }}</td>
-                            <td class="text-amber-600">&#9733; {{ number_format((float) $item->rating, 1) }}</td>
                             <td>{{ \Illuminate\Support\Carbon::parse($item->tgl_masuk)->format('d/m/Y') }}</td>
                             <td><span class="badge badge-info">{{ $item->status }}</span></td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="table-empty">Tidak ada karyawan Lapangan yang sedang tersedia.</td>
+                            <td colspan="5" class="table-empty">Tidak ada karyawan Lapangan yang sedang tersedia.</td>
                         </tr>
                     @endforelse
                 </tbody>

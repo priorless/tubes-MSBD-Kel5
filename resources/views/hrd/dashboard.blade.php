@@ -114,13 +114,13 @@
 
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Pool tersedia &mdash; rating tertinggi</h3>
+                    <h3 class="card-title">Pool tersedia &mdash; terdaftar paling lama</h3>
                 </div>
                 <ul class="divide-y divide-gray-100">
                     @forelse ($poolTeratas as $item)
                         <li class="flex items-center justify-between px-6 py-3 text-sm">
                             <span>{{ $item->nama }} <span class="text-gray-400">&middot; {{ $item->nama_layanan }}</span></span>
-                            <span class="font-medium text-amber-600">&#9733; {{ number_format((float) $item->rating, 1) }}</span>
+                            <span class="text-gray-500">sejak {{ \Illuminate\Support\Carbon::parse($item->tgl_masuk)->format('d/m/Y') }}</span>
                         </li>
                     @empty
                         <li class="table-empty">Pool kosong.</li>
