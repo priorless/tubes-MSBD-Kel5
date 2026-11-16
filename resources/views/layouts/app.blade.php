@@ -24,6 +24,7 @@
             $menu['Eksekutif'] = [
                 ['Dashboard Eksekutif', 'ceo.dashboard', 'ceo.dashboard'],
                 ['Profit Klien', 'ceo.profit-klien', 'ceo.profit-klien'],
+                ['Log Aktivitas', 'ceo.log-aktivitas', 'ceo.log-aktivitas'],
             ];
         }
 

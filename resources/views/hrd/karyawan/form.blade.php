@@ -75,22 +75,13 @@
                             <p class="form-hint">Wajib untuk karyawan Lapangan. Gaji karyawan Lapangan diatur lewat kontrak penempatan.</p>
                         </div>
 
-                        <div class="js-bagian-internal grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div>
-                                <label for="gaji_pokok" class="form-label">Gaji Pokok (Rp)</label>
-                                <input id="gaji_pokok" name="gaji_pokok" type="number" min="0" step="1000"
-                                    @class(['form-input', 'form-input-error' => $errors->has('gaji_pokok')])
-                                    value="{{ old('gaji_pokok', $karyawan?->gaji_pokok) }}">
-                                @error('gaji_pokok') <p class="form-error">{{ $message }}</p> @enderror
-                                <p class="form-hint">Wajib untuk karyawan Internal.</p>
-                            </div>
-                            <div>
-                                <label for="tunjangan" class="form-label">Tunjangan (Rp)</label>
-                                <input id="tunjangan" name="tunjangan" type="number" min="0" step="1000"
-                                    @class(['form-input', 'form-input-error' => $errors->has('tunjangan')])
-                                    value="{{ old('tunjangan', $karyawan?->tunjangan) }}">
-                                @error('tunjangan') <p class="form-error">{{ $message }}</p> @enderror
-                            </div>
+                        <div class="js-bagian-internal">
+                            <label for="gaji_pokok" class="form-label">Gaji Pokok (Rp)</label>
+                            <input id="gaji_pokok" name="gaji_pokok" type="number" min="0" step="1000"
+                                @class(['form-input', 'form-input-error' => $errors->has('gaji_pokok')])
+                                value="{{ old('gaji_pokok', $karyawan?->gaji_pokok) }}">
+                            @error('gaji_pokok') <p class="form-error">{{ $message }}</p> @enderror
+                            <p class="form-hint">Wajib untuk karyawan Internal. Gaji yang dibayarkan = gaji pokok + lembur &minus; potongan absen.</p>
                         </div>
 
                         <div>
@@ -188,9 +179,28 @@
                 </div>
 
                 @if ($isEditing)
-                    <div class="callout callout-info">
-                        <p><span class="font-semibold">Status:</span> {{ $karyawan->status }}</p>
-                        <p class="mt-1 text-xs">Status dikelola otomatis oleh sistem (penempatan, rotasi).</p>
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Status Karyawan</h2>
+                        </div>
+                        <div class="card-body space-y-2">
+                            @if ($penempatanAktif)
+                                <p class="text-sm"><span class="badge badge-primary">{{ $karyawan->status }}</span></p>
+                                <p class="form-hint">Karyawan masih memiliki penempatan Aktif, sehingga status tidak dapat diubah. Minta bagian Operasional mengakhiri penempatannya terlebih dahulu.</p>
+                            @else
+                                <label for="status" class="form-label">Status</label>
+                                <select id="status" name="status" @class(['form-input', 'form-input-error' => $errors->has('status')])>
+                                    @foreach ($pilihanStatus as $status)
+                                        <option value="{{ $status }}" @selected(old('status', $karyawan->status) === $status)>{{ $status }}</option>
+                                    @endforeach
+                                </select>
+                                @error('status') <p class="form-error">{{ $message }}</p> @enderror
+                                <p class="form-hint">
+                                    Nonaktif juga menonaktifkan akun login karyawan ini; mengaktifkan kembali akan mengaktifkan akunnya lagi.
+                                    @if ($karyawan->kategori === 'Lapangan') Status Ditempatkan diatur otomatis saat penempatan dibuat. @endif
+                                </p>
+                            @endif
+                        </div>
                     </div>
                 @else
                     <div class="card js-bagian-lapangan">

@@ -149,6 +149,7 @@
                             <th>Layanan</th>
                             <th>Klien</th>
                             <th>Lokasi Kerja</th>
+                            <th class="text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -159,6 +160,9 @@
                                 <td>{{ $item->nama_layanan ?? '—' }}</td>
                                 <td>{{ $item->nama_perusahaan }}</td>
                                 <td>{{ $item->lokasi_kerja }}</td>
+                                <td class="text-right">
+                                    <a href="{{ route('hrd.absensi', ['tanggal' => $tanggal, 'karyawan' => $item->id]) }}#catat-ketidakhadiran" class="btn-secondary btn-sm">Catat</a>
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -167,10 +171,116 @@
         </div>
     @endif
 
+    {{-- Persetujuan lembur (sp_putuskan_lembur) --}}
+    <div class="card mt-6" id="lembur-menunggu">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">Lembur Menunggu Persetujuan</h2>
+                <p class="text-sm text-gray-500">Indikasi lembur dihitung dari waktu kerja setelah jam pulang penempatan. Hanya lembur yang disetujui yang masuk payroll.</p>
+            </div>
+            <span class="badge badge-warning">{{ $lemburMenunggu->count() }} menunggu</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Tanggal</th>
+                        <th>NIP</th>
+                        <th>Nama</th>
+                        <th>Klien</th>
+                        <th>Masuk &ndash; Keluar</th>
+                        <th>Jadwal Pulang</th>
+                        <th class="text-center">Jam Lembur</th>
+                        <th class="text-right">Keputusan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($lemburMenunggu as $lembur)
+                        <tr>
+                            <td class="whitespace-nowrap">{{ FormatKolom::tanggal($lembur->tgl, 'd/m/Y') }}</td>
+                            <td class="font-mono text-gray-600">{{ $lembur->nip }}</td>
+                            <td class="font-medium text-gray-800">{{ $lembur->nama }}</td>
+                            <td>{{ $lembur->nama_klien ?? '—' }}</td>
+                            <td class="whitespace-nowrap font-mono">{{ substr((string) $lembur->jam_masuk, 0, 5) }} &ndash; {{ substr((string) $lembur->jam_keluar, 0, 5) }}</td>
+                            <td class="font-mono">{{ $lembur->jadwal_pulang ? substr($lembur->jadwal_pulang, 0, 5) : '—' }}</td>
+                            <td class="text-center font-semibold">{{ $lembur->jam_lembur }} jam</td>
+                            <td>
+                                <div class="flex justify-end gap-2">
+                                    @foreach (['Disetujui' => ['Setujui', 'btn-success'], 'Ditolak' => ['Tolak', 'btn-outline-danger']] as $keputusan => [$label, $kelas])
+                                        <form method="POST" action="{{ route('hrd.absensi.lembur', $lembur->id_absensi) }}"
+                                              onsubmit="return confirm(@js($label.' lembur '.$lembur->jam_lembur.' jam untuk '.$lembur->nama.'?'))">
+                                            @csrf
+                                            <input type="hidden" name="keputusan" value="{{ $keputusan }}">
+                                            <button type="submit" class="{{ $kelas }} btn-sm">{{ $label }}</button>
+                                        </form>
+                                    @endforeach
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="table-empty">Tidak ada lembur yang menunggu persetujuan.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {{-- Input ketidakhadiran (sp_input_ketidakhadiran) --}}
+    <form method="POST" action="{{ route('hrd.absensi.ketidakhadiran') }}" class="card mt-6" id="catat-ketidakhadiran">
+        @csrf
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">Catat Ketidakhadiran</h2>
+                <p class="text-sm text-gray-500">Untuk karyawan yang Izin, Sakit, atau Alpha (tidak check-in). Tanggal tidak boleh di masa depan dan belum ada absensi pada tanggal itu.</p>
+            </div>
+        </div>
+        <div class="card-body grid grid-cols-1 gap-4 md:grid-cols-12">
+            <div class="md:col-span-4">
+                <label for="id_karyawan" class="form-label">Karyawan</label>
+                <select id="id_karyawan" name="id_karyawan" required @class(['form-input', 'form-input-error' => $errors->has('id_karyawan')])>
+                    <option value="">&mdash; Pilih karyawan &mdash;</option>
+                    @foreach ($daftarKaryawan as $karyawan)
+                        <option value="{{ $karyawan->id }}" @selected((string) old('id_karyawan', request('karyawan')) === (string) $karyawan->id)>
+                            {{ $karyawan->nama }} ({{ $karyawan->nip }}, {{ $karyawan->kategori }})
+                        </option>
+                    @endforeach
+                </select>
+                @error('id_karyawan') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+            <div class="md:col-span-2">
+                <label for="tgl_ketidakhadiran" class="form-label">Tanggal</label>
+                <input id="tgl_ketidakhadiran" name="tgl" type="date" required value="{{ old('tgl', $tanggal) }}"
+                    @class(['form-input', 'form-input-error' => $errors->has('tgl')])>
+                @error('tgl') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+            <div class="md:col-span-2">
+                <label for="status_kehadiran" class="form-label">Status</label>
+                <select id="status_kehadiran" name="status_kehadiran" required @class(['form-input', 'form-input-error' => $errors->has('status_kehadiran')])>
+                    @foreach (\App\Http\Requests\Hrd\StoreKetidakhadiranRequest::STATUS as $status)
+                        <option value="{{ $status }}" @selected(old('status_kehadiran', 'Izin') === $status)>{{ $status }}</option>
+                    @endforeach
+                </select>
+                @error('status_kehadiran') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+            <div class="md:col-span-4">
+                <label for="keterangan" class="form-label">Keterangan</label>
+                <input id="keterangan" name="keterangan" type="text" maxlength="255" value="{{ old('keterangan') }}"
+                    placeholder="mis. surat dokter, keperluan keluarga"
+                    @class(['form-input', 'form-input-error' => $errors->has('keterangan')])>
+                @error('keterangan') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+        </div>
+        <div class="card-footer justify-start">
+            <button type="submit" class="btn-primary">Simpan Ketidakhadiran</button>
+        </div>
+    </form>
+
     <div class="callout callout-info mt-6">
         Lokasi resmi dan jadwal diambil dari data <b>penempatan</b> (modul Operasional) yang berlaku pada tanggal absensi.
         Terlambat bila check-in lebih dari 30 menit setelah jam datang; indikasi lembur dihitung dari waktu kerja setelah jam pulang
-        dan belum melalui persetujuan lembur. Bila jadwal penempatan kosong, keduanya tidak dihitung.
+        dan baru masuk payroll setelah disetujui HRD. Bila jadwal penempatan kosong, keduanya tidak dihitung.
         Foto check-in/check-out diunggah karyawan dan seharusnya menampilkan wajah serta keterangan tanggal, jam, dan lokasi dari aplikasi kamera karyawan — periksa kesesuaiannya; sistem tidak membuat keterangan tersebut. Jam absensi resmi tetap jam server.
     </div>
 @endsection

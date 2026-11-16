@@ -104,7 +104,6 @@ class HrdModulTest extends TestCase
         $response = $this->post(route('hrd.karyawan.store'), $this->dataKaryawan([
             'kategori' => 'Internal',
             'gaji_pokok' => 6000000,
-            'tunjangan' => 500000,
             'buat_akun' => '1',
             'id_role' => $idRoleKeuangan,
             'username' => 'staf.keuangan.tst',

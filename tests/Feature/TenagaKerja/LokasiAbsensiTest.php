@@ -73,14 +73,18 @@ class LokasiAbsensiTest extends TestCase
 
     public function test_gallery_photo_is_accepted_and_passed_to_service(): void
     {
-        $this->mockLayanan(function (MockInterface $mock): void {
+        $baris = (object) [
+            'id' => 11, 'tgl' => '2026-11-15', 'jam_masuk' => '07:45:12', 'jam_keluar' => null,
+            'status_kehadiran' => 'Terlambat', 'menit_terlambat' => 45,
+            'foto_masuk' => 'absensi/2026-11/masuk-x.jpg', 'foto_keluar' => null,
+        ];
+
+        $this->mockLayanan(function (MockInterface $mock) use ($baris): void {
             $mock->shouldReceive('checkIn')->once()->with(7, \Mockery::type('string'));
-            $mock->shouldReceive('kolom')->andReturnUsing(fn (string $tabel, string $kunci) => config("tenaga_kerja.kolom.$kunci")[0] ?? null);
-            $mock->shouldReceive('absensiHariIni')->andReturn((object) [
-                'id' => 11, 'tgl' => '2026-11-15', 'jam_masuk' => '07:45:12', 'jam_keluar' => null,
-                'status_kehadiran' => 'Terlambat', 'menit_terlambat' => 45,
-                'foto_masuk' => 'absensi/2026-11/masuk-x.jpg', 'foto_keluar' => null,
-            ]);
+            // Seperti TenagaKerjaService::kolom(): kandidat pertama yang BENAR-BENAR ada di tabel.
+            $mock->shouldReceive('kolom')->andReturnUsing(fn (string $tabel, string $kunci) => collect(config("tenaga_kerja.kolom.$kunci", []))
+                ->first(fn (string $kandidat) => property_exists($baris, $kandidat)));
+            $mock->shouldReceive('absensiHariIni')->andReturn($baris);
         });
 
         $this->postJson(route('tenaga-kerja.absensi.check-in'), ['foto' => $this->foto()])

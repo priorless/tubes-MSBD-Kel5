@@ -33,7 +33,6 @@ class StoreKaryawanRequest extends FormRequest
             'kategori' => ['required', Rule::in(['Lapangan', 'Internal'])],
             'id_jenis_layanan' => ['nullable', 'integer', Rule::exists('tbl_jenis_layanan', 'id')],
             'gaji_pokok' => ['exclude_if:kategori,Lapangan', 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'tunjangan' => ['exclude_if:kategori,Lapangan', 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'no_ktp' => ['bail', 'required', 'digits:16', Rule::unique('tbl_karyawan', 'no_ktp')],
             'tempat_lahir' => ['nullable', 'string', 'max:50'],
             'tgl_lahir' => ['bail', 'required', 'date', 'before:today'],

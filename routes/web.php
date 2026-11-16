@@ -1,14 +1,18 @@
 <?php
 
 use App\Http\Controllers\BerandaController;
+use App\Http\Controllers\Ceo\LogAktivitasController;
 use App\Http\Controllers\CeoController;
 use App\Http\Controllers\FotoAbsensiController;
 use App\Http\Controllers\Hrd\AbsensiKaryawanController;
 use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
+use App\Http\Controllers\Hrd\KetidakhadiranController;
+use App\Http\Controllers\Hrd\PersetujuanLemburController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
 use App\Http\Controllers\Hrd\SertifikatController;
 use App\Http\Controllers\KeuanganController;
+use App\Http\Controllers\Operasional\AkhiriPenempatanController;
 use App\Http\Controllers\Operasional\KlienController;
 use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\TenagaKerjaController;
@@ -52,6 +56,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
     Route::middleware('role:'.Role::Ceo)->prefix('ceo')->name('ceo.')->group(function () {
         Route::get('/dashboard', [CeoController::class, 'dashboard'])->name('dashboard');
         Route::get('/profit-klien', [CeoController::class, 'profitKlien'])->name('profit-klien');
+        Route::get('/log-aktivitas', LogAktivitasController::class)->name('log-aktivitas');
     });
 
     /* =====================================================================
@@ -62,6 +67,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::resource('karyawan', KaryawanController::class)->except('show');
         Route::get('pool-karyawan', PoolKaryawanController::class)->name('pool');
         Route::get('absensi-karyawan', AbsensiKaryawanController::class)->name('absensi');
+        Route::post('absensi-karyawan/ketidakhadiran', KetidakhadiranController::class)->name('absensi.ketidakhadiran');
+        Route::post('absensi-karyawan/lembur/{absensi}', PersetujuanLemburController::class)->whereNumber('absensi')->name('absensi.lembur');
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
     });
 
@@ -74,6 +81,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('penempatan', [OperasionalController::class, 'createPenempatan'])->name('penempatan.create');
         Route::get('penempatan/create', [OperasionalController::class, 'createPenempatan']);
         Route::post('penempatan', [OperasionalController::class, 'storePenempatan'])->name('penempatan.store');
+        Route::post('penempatan/{penempatan}/akhiri', AkhiriPenempatanController::class)->whereNumber('penempatan')->name('penempatan.akhiri');
 
         Route::get('rotasi', [OperasionalController::class, 'createRotasi'])->name('rotasi.create');
         Route::get('rotasi/create', [OperasionalController::class, 'createRotasi']);

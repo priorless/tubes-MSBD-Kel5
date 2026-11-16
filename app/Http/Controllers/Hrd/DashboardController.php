@@ -31,7 +31,7 @@ class DashboardController extends Controller
                 ->orderBy('jl.nama_layanan')
                 ->selectRaw('jl.nama_layanan, COUNT(k.id) AS jumlah')
                 ->get(),
-            'poolTeratas' => DB::table('v_pool_karyawan_hrd')->orderByDesc('rating')->orderBy('nama')->limit(5)->get(),
+            'poolTeratas' => DB::table('v_pool_karyawan_hrd')->orderBy('tgl_masuk')->orderBy('nama')->limit(5)->get(),
             'karyawanTerbaru' => DB::table('tbl_karyawan')->orderByDesc('id')->limit(5)->get(['id', 'nip', 'nama', 'kategori', 'status', 'tgl_masuk']),
             'batasHari' => $batasHari,
         ]);

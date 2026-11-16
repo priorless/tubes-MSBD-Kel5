@@ -19,7 +19,6 @@ class KaryawanDummySeeder extends Seeder
                 'nama' => 'Bima Pratama',
                 'kategori' => 'Lapangan',
                 'id_jenis_layanan' => 1,
-                'tunjangan' => 0,
                 'no_ktp' => '3276011501900001',
                 'tempat_lahir' => 'Bandung',
                 'tgl_lahir' => '1990-01-15',
@@ -28,7 +27,6 @@ class KaryawanDummySeeder extends Seeder
                 'no_telp' => '081234567801',
                 'email' => 'dummy.satpam.001@example.test',
                 'status' => 'Tersedia',
-                'rating' => 0,
                 'tgl_masuk' => '2025-01-15',
             ],
             [
@@ -36,7 +34,6 @@ class KaryawanDummySeeder extends Seeder
                 'nama' => 'Andi Saputra',
                 'kategori' => 'Lapangan',
                 'id_jenis_layanan' => 2,
-                'tunjangan' => 0,
                 'no_ktp' => '3276021602910002',
                 'tempat_lahir' => 'Bogor',
                 'tgl_lahir' => '1991-02-16',
@@ -45,7 +42,6 @@ class KaryawanDummySeeder extends Seeder
                 'no_telp' => '081234567802',
                 'email' => 'dummy.driver.002@example.test',
                 'status' => 'Tersedia',
-                'rating' => 0,
                 'tgl_masuk' => '2025-02-16',
             ],
             [
@@ -53,7 +49,6 @@ class KaryawanDummySeeder extends Seeder
                 'nama' => 'Rani Puspita',
                 'kategori' => 'Lapangan',
                 'id_jenis_layanan' => 3,
-                'tunjangan' => 0,
                 'no_ktp' => '3276031703920003',
                 'tempat_lahir' => 'Depok',
                 'tgl_lahir' => '1992-03-17',
@@ -62,7 +57,6 @@ class KaryawanDummySeeder extends Seeder
                 'no_telp' => '081234567803',
                 'email' => 'dummy.cleaning.003@example.test',
                 'status' => 'Tersedia',
-                'rating' => 0,
                 'tgl_masuk' => '2025-03-17',
             ],
         ];

@@ -75,6 +75,27 @@ class DatabaseService
     /**
      * Function fn_sisa_hari_dokumen: sisa hari sebelum dokumen kadaluarsa (minimal 0).
      */
+    /**
+     * Procedure sp_input_ketidakhadiran: HRD mencatat Izin/Sakit/Alpha.
+     *
+     * @throws QueryException SQLSTATE 45000 jika status/tanggal tidak valid, karyawan Nonaktif,
+     *                        sudah ada absensi, atau karyawan Lapangan tanpa penempatan pada tanggal itu.
+     */
+    public static function callInputKetidakhadiran(int $idKaryawan, string $tgl, string $status, ?string $keterangan): void
+    {
+        DB::statement('CALL sp_input_ketidakhadiran(?, ?, ?, ?)', [$idKaryawan, $tgl, $status, $keterangan]);
+    }
+
+    /**
+     * Procedure sp_putuskan_lembur: HRD menyetujui ('Disetujui') atau menolak ('Ditolak') lembur Menunggu.
+     *
+     * @throws QueryException SQLSTATE 45000 jika keputusan tidak valid, absensi tidak ada, atau lembur bukan Menunggu.
+     */
+    public static function callPutuskanLembur(int $idAbsensi, string $keputusan): void
+    {
+        DB::statement('CALL sp_putuskan_lembur(?, ?)', [$idAbsensi, $keputusan]);
+    }
+
     public static function getSisaHariDokumen(string $tglKadaluarsa): int
     {
         $result = DB::selectOne('SELECT fn_sisa_hari_dokumen(?) AS sisa_hari', [$tglKadaluarsa]);

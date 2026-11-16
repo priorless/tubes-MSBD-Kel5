@@ -27,6 +27,7 @@
                         <th>Jam Pulang</th>
                         <th>Periode</th>
                         <th>Sisa Kontrak</th>
+                        <th class="text-right">Akhiri Penempatan</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -53,10 +54,20 @@
                                     <span class="badge badge-success">{{ $item->sisa_hari_kontrak }} hari</span>
                                 @endif
                             </td>
+                            <td>
+                                <form method="POST" action="{{ route('operasional.penempatan.akhiri', $item->id_penempatan) }}" class="flex items-center justify-end gap-2"
+                                      onsubmit="return confirm(@js('Akhiri penempatan '.$item->nama.' di '.$item->nama_perusahaan.'? Penempatan & kontrak menjadi Selesai dan karyawan kembali Tersedia.'))">
+                                    @csrf
+                                    <label for="tgl_selesai_{{ $item->id_penempatan }}" class="sr-only">Tanggal selesai</label>
+                                    <input type="date" id="tgl_selesai_{{ $item->id_penempatan }}" name="tgl_selesai" required
+                                           value="{{ now('Asia/Jakarta')->toDateString() }}" min="{{ $item->tgl_mulai }}" class="form-input w-auto py-1.5">
+                                    <button type="submit" class="btn-outline-danger btn-sm">Akhiri</button>
+                                </form>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="table-empty">Belum ada penempatan aktif.</td>
+                            <td colspan="10" class="table-empty">Belum ada penempatan aktif.</td>
                         </tr>
                     @endforelse
                 </tbody>
