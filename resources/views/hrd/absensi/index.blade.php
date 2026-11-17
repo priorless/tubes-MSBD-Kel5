@@ -9,6 +9,14 @@
 @endphp
 
 @section('content')
+    <nav class="mb-6 flex gap-2 border-b border-gray-200" aria-label="Bagian absensi karyawan">
+        <a href="{{ route('hrd.absensi', ['tab' => 'harian']) }}" @class(['border-b-2 px-4 py-3 text-sm font-medium', 'border-sji-biru text-sji-biru' => $tab === 'harian', 'border-transparent text-gray-500 hover:text-gray-700' => $tab !== 'harian']) @if ($tab === 'harian') aria-current="page" @endif>Absensi Harian</a>
+        <a href="{{ route('hrd.absensi', ['tab' => 'rekap']) }}" @class(['border-b-2 px-4 py-3 text-sm font-medium', 'border-sji-biru text-sji-biru' => $tab === 'rekap', 'border-transparent text-gray-500 hover:text-gray-700' => $tab !== 'rekap']) @if ($tab === 'rekap') aria-current="page" @endif>Rekap Absensi</a>
+    </nav>
+
+    @if ($tab === 'rekap')
+        @include('hrd.absensi.rekap')
+    @else
     @if ($ringkasan)
         <div class="mb-6 grid grid-cols-2 gap-6 xl:grid-cols-4">
             @foreach ([
@@ -283,4 +291,5 @@
         dan baru masuk payroll setelah disetujui HRD. Bila jadwal penempatan kosong, keduanya tidak dihitung.
         Foto check-in/check-out diunggah karyawan dan seharusnya menampilkan wajah serta keterangan tanggal, jam, dan lokasi dari aplikasi kamera karyawan — periksa kesesuaiannya; sistem tidak membuat keterangan tersebut. Jam absensi resmi tetap jam server.
     </div>
+    @endif
 @endsection

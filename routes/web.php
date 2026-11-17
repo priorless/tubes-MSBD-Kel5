@@ -66,6 +66,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('/', HrdDashboardController::class)->name('dashboard');
         Route::resource('karyawan', KaryawanController::class)->except('show');
         Route::get('pool-karyawan', PoolKaryawanController::class)->name('pool');
+        Route::get('absensi-karyawan/rekap/csv', [AbsensiKaryawanController::class, 'exportCsv'])->name('absensi.rekap.csv');
         Route::get('absensi-karyawan', AbsensiKaryawanController::class)->name('absensi');
         Route::post('absensi-karyawan/ketidakhadiran', KetidakhadiranController::class)->name('absensi.ketidakhadiran');
         Route::post('absensi-karyawan/lembur/{absensi}', PersetujuanLemburController::class)->whereNumber('absensi')->name('absensi.lembur');

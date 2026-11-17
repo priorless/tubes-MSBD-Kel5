@@ -79,6 +79,88 @@ class PersetujuanLemburTest extends TestCase
             ->assertSee('3 jam');
     }
 
+    public function test_rekap_memisahkan_alpha_tercatat_dari_hari_tanpa_catatan_dan_mengikuti_filter(): void
+    {
+        $idKaryawan = $this->buatKaryawan();
+        $idKlien = $this->buatKlien();
+        $tanggalAwal = $this->hariIniDb(-3);
+        $tanggalAkhir = $this->hariIniDb(-1);
+        $idPenempatan = $this->buatPenempatan($idKaryawan, $idKlien, $tanggalAwal);
+        $this->buatAbsensi($idKaryawan, $tanggalAwal, 'Alpha', ['id_penempatan' => $idPenempatan]);
+
+        $this->get(route('hrd.absensi', [
+            'tab' => 'rekap',
+            'tanggal_awal' => $tanggalAwal,
+            'tanggal_akhir' => $tanggalAkhir,
+            'id_karyawan' => $idKaryawan,
+            'id_klien' => $idKlien,
+        ]))
+            ->assertOk()
+            ->assertSee('Rekap Absensi')
+            ->assertSee('Alpha tercatat')
+            ->assertSee('Tanpa catatan')
+            ->assertSee('Karyawan Uji')
+            ->assertSee('Alpha');
+    }
+
+    public function test_rekap_shift_malam_dikelompokkan_pada_tanggal_absensi(): void
+    {
+        $idKaryawan = $this->buatKaryawan();
+        $idKlien = $this->buatKlien();
+        $tanggalShift = $this->hariIniDb(-1);
+        $idPenempatan = $this->buatPenempatan($idKaryawan, $idKlien, $this->hariIniDb(-10), null, [
+            'jam_datang' => '22:00:00',
+            'jam_pulang' => '06:00:00',
+        ]);
+        $idAbsensi = $this->buatAbsensi($idKaryawan, $tanggalShift, 'Hadir', [
+            'id_penempatan' => $idPenempatan,
+            'jam_masuk' => '22:15:00',
+        ]);
+        DB::table('tbl_absensi')->where('id', $idAbsensi)->update(['jam_keluar' => '06:00:00']);
+
+        $this->get(route('hrd.absensi', [
+            'tab' => 'rekap',
+            'tanggal_awal' => $tanggalShift,
+            'tanggal_akhir' => $tanggalShift,
+            'id_karyawan' => $idKaryawan,
+        ]))
+            ->assertOk()
+            ->assertSee('22:15')
+            ->assertSee('06:00');
+    }
+
+    public function test_csv_rekap_menggunakan_filter_karyawan_dan_periode(): void
+    {
+        $idKlien = $this->buatKlien();
+        $idKaryawanSesuai = $this->buatKaryawan('Lapangan', ['nip' => 'TSTX-REKAP-1']);
+        $idKaryawanLain = $this->buatKaryawan('Lapangan', ['nip' => 'TSTX-REKAP-2']);
+        $tanggal = $this->hariIniDb(-1);
+        $idPenempatan = $this->buatPenempatan($idKaryawanSesuai, $idKlien, $this->hariIniDb(-10));
+        $this->buatPenempatan($idKaryawanLain, $idKlien, $this->hariIniDb(-10));
+        $this->buatAbsensi($idKaryawanSesuai, $tanggal, 'Alpha', ['id_penempatan' => $idPenempatan]);
+        $this->buatAbsensi($idKaryawanLain, $tanggal, 'Izin');
+
+        $response = $this->get(route('hrd.absensi.rekap.csv', [
+            'tanggal_awal' => $tanggal,
+            'tanggal_akhir' => $tanggal,
+            'id_karyawan' => $idKaryawanSesuai,
+            'id_klien' => $idKlien,
+        ]));
+
+        $response->assertDownload('rekap-absensi-'.$tanggal.'-'.$tanggal.'.csv');
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('TSTX-REKAP-1', $csv);
+        $this->assertStringNotContainsString('TSTX-REKAP-2', $csv);
+    }
+
+    public function test_role_lain_tidak_dapat_membuka_rekap_absensi(): void
+    {
+        $this->loginSebagai(Role::Keuangan);
+
+        $this->get(route('hrd.absensi', ['tab' => 'rekap']))->assertForbidden();
+        $this->get(route('hrd.absensi.rekap.csv'))->assertForbidden();
+    }
+
     public function test_hrd_menyetujui_dan_menolak_lembur(): void
     {
         $disetujui = $this->absensiDenganCheckOut('19:10:00');
