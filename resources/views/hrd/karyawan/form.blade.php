@@ -172,6 +172,18 @@
                                 @error('nama_ibu_kandung') <p class="form-error">{{ $message }}</p> @enderror
                             </div>
                         </div>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div>
+                                <label for="jenis_jaminan_kesehatan" class="form-label">Jenis Jaminan Kesehatan</label>
+                                <select id="jenis_jaminan_kesehatan" name="jenis_jaminan_kesehatan" @class(['form-input', 'form-input-error' => $errors->has('jenis_jaminan_kesehatan')])>
+                                    <option value="" disabled @selected(blank(old('jenis_jaminan_kesehatan', $karyawan?->jenis_jaminan_kesehatan)))>Belum diisi</option>
+                                    @foreach (\App\Http\Requests\Hrd\StoreKaryawanRequest::PILIHAN_JAMINAN_KESEHATAN as $jenisJaminan)
+                                        <option value="{{ $jenisJaminan }}" @selected(old('jenis_jaminan_kesehatan', $karyawan?->jenis_jaminan_kesehatan) === $jenisJaminan)>{{ $jenisJaminan }}</option>
+                                    @endforeach
+                                </select>
+                                @error('jenis_jaminan_kesehatan') <p class="form-error">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
