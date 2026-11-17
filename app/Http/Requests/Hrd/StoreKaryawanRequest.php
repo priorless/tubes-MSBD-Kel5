@@ -37,6 +37,8 @@ class StoreKaryawanRequest extends FormRequest
             'tempat_lahir' => ['nullable', 'string', 'max:50'],
             'tgl_lahir' => ['bail', 'required', 'date', 'before:today'],
             'jenis_kelamin' => ['required', Rule::in(['L', 'P'])],
+            'status_pernikahan' => ['nullable', Rule::in(['Belum Menikah', 'Menikah'])],
+            'nama_ibu_kandung' => ['nullable', 'string', 'max:100'],
             'alamat' => ['nullable', 'string'],
             'no_telp' => ['bail', 'required', 'string', 'max:15', 'regex:/^\+?[0-9]{8,14}$/'],
             'email' => ['nullable', 'email', 'max:100', Rule::unique('tbl_karyawan', 'email')],

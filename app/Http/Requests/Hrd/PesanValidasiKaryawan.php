@@ -55,6 +55,8 @@ trait PesanValidasiKaryawan
             'tempat_lahir' => 'tempat lahir',
             'tgl_lahir' => 'tanggal lahir',
             'jenis_kelamin' => 'jenis kelamin',
+            'status_pernikahan' => 'status pernikahan',
+            'nama_ibu_kandung' => 'nama ibu kandung',
             'alamat' => 'alamat',
             'no_telp' => 'nomor telepon',
             'email' => 'email',
