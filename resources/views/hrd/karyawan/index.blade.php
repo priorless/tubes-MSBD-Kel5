@@ -38,6 +38,7 @@
                         <th>Kategori</th>
                         <th>Layanan / Gaji Pokok</th>
                         <th>Kontak</th>
+                        <th>Jaminan Kesehatan</th>
                         <th>Status</th>
                         <th>Akun Login</th>
                         <th class="text-right">Aksi</th>
@@ -82,6 +83,13 @@
                                     <p class="text-xs text-gray-400">{{ $item->email }}</p>
                                 @endif
                             </td>
+                            <td class="whitespace-nowrap">
+                                @if ($item->jenis_jaminan_kesehatan)
+                                    <span class="badge badge-{{ $item->jenis_jaminan_kesehatan === 'BPJS' ? 'success' : 'primary' }}">{{ $item->jenis_jaminan_kesehatan }}</span>
+                                @else
+                                    <span class="text-gray-400">Belum diisi</span>
+                                @endif
+                            </td>
                             <td><span class="badge badge-{{ $warnaStatus[$item->status] ?? 'secondary' }}">{{ $item->status }}</span></td>
                             <td>
                                 @if ($item->username)
@@ -104,7 +112,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="table-empty">Belum ada data karyawan.</td>
+                            <td colspan="8" class="table-empty">Belum ada data karyawan.</td>
                         </tr>
                     @endforelse
                 </tbody>

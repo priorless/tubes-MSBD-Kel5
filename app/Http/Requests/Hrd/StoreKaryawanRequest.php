@@ -17,6 +17,13 @@ class StoreKaryawanRequest extends FormRequest
 {
     use PesanValidasiKaryawan;
 
+    /**
+     * Pilihan kolom tbl_karyawan.jenis_jaminan_kesehatan (ENUM). Dipakai juga oleh UpdateKaryawanRequest dan form.
+     *
+     * @var list<string>
+     */
+    public const array PILIHAN_JAMINAN_KESEHATAN = ['BPJS', 'Asuransi Kesehatan Swasta'];
+
     public function authorize(): bool
     {
         return true;
@@ -39,6 +46,7 @@ class StoreKaryawanRequest extends FormRequest
             'jenis_kelamin' => ['required', Rule::in(['L', 'P'])],
             'status_pernikahan' => ['nullable', Rule::in(['Belum Menikah', 'Menikah'])],
             'nama_ibu_kandung' => ['nullable', 'string', 'max:100'],
+            'jenis_jaminan_kesehatan' => ['nullable', Rule::in(self::PILIHAN_JAMINAN_KESEHATAN)],
             'alamat' => ['nullable', 'string'],
             'no_telp' => ['bail', 'required', 'string', 'max:15', 'regex:/^\+?[0-9]{8,14}$/'],
             'email' => ['nullable', 'email', 'max:100', Rule::unique('tbl_karyawan', 'email')],
