@@ -14,14 +14,25 @@
             @error('tanggal_akhir') <p class="form-error">{{ $message }}</p> @enderror
         </div>
         <div class="md:col-span-3">
-            <label for="filter_karyawan" class="form-label">Karyawan</label>
-            <select id="filter_karyawan" name="id_karyawan" class="form-input">
-                <option value="">Semua karyawan</option>
-                @foreach ($daftarKaryawan as $karyawan)
-                    <option value="{{ $karyawan->id }}" @selected((string) $filterRekap['id_karyawan'] === (string) $karyawan->id)>{{ $karyawan->nama }} ({{ $karyawan->nip }})</option>
-                @endforeach
-            </select>
+            <label for="filter_karyawan" class="form-label">Cari Karyawan</label>
+            <div class="relative" data-karyawan-autocomplete>
+                <input id="filter_karyawan" type="search" class="form-input" autocomplete="off"
+                    placeholder="Ketik nama atau NIP karyawan..." role="combobox" aria-autocomplete="list"
+                    aria-controls="hasil-karyawan" aria-expanded="false"
+                    value="{{ $karyawanTerpilih ? $karyawanTerpilih->nama.' ('.$karyawanTerpilih->nip.')' : '' }}">
+                <input id="id_karyawan" type="hidden" name="id_karyawan" value="{{ $filterRekap['id_karyawan'] ?? '' }}">
+                <div id="hasil-karyawan" class="absolute z-20 mt-1 hidden max-h-64 w-full overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg" role="listbox" aria-label="Hasil pencarian karyawan"></div>
+                <p id="status-pencarian-karyawan" class="mt-1 text-xs text-gray-500" aria-live="polite">
+                    @if ($karyawanTerpilih)
+                        Filter: {{ $karyawanTerpilih->nama }} ({{ $karyawanTerpilih->nip }})
+                    @else
+                        Kosongkan pencarian untuk menampilkan semua karyawan.
+                    @endif
+                </p>
+            </div>
+            @error('id_karyawan') <p class="form-error">{{ $message }}</p> @enderror
         </div>
+
         <div class="md:col-span-3">
             <label for="filter_klien" class="form-label">Klien / penempatan</label>
             <select id="filter_klien" name="id_klien" class="form-input">
@@ -110,3 +121,101 @@
 @else
     <p class="table-empty">View v_absensi_harian belum tersedia. Jalankan <code>php artisan migrate</code>.</p>
 @endif
+
+@push('scripts')
+    <script>
+        (() => {
+            const pembungkus = document.querySelector('[data-karyawan-autocomplete]');
+            if (!pembungkus) return;
+
+            const formulir = pembungkus.closest('form');
+            const input = document.getElementById('filter_karyawan');
+            const idTerpilih = document.getElementById('id_karyawan');
+            const daftar = document.getElementById('hasil-karyawan');
+            const status = document.getElementById('status-pencarian-karyawan');
+            const urlCari = @json(route('hrd.absensi.karyawan.cari'));
+            let timerPencarian;
+            let permintaanAktif;
+
+            const tutupDaftar = () => {
+                daftar.replaceChildren();
+                daftar.classList.add('hidden');
+                input.setAttribute('aria-expanded', 'false');
+            };
+
+            const buatPilihan = (karyawan) => {
+                const tombol = document.createElement('button');
+                tombol.type = 'button';
+                tombol.role = 'option';
+                tombol.className = 'block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none';
+                tombol.textContent = `${karyawan.nama} — NIP: ${karyawan.nip} · ${karyawan.layanan}`;
+                tombol.addEventListener('click', () => {
+                    idTerpilih.value = karyawan.id;
+                    input.value = `${karyawan.nama} (${karyawan.nip})`;
+                    status.textContent = `Filter: ${input.value}`;
+                    tutupDaftar();
+                });
+                daftar.append(tombol);
+            };
+
+            input.addEventListener('input', () => {
+                idTerpilih.value = '';
+                window.clearTimeout(timerPencarian);
+                permintaanAktif?.abort();
+                const kataKunci = input.value.trim();
+
+                if (kataKunci.length === 0) {
+                    tutupDaftar();
+                    status.textContent = 'Kosongkan pencarian untuk menampilkan semua karyawan.';
+                    return;
+                }
+
+                status.textContent = 'Mencari karyawan...';
+                timerPencarian = window.setTimeout(async () => {
+                    permintaanAktif = new AbortController();
+                    const parameter = new URLSearchParams({ q: kataKunci });
+
+                    try {
+                        const respons = await fetch(`${urlCari}?${parameter}`, {
+                            headers: { Accept: 'application/json' },
+                            signal: permintaanAktif.signal,
+                        });
+                        if (!respons.ok) throw new Error('Pencarian karyawan gagal.');
+
+                        const hasil = await respons.json();
+                        tutupDaftar();
+                        if (hasil.length === 0) {
+                            status.textContent = 'Karyawan tidak ditemukan';
+                            return;
+                        }
+
+                        hasil.forEach(buatPilihan);
+                        daftar.classList.remove('hidden');
+                        input.setAttribute('aria-expanded', 'true');
+                        status.textContent = `${hasil.length} hasil pencarian.`;
+                    } catch (kesalahan) {
+                        if (kesalahan.name !== 'AbortError') {
+                            tutupDaftar();
+                            status.textContent = 'Pencarian karyawan gagal. Coba lagi.';
+                        }
+                    }
+                }, 250);
+            });
+
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') tutupDaftar();
+                if (event.key === 'ArrowDown' && !daftar.classList.contains('hidden')) {
+                    event.preventDefault();
+                    daftar.querySelector('button')?.focus();
+                }
+            });
+            formulir.addEventListener('submit', (event) => {
+                if (input.value.trim() !== '' && idTerpilih.value === '') {
+                    event.preventDefault();
+                    status.textContent = 'Pilih karyawan dari hasil pencarian atau kosongkan pencarian untuk semua karyawan.';
+                    input.focus();
+                }
+            });
+        })();
+    </script>
+@endpush

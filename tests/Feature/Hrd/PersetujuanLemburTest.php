@@ -104,6 +104,41 @@ class PersetujuanLemburTest extends TestCase
             ->assertSee('Alpha');
     }
 
+    public function test_semua_karyawan_menjadi_default_dan_filter_karyawan_membatasi_rekap(): void
+    {
+        $idKlien = $this->buatKlien();
+        $pertama = $this->buatKaryawan('Lapangan', ['nama' => 'Andi Saputra']);
+        $kedua = $this->buatKaryawan('Lapangan', ['nama' => 'Budi Santoso']);
+        $tanggal = $this->hariIniDb(-1);
+        $penempatanPertama = $this->buatPenempatan($pertama, $idKlien, $this->hariIniDb(-10));
+        $penempatanKedua = $this->buatPenempatan($kedua, $idKlien, $this->hariIniDb(-10));
+        $this->buatAbsensi($pertama, $tanggal, 'Hadir', ['id_penempatan' => $penempatanPertama]);
+        $this->buatAbsensi($kedua, $tanggal, 'Hadir', ['id_penempatan' => $penempatanKedua]);
+
+        $this->get(route('hrd.absensi', [
+            'tab' => 'rekap',
+            'tanggal_awal' => $tanggal,
+            'tanggal_akhir' => $tanggal,
+            'id_klien' => $idKlien,
+        ]))
+            ->assertOk()
+            ->assertSee('placeholder="Ketik nama atau NIP karyawan..."', false)
+            ->assertSee('Andi Saputra')
+            ->assertSee('Budi Santoso');
+
+        $this->get(route('hrd.absensi', [
+            'tab' => 'rekap',
+            'tanggal_awal' => $tanggal,
+            'tanggal_akhir' => $tanggal,
+            'id_karyawan' => $pertama,
+            'id_klien' => $idKlien,
+        ]))
+            ->assertOk()
+            ->assertSee('Andi Saputra (')
+            ->assertSee('Andi Saputra')
+            ->assertDontSee('Budi Santoso');
+    }
+
     public function test_rekap_shift_malam_dikelompokkan_pada_tanggal_absensi(): void
     {
         $idKaryawan = $this->buatKaryawan();
@@ -128,6 +163,30 @@ class PersetujuanLemburTest extends TestCase
             ->assertOk()
             ->assertSee('22:15')
             ->assertSee('06:00');
+    }
+
+    public function test_pencarian_karyawan_rekap_mengembalikan_hasil_terbatas_dari_database(): void
+    {
+        $cocokSatu = $this->buatKaryawan('Lapangan', ['nama' => 'Rina Putri', 'nip' => '202501001']);
+        $cocokDua = $this->buatKaryawan('Lapangan', ['nama' => 'Rina Saputra']);
+        $tidakCocok = $this->buatKaryawan('Lapangan', ['nama' => 'Budi Santoso']);
+
+        $this->getJson(route('hrd.absensi.karyawan.cari', ['q' => 'Rina']))
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonFragment(['id' => $cocokSatu, 'nama' => 'Rina Putri'])
+            ->assertJsonFragment(['id' => $cocokSatu, 'layanan' => 'Driver'])
+            ->assertJsonFragment(['id' => $cocokDua, 'nama' => 'Rina Saputra'])
+            ->assertJsonMissing(['id' => $tidakCocok, 'nama' => 'Budi Santoso']);
+
+        $this->getJson(route('hrd.absensi.karyawan.cari', ['q' => '202501001']))
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonFragment(['id' => $cocokSatu, 'nama' => 'Rina Putri', 'nip' => '202501001']);
+
+        $this->getJson(route('hrd.absensi.karyawan.cari', ['q' => 'NamaTidakDitemukan']))
+            ->assertOk()
+            ->assertExactJson([]);
     }
 
     public function test_pdf_rekap_mengunduh_file_pdf(): void
@@ -192,6 +251,7 @@ class PersetujuanLemburTest extends TestCase
         $this->loginSebagai(Role::Keuangan);
 
         $this->get(route('hrd.absensi', ['tab' => 'rekap']))->assertForbidden();
+        $this->getJson(route('hrd.absensi.karyawan.cari', ['q' => 'Rina']))->assertForbidden();
         $this->get(route('hrd.absensi.rekap.pdf'))->assertForbidden();
     }
 

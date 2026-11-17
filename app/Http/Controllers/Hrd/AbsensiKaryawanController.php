@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hrd;
 use App\Http\Controllers\Controller;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -118,6 +119,33 @@ class AbsensiKaryawanController extends Controller
             ->download($namaFile);
     }
 
+    public function cariKaryawan(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'min:1', 'max:100'],
+        ]);
+        $kataKunci = trim($validated['q']);
+
+        if ($kataKunci === '') {
+            return response()->json([]);
+        }
+
+        return response()->json(DB::table('tbl_karyawan')
+            ->leftJoin('tbl_jenis_layanan as jl', 'jl.id', '=', 'tbl_karyawan.id_jenis_layanan')
+            ->where('tbl_karyawan.status', '<>', 'Nonaktif')
+            ->where(fn (Builder $query) => $query
+                ->where('tbl_karyawan.nama', 'like', '%'.$kataKunci.'%')
+                ->orWhere('tbl_karyawan.nip', 'like', '%'.$kataKunci.'%'))
+            ->orderBy('tbl_karyawan.nama')
+            ->limit(10)
+            ->get([
+                'tbl_karyawan.id',
+                'tbl_karyawan.nama',
+                'tbl_karyawan.nip',
+                DB::raw('COALESCE(jl.nama_layanan, tbl_karyawan.kategori) AS layanan'),
+            ]));
+    }
+
     private function halamanRekap(Request $request): View
     {
         $filter = $this->filterRekap($request);
@@ -135,9 +163,11 @@ class AbsensiKaryawanController extends Controller
             'belumAbsen' => collect(),
             'daftarLayanan' => collect(),
             'daftarTanda' => self::TANDA,
-            'daftarKaryawan' => $this->daftarKaryawan(),
             'lemburMenunggu' => collect(),
             'filterRekap' => $filter,
+            'karyawanTerpilih' => $filter['id_karyawan']
+                ? DB::table('tbl_karyawan')->where('id', $filter['id_karyawan'])->first(['id', 'nama', 'nip'])
+                : null,
             'daftarKlien' => DB::table('tbl_klien')->orderBy('nama_perusahaan')->get(['id', 'nama_perusahaan']),
             'rekap' => $baris,
             'ringkasanRekap' => $ringkasan,
