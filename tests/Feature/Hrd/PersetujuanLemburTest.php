@@ -3,6 +3,7 @@
 namespace Tests\Feature\Hrd;
 
 use App\Models\Role;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\MemakaiDatabaseSji;
 use Tests\TestCase;
@@ -129,7 +130,7 @@ class PersetujuanLemburTest extends TestCase
             ->assertSee('06:00');
     }
 
-    public function test_csv_rekap_menggunakan_filter_karyawan_dan_periode(): void
+    public function test_pdf_rekap_mengunduh_file_pdf(): void
     {
         $idKlien = $this->buatKlien();
         $idKaryawanSesuai = $this->buatKaryawan('Lapangan', ['nip' => 'TSTX-REKAP-1']);
@@ -140,17 +141,50 @@ class PersetujuanLemburTest extends TestCase
         $this->buatAbsensi($idKaryawanSesuai, $tanggal, 'Alpha', ['id_penempatan' => $idPenempatan]);
         $this->buatAbsensi($idKaryawanLain, $tanggal, 'Izin');
 
-        $response = $this->get(route('hrd.absensi.rekap.csv', [
+        $response = $this->get(route('hrd.absensi.rekap.pdf', [
             'tanggal_awal' => $tanggal,
             'tanggal_akhir' => $tanggal,
             'id_karyawan' => $idKaryawanSesuai,
             'id_klien' => $idKlien,
         ]));
 
-        $response->assertDownload('rekap-absensi-'.$tanggal.'-'.$tanggal.'.csv');
-        $csv = $response->streamedContent();
-        $this->assertStringContainsString('TSTX-REKAP-1', $csv);
-        $this->assertStringNotContainsString('TSTX-REKAP-2', $csv);
+        $response->assertDownload('rekap-absensi-'.$tanggal.'-'.$tanggal.'.pdf');
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    public function test_pdf_rekap_menerapkan_filter_karyawan_periode_dan_klien(): void
+    {
+        $idKlien = $this->buatKlien();
+        $idKaryawanSesuai = $this->buatKaryawan('Lapangan', ['nip' => 'TSTX-REKAP-1']);
+        $idKaryawanLain = $this->buatKaryawan('Lapangan', ['nip' => 'TSTX-REKAP-2']);
+        $tanggal = $this->hariIniDb(-1);
+        $idPenempatan = $this->buatPenempatan($idKaryawanSesuai, $idKlien, $this->hariIniDb(-10));
+        $this->buatPenempatan($idKaryawanLain, $idKlien, $this->hariIniDb(-10));
+        $this->buatAbsensi($idKaryawanSesuai, $tanggal, 'Alpha', ['id_penempatan' => $idPenempatan]);
+        $this->buatAbsensi($idKaryawanLain, $tanggal, 'Izin');
+
+        $pdf = \Mockery::mock(\Barryvdh\DomPDF\PDF::class);
+        $pdf->shouldReceive('setPaper')->once()->with('a4', 'landscape')->andReturnSelf();
+        $pdf->shouldReceive('setOption')->once()->with('defaultFont', 'DejaVu Sans')->andReturnSelf();
+        $pdf->shouldReceive('download')->once()->with('rekap-absensi-'.$tanggal.'-'.$tanggal.'.pdf')->andReturn(response('mock-pdf'));
+        Pdf::shouldReceive('loadView')
+            ->once()
+            ->with('hrd.absensi.pdf', \Mockery::on(fn (array $data): bool => $data['filter']['tanggal_awal'] === $tanggal
+                && $data['filter']['tanggal_akhir'] === $tanggal
+                && $data['filter']['id_karyawan'] === $idKaryawanSesuai
+                && $data['filter']['id_klien'] === $idKlien
+                && $data['rekap']->pluck('nip')->all() === ['TSTX-REKAP-1']
+                && $data['karyawan']->nip === 'TSTX-REKAP-1'
+                && $data['klien'] === 'Klien Uji'
+            ))
+            ->andReturn($pdf);
+
+        $this->get(route('hrd.absensi.rekap.pdf', [
+            'tanggal_awal' => $tanggal,
+            'tanggal_akhir' => $tanggal,
+            'id_karyawan' => $idKaryawanSesuai,
+            'id_klien' => $idKlien,
+        ]))->assertOk()->assertSee('mock-pdf');
     }
 
     public function test_role_lain_tidak_dapat_membuka_rekap_absensi(): void
@@ -158,7 +192,7 @@ class PersetujuanLemburTest extends TestCase
         $this->loginSebagai(Role::Keuangan);
 
         $this->get(route('hrd.absensi', ['tab' => 'rekap']))->assertForbidden();
-        $this->get(route('hrd.absensi.rekap.csv'))->assertForbidden();
+        $this->get(route('hrd.absensi.rekap.pdf'))->assertForbidden();
     }
 
     public function test_hrd_menyetujui_dan_menolak_lembur(): void

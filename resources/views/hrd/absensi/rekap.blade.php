@@ -35,7 +35,7 @@
             <button type="submit" class="btn-primary">Terapkan Filter</button>
             <a href="{{ route('hrd.absensi', ['tab' => 'rekap']) }}" class="btn-secondary">Reset</a>
             @if ($rekap !== null)
-                <a href="{{ route('hrd.absensi.rekap.csv', $filterRekap) }}" class="btn-secondary">Export CSV</a>
+                <a href="{{ route('hrd.absensi.rekap.pdf', $filterRekap) }}" class="btn-secondary">Export PDF</a>
             @endif
         </div>
     </div>

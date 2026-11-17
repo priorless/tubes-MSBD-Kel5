@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hrd;
 
 use App\Http\Controllers\Controller;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Laporan absensi karyawan untuk HRD (hanya baca).
@@ -90,29 +91,31 @@ class AbsensiKaryawanController extends Controller
         ]);
     }
 
-    public function exportCsv(Request $request): StreamedResponse
+    public function exportPdf(Request $request): Response
     {
         abort_unless(Schema::hasView('v_absensi_harian'), 503, 'Data absensi belum tersedia.');
 
         $filter = $this->filterRekap($request);
-        $namaFile = 'rekap-absensi-'.$filter['tanggal_awal'].'-'.$filter['tanggal_akhir'].'.csv';
+        $karyawan = $filter['id_karyawan']
+            ? DB::table('tbl_karyawan')->where('id', $filter['id_karyawan'])->first(['nip', 'nama'])
+            : null;
+        $klien = $filter['id_klien']
+            ? DB::table('tbl_klien')->where('id', $filter['id_klien'])->value('nama_perusahaan')
+            : null;
+        $data = [
+            'filter' => $filter,
+            'karyawan' => $karyawan,
+            'klien' => $klien,
+            'ringkasanRekap' => $this->ringkasanRekap($filter),
+            'rekap' => $this->queryRekap($filter)->orderBy('a.tgl')->orderBy('a.nama')->get(),
+            'waktuCetak' => now(),
+        ];
+        $namaFile = 'rekap-absensi-'.$filter['tanggal_awal'].'-'.$filter['tanggal_akhir'].'.pdf';
 
-        return response()->streamDownload(function () use ($filter): void {
-            $keluaran = fopen('php://output', 'w');
-            fputcsv($keluaran, ['Tanggal', 'NIP', 'Nama', 'Klien', 'Lokasi', 'Status', 'Menit Terlambat', 'Jam Masuk', 'Jam Keluar', 'Jam Lembur', 'Status Lembur', 'Keterangan']);
-
-            $this->queryRekap($filter)->orderBy('a.tgl')->orderBy('a.nama')->chunk(500, function (Collection $baris) use ($keluaran): void {
-                foreach ($baris as $item) {
-                    fputcsv($keluaran, [
-                        $item->tgl, $item->nip, $item->nama, $item->nama_klien, $item->lokasi_kerja,
-                        $item->status_kehadiran, $item->menit_terlambat, $item->jam_masuk, $item->jam_keluar,
-                        $item->jam_lembur, $item->status_lembur, $item->keterangan,
-                    ]);
-                }
-            });
-
-            fclose($keluaran);
-        }, $namaFile, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return Pdf::loadView('hrd.absensi.pdf', $data)
+            ->setPaper('a4', 'landscape')
+            ->setOption('defaultFont', 'DejaVu Sans')
+            ->download($namaFile);
     }
 
     private function halamanRekap(Request $request): View
@@ -122,27 +125,7 @@ class AbsensiKaryawanController extends Controller
         $baris = $tersedia
             ? $this->queryRekap($filter)->orderByDesc('a.tgl')->orderBy('a.nama')->paginate(25)->withQueryString()
             : null;
-        $ringkasan = $tersedia
-            ? $this->queryRekap($filter)->selectRaw(<<<'SQL'
-                COUNT(CASE WHEN a.status_kehadiran IN ('Hadir', 'Terlambat') THEN 1 END) AS hadir,
-                COUNT(CASE WHEN a.status_kehadiran = 'Terlambat' THEN 1 END) AS terlambat,
-                COALESCE(SUM(a.menit_terlambat), 0) AS total_menit_terlambat,
-                COUNT(CASE WHEN a.status_kehadiran = 'Izin' THEN 1 END) AS izin,
-                COUNT(CASE WHEN a.status_kehadiran = 'Sakit' THEN 1 END) AS sakit,
-                COUNT(CASE WHEN a.status_kehadiran = 'Alpha' THEN 1 END) AS alpha,
-                COUNT(CASE WHEN a.jam_masuk IS NOT NULL AND a.jam_keluar IS NULL THEN 1 END) AS belum_check_out,
-                COUNT(CASE WHEN a.status_lembur = 'Menunggu' THEN 1 END) AS lembur_menunggu,
-                COUNT(CASE WHEN a.status_lembur = 'Disetujui' THEN 1 END) AS lembur_disetujui,
-                COUNT(CASE WHEN a.status_lembur = 'Ditolak' THEN 1 END) AS lembur_ditolak,
-                COALESCE(SUM(CASE WHEN a.status_lembur = 'Menunggu' THEN a.jam_lembur ELSE 0 END), 0) AS jam_lembur_menunggu,
-                COALESCE(SUM(CASE WHEN a.status_lembur = 'Disetujui' THEN a.jam_lembur ELSE 0 END), 0) AS jam_lembur_disetujui,
-                COALESCE(SUM(CASE WHEN a.status_lembur = 'Ditolak' THEN a.jam_lembur ELSE 0 END), 0) AS jam_lembur_ditolak
-                SQL)->first()
-            : null;
-
-        if ($ringkasan) {
-            $ringkasan->tanpa_catatan = $this->jumlahHariTanpaCatatan($filter);
-        }
+        $ringkasan = $tersedia ? $this->ringkasanRekap($filter) : null;
 
         return view('hrd.absensi.index', [
             'tab' => 'rekap',
@@ -159,6 +142,34 @@ class AbsensiKaryawanController extends Controller
             'rekap' => $baris,
             'ringkasanRekap' => $ringkasan,
         ]);
+    }
+
+    /** @param array{tanggal_awal: string, tanggal_akhir: string, id_karyawan: ?int, id_klien: ?int} $filter */
+    private function ringkasanRekap(array $filter): ?object
+    {
+        if (! Schema::hasView('v_absensi_harian')) {
+            return null;
+        }
+
+        $ringkasan = $this->queryRekap($filter)->selectRaw(<<<'SQL'
+                COUNT(CASE WHEN a.status_kehadiran IN ('Hadir', 'Terlambat') THEN 1 END) AS hadir,
+                COUNT(CASE WHEN a.status_kehadiran = 'Terlambat' THEN 1 END) AS terlambat,
+                COALESCE(SUM(a.menit_terlambat), 0) AS total_menit_terlambat,
+                COUNT(CASE WHEN a.status_kehadiran = 'Izin' THEN 1 END) AS izin,
+                COUNT(CASE WHEN a.status_kehadiran = 'Sakit' THEN 1 END) AS sakit,
+                COUNT(CASE WHEN a.status_kehadiran = 'Alpha' THEN 1 END) AS alpha,
+                COUNT(CASE WHEN a.jam_masuk IS NOT NULL AND a.jam_keluar IS NULL THEN 1 END) AS belum_check_out,
+                COUNT(CASE WHEN a.status_lembur = 'Menunggu' THEN 1 END) AS lembur_menunggu,
+                COUNT(CASE WHEN a.status_lembur = 'Disetujui' THEN 1 END) AS lembur_disetujui,
+                COUNT(CASE WHEN a.status_lembur = 'Ditolak' THEN 1 END) AS lembur_ditolak,
+                COALESCE(SUM(CASE WHEN a.status_lembur = 'Menunggu' THEN a.jam_lembur ELSE 0 END), 0) AS jam_lembur_menunggu,
+                COALESCE(SUM(CASE WHEN a.status_lembur = 'Disetujui' THEN a.jam_lembur ELSE 0 END), 0) AS jam_lembur_disetujui,
+                COALESCE(SUM(CASE WHEN a.status_lembur = 'Ditolak' THEN a.jam_lembur ELSE 0 END), 0) AS jam_lembur_ditolak
+                SQL)->first();
+
+        $ringkasan->tanpa_catatan = $this->jumlahHariTanpaCatatan($filter);
+
+        return $ringkasan;
     }
 
     /** @return array{tanggal_awal: string, tanggal_akhir: string, id_karyawan: ?int, id_klien: ?int} */
