@@ -3,7 +3,9 @@
 @section('title', 'Beranda Operasional')
 
 @php
-    $jumlahPerhatian = $jadwalBelumLengkap->count() + $kontrakSegeraBerakhir->count() + $penempatanLewatMasa->count();
+    $pertukaranMenunggu = $ringkasanPertukaranShift['Menunggu'];
+    $jumlahPerhatian = $jadwalBelumLengkap->count() + $kontrakSegeraBerakhir->count() + $penempatanLewatMasa->count() + $pertukaranMenunggu;
+    $urlPertukaran = static fn (string $status): string => route('operasional.jadwal-kerja.pertukaran-shift.index', ['status' => $status]);
 @endphp
 
 @section('content')
@@ -24,6 +26,24 @@
         @endif
     </div>
 
+    @if ($pertukaranShiftTersedia)
+        <section class="mt-6" aria-labelledby="judul-pertukaran-shift">
+            <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                <h3 id="judul-pertukaran-shift" class="text-sm font-semibold text-gray-700">Pengajuan Pertukaran Shift</h3>
+                <a href="{{ route('operasional.jadwal-kerja.pertukaran-shift.index') }}" class="text-sm font-medium text-sji-biru hover:underline">Lihat semua &rarr;</a>
+            </div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <x-ui.stat-card label="Menunggu persetujuan" :value="$pertukaranMenunggu"
+                    :hint="$pertukaranMenunggu > 0 ? 'Perlu diputuskan' : 'Tidak ada yang tertunda'"
+                    :tone="$pertukaranMenunggu > 0 ? 'warning' : 'success'" :href="$urlPertukaran('Menunggu')" />
+                <x-ui.stat-card label="Disetujui" :value="$ringkasanPertukaranShift['Disetujui']" hint="Jadwal sudah ditukar"
+                    :href="$urlPertukaran('Disetujui')" />
+                <x-ui.stat-card label="Ditolak" :value="$ringkasanPertukaranShift['Ditolak']" hint="Jadwal tetap seperti semula"
+                    :href="$urlPertukaran('Ditolak')" />
+            </div>
+        </section>
+    @endif
+
     <div class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div class="card xl:col-span-2">
             <div class="card-header">
@@ -36,6 +56,16 @@
                 @if ($jumlahPerhatian === 0)
                     <x-ui.empty-state title="Semua beres"
                         message="Jadwal bulan ini sudah lengkap dan tidak ada kontrak yang segera berakhir." />
+                @endif
+
+                @if ($pertukaranMenunggu > 0)
+                    <section>
+                        <h4 class="text-sm font-semibold text-gray-800">Pengajuan pertukaran shift menunggu persetujuan</h4>
+                        <p class="text-xs text-gray-500">Periksa detail tiap pengajuan, lalu setujui atau tolak sebelum tanggal shift.</p>
+                        <a href="{{ $urlPertukaran('Menunggu') }}" class="mt-2 inline-flex items-center gap-2 text-sm font-medium text-sji-biru hover:underline">
+                            <span class="badge badge-warning">{{ $pertukaranMenunggu }}</span> Buka daftar pengajuan &rarr;
+                        </a>
+                    </section>
                 @endif
 
                 @if ($penempatanLewatMasa->isNotEmpty())

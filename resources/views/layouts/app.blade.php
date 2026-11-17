@@ -109,6 +109,11 @@
                                    @if ($sedangAktif) aria-current="page" @endif>
                                     <span @class(['h-4 w-1 rounded-full', 'bg-sji-emas' => $sedangAktif, 'bg-transparent' => ! $sedangAktif])></span>
                                     {{ $label }}
+                                    @if (($badgeMenu[$namaRoute] ?? 0) > 0)
+                                        <span class="ml-auto rounded-full bg-sji-emas px-2 py-0.5 text-xs font-bold text-sji-biru-tua"
+                                              title="{{ $badgeMenu[$namaRoute] }} pengajuan tukar shift menunggu persetujuan"
+                                              data-badge-menu="{{ $namaRoute }}">{{ $badgeMenu[$namaRoute] }}</span>
+                                    @endif
                                 </a>
                             </li>
                         @endforeach

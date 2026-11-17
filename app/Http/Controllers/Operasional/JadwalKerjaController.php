@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Operasional;
 
 use App\Http\Controllers\Controller;
 use App\Services\JadwalKerjaService;
+use App\Services\PertukaranShiftService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -44,7 +45,7 @@ class JadwalKerjaController extends Controller
      * Setiap tanggal dipetakan ke penempatan karyawan yang berlaku pada tanggal itu,
      * sehingga riwayat jadwal penempatan lama (sebelum Rotasi) tetap terlihat apa adanya.
      */
-    public function __invoke(Request $request, JadwalKerjaService $jadwalKerjaService): View
+    public function __invoke(Request $request, JadwalKerjaService $jadwalKerjaService, PertukaranShiftService $pertukaranShiftService): View
     {
         $validated = $request->validate([
             'id_klien' => ['nullable', 'integer', 'min:1'],
@@ -148,6 +149,7 @@ class JadwalKerjaController extends Controller
 
         return view('operasional.jadwal-kerja.index', [
             'rosterTersedia' => $rosterTersedia,
+            'jumlahPertukaranMenunggu' => $pertukaranShiftService->jumlahMenunggu(),
             'daftarKaryawan' => $daftarKaryawan,
             'daftarKlienFilter' => DB::table('tbl_klien as kl')
                 ->whereExists(fn ($query) => $query->select(DB::raw(1))->from('tbl_penempatan as p')->whereColumn('p.id_klien', 'kl.id'))

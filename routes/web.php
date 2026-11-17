@@ -16,10 +16,12 @@ use App\Http\Controllers\Operasional\AkhiriPenempatanController;
 use App\Http\Controllers\Operasional\BerandaOperasionalController;
 use App\Http\Controllers\Operasional\JadwalKerjaController;
 use App\Http\Controllers\Operasional\KlienController;
+use App\Http\Controllers\Operasional\PertukaranShiftController;
 use App\Http\Controllers\Operasional\RekapOperasionalController;
 use App\Http\Controllers\Operasional\TemplateJadwalController;
 use App\Http\Controllers\Operasional\TemplateShiftController;
 use App\Http\Controllers\OperasionalController;
+use App\Http\Controllers\TenagaKerja\PengajuanTukarShiftController;
 use App\Http\Controllers\TenagaKerjaController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Middleware\PastikanKaryawan;
@@ -116,6 +118,15 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
                 Route::patch('{templateJadwal}/nonaktifkan', 'deactivate')->whereNumber('templateJadwal')->name('deactivate');
                 Route::post('{templateJadwal}/terapkan', 'apply')->whereNumber('templateJadwal')->name('apply');
             });
+        Route::controller(PertukaranShiftController::class)
+            ->prefix('jadwal-kerja/pertukaran-shift')
+            ->name('jadwal-kerja.pertukaran-shift.')
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::get('{pertukaranShift}', 'show')->whereNumber('pertukaranShift')->name('show');
+                Route::patch('{pertukaranShift}/setujui', 'approve')->whereNumber('pertukaranShift')->name('approve');
+                Route::patch('{pertukaranShift}/tolak', 'reject')->whereNumber('pertukaranShift')->name('reject');
+            });
         Route::post('jadwal-kerja/atur', [JadwalKerjaController::class, 'atur'])->name('jadwal-kerja.atur');
         Route::post('jadwal-kerja', [JadwalKerjaController::class, 'store'])->name('jadwal-kerja.store');
         Route::put('jadwal-kerja/{jadwal}', [JadwalKerjaController::class, 'update'])
@@ -169,6 +180,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             Route::get('/absensi', 'absensi')->name('absensi');
             Route::post('/absensi/check-in', 'checkIn')->middleware('throttle:10,1')->name('absensi.check-in');
             Route::post('/absensi/check-out', 'checkOut')->middleware('throttle:10,1')->name('absensi.check-out');
+            Route::post('/absensi/tukar-shift', PengajuanTukarShiftController::class)->middleware('throttle:10,1')->name('tukar-shift.store');
 
             Route::get('/riwayat-absensi', 'riwayat')->name('riwayat');
             Route::get('/riwayat-absensi/unduh', 'riwayatCsv')->name('riwayat.unduh');

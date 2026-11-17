@@ -92,6 +92,8 @@
                                 <td class="whitespace-nowrap">
                                     @if ($baris->jadwal_datang || $baris->jadwal_pulang)
                                         <span class="font-mono">{{ FormatKolom::jam($baris->jadwal_datang) }}&ndash;{{ FormatKolom::jam($baris->jadwal_pulang) }}</span>
+                                    @elseif (($baris->sumber_jadwal ?? null) === 'Libur')
+                                        <span class="badge badge-warning" title="Masuk pada hari yang dijadwalkan Libur">Libur</span>
                                     @else
                                         <span class="badge badge-secondary">Jadwal belum ditentukan</span>
                                     @endif
