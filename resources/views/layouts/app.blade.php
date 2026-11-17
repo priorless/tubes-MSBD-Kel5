@@ -60,7 +60,6 @@
             $menu['Keuangan'] = [
                 ['Payroll', 'keuangan.payroll.index', 'keuangan.payroll.*'],
                 ['Invoice Klien', 'keuangan.invoice.index', 'keuangan.invoice.*'],
-                ['Mutasi Kas', 'keuangan.mutasi.index', 'keuangan.mutasi.*'],
             ];
         }
 

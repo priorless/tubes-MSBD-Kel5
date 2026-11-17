@@ -9,9 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
- * Modul Keuangan: seluruh logika bisnis (perhitungan payroll, invoice,
- * pencatatan mutasi kas) berada di database. Controller ini hanya
- * memanggil stored procedure dan membaca view/tabel.
+ * Modul Keuangan: seluruh logika bisnis (perhitungan payroll dan invoice)
+ * berada di database. Controller ini hanya memanggil stored procedure dan membaca view/tabel.
  */
 class KeuanganController extends Controller
 {
@@ -228,33 +227,6 @@ class KeuanganController extends Controller
         ]);
 
         return $gagal ?? back()->with('success', 'Invoice berhasil ditandai lunas.');
-    }
-
-    public function mutasi(Request $request): View
-    {
-        $periode = $this->periodeDariRequest($request);
-        $jenis = in_array($request->query('jenis'), ['Pemasukan', 'Pengeluaran'], true)
-            ? $request->query('jenis')
-            : null;
-
-        return view('keuangan.mutasi.index', [
-            'mutasi' => DB::table('tbl_mutasi_keuangan')
-                ->whereMonth('tgl_mutasi', $periode['bulan'])
-                ->whereYear('tgl_mutasi', $periode['tahun'])
-                ->when($jenis, fn ($query, string $jenis) => $query->where('jenis', $jenis))
-                ->orderByDesc('tgl_mutasi')
-                ->orderByDesc('id')
-                ->paginate(20)
-                ->withQueryString(),
-            'ringkasan' => DB::table('v_arus_kas_bulanan')
-                ->where('bulan', $periode['bulan'])
-                ->where('tahun', $periode['tahun'])
-                ->first(),
-            'bulan' => $periode['bulan'],
-            'tahun' => $periode['tahun'],
-            'jenis' => $jenis,
-            'daftarBulan' => self::DAFTAR_BULAN,
-        ]);
     }
 
     /**
