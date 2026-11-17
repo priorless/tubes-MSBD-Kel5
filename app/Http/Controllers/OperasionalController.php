@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Operasional\AkhiriPenempatanController;
 use App\Services\DatabaseService;
 use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +18,18 @@ use Illuminate\View\View;
 
 class OperasionalController extends Controller
 {
+    public const string STATUS_BELUM_MULAI = 'Belum Mulai';
+
+    public const string STATUS_BERJALAN = 'Berjalan';
+
+    public const string STATUS_LEWAT_KONTRAK = 'Lewat Kontrak';
+
+    /** Urutan tampilan status penempatan di Monitoring Sebaran. */
+    public const array STATUS_MONITORING = [self::STATUS_BERJALAN, self::STATUS_BELUM_MULAI, self::STATUS_LEWAT_KONTRAK];
+
+    /** Label untuk karyawan lapangan yang belum diberi jenis layanan oleh HRD. */
+    private const string LAYANAN_KOSONG = 'Belum diisi HRD';
+
     /**
      * Daftar penempatan dengan pencarian dan filter klien, jenis layanan, serta status.
      */
@@ -259,33 +274,124 @@ class OperasionalController extends Controller
     }
 
     /**
-     * Monitoring sebaran dari view v_monitoring_sebaran_operasional (hanya penempatan Aktif).
-     * Ringkasan per klien dan per jenis layanan, serta penempatan yang perlu diperiksa
+     * Monitoring sebaran dari view v_monitoring_sebaran_operasional (hanya penempatan Aktif), dapat difilter
+     * per klien dan per jenis layanan. Ringkasan per klien, per jenis layanan (semua layanan, termasuk 0),
+     * per status penempatan (dihitung dari tanggal), serta penempatan yang perlu diperiksa
      * (sisa kontrak < 30 hari atau masa penempatan sudah lewat).
      */
-    public function monitoring(): View
+    public function monitoring(Request $request): View
     {
-        $semua = DB::table('v_monitoring_sebaran_operasional')
-            ->get(['id_penempatan', 'nip', 'nama', 'nama_layanan', 'nama_perusahaan', 'tgl_selesai', 'sisa_hari_kontrak']);
-        $hitung = static fn (string $kolom) => $semua->countBy($kolom)->sortDesc()
-            ->map(static fn (int $jumlah, string $nama): object => (object) ['nama' => $nama, 'jumlah' => $jumlah])
-            ->values();
+        $validated = $request->validate([
+            'id_klien' => ['nullable', 'integer'],
+            'id_jenis_layanan' => ['nullable', 'integer'],
+        ], [
+            'id_klien.integer' => 'Filter klien tidak valid.',
+            'id_jenis_layanan.integer' => 'Filter jenis layanan tidak valid.',
+        ]);
+        $filterTersedia = $this->filterMonitoringTersedia();
+        $filter = [
+            'id_klien' => $filterTersedia && isset($validated['id_klien']) ? (int) $validated['id_klien'] : null,
+            'id_jenis_layanan' => $filterTersedia && isset($validated['id_jenis_layanan']) ? (int) $validated['id_jenis_layanan'] : null,
+        ];
+        $saring = static fn (Builder $query): Builder => $query
+            ->when($filter['id_klien'] !== null, fn (Builder $q) => $q->where('id_klien', $filter['id_klien']))
+            ->when($filter['id_jenis_layanan'] !== null, fn (Builder $q) => $q->where('id_jenis_layanan', $filter['id_jenis_layanan']));
+        $hariIni = now(AkhiriPenempatanController::ZONA_WAKTU)->toDateString();
+        $beriStatus = static function (object $item) use ($hariIni): void {
+            $item->status_penempatan = self::statusPenempatan((string) $item->tgl_mulai, $item->tgl_selesai, $hariIni);
+        };
+
+        $semua = $saring(DB::table('v_monitoring_sebaran_operasional'))
+            ->get(['id_penempatan', 'nip', 'nama', 'nama_layanan', 'nama_perusahaan', 'tgl_mulai', 'tgl_selesai', 'sisa_hari_kontrak'])
+            ->each($beriStatus);
+        $penempatan = $saring(DB::table('v_monitoring_sebaran_operasional'))
+            ->orderBy('sisa_hari_kontrak')
+            ->paginate(15)
+            ->withQueryString();
+        $penempatan->getCollection()->each($beriStatus);
+
+        $daftarLayanan = DB::table('tbl_jenis_layanan')->orderBy('nama_layanan')->get(['id', 'nama_layanan']);
 
         return view('operasional.monitoring.index', [
-            'penempatan' => DB::table('v_monitoring_sebaran_operasional')
-                ->orderBy('sisa_hari_kontrak')
-                ->paginate(15),
+            'penempatan' => $penempatan,
+            'filter' => $filter,
+            'filterTersedia' => $filterTersedia,
+            'daftarKlien' => DB::table('tbl_klien')->orderBy('nama_perusahaan')->get(['id', 'nama_perusahaan', 'status']),
+            'daftarLayanan' => $daftarLayanan,
             'ringkasan' => [
                 'jumlah_karyawan' => $semua->pluck('nip')->unique()->count(),
                 'jumlah_penempatan' => $semua->count(),
-                'per_klien' => $hitung('nama_perusahaan'),
-                'per_layanan' => $hitung('nama_layanan'),
+                'per_klien' => $this->jumlahPer($semua->countBy('nama_perusahaan')),
+                'per_layanan' => $this->sebaranPerLayanan($semua, $daftarLayanan, $filter['id_jenis_layanan']),
+                'per_status' => collect(self::STATUS_MONITORING)
+                    ->map(static fn (string $status): object => (object) [
+                        'nama' => $status,
+                        'jumlah' => $semua->where('status_penempatan', $status)->count(),
+                    ]),
                 'perlu_diperiksa' => $semua
                     ->filter(static fn (object $item): bool => (int) $item->sisa_hari_kontrak < 30)
                     ->sortBy(static fn (object $item): int => (int) $item->sisa_hari_kontrak)
                     ->values(),
             ],
         ]);
+    }
+
+    /**
+     * Status penempatan Aktif menurut tanggal (bukan hanya status database):
+     * Belum Mulai bila tanggal mulai setelah hari ini, Lewat Kontrak bila tanggal selesai sebelum hari ini,
+     * selain itu Berjalan. Tanggal dibandingkan sebagai string Y-m-d.
+     */
+    private static function statusPenempatan(string $tglMulai, ?string $tglSelesai, string $hariIni): string
+    {
+        if (substr($tglMulai, 0, 10) > $hariIni) {
+            return self::STATUS_BELUM_MULAI;
+        }
+
+        if ($tglSelesai !== null && substr($tglSelesai, 0, 10) < $hariIni) {
+            return self::STATUS_LEWAT_KONTRAK;
+        }
+
+        return self::STATUS_BERJALAN;
+    }
+
+    /**
+     * Kolom id_klien & id_jenis_layanan ditambahkan ke view oleh migrasi 2026_11_17_065726. Selama belum dimigrasi,
+     * monitoring tetap tampil tanpa filter dan halaman menampilkan peringatan (kegagalan migrasi tidak disembunyikan).
+     */
+    private function filterMonitoringTersedia(): bool
+    {
+        return Schema::hasColumn('v_monitoring_sebaran_operasional', 'id_klien')
+            && Schema::hasColumn('v_monitoring_sebaran_operasional', 'id_jenis_layanan');
+    }
+
+    /**
+     * Semua jenis layanan dari HRD ditampilkan (termasuk yang 0 orang), ditambah "Belum diisi HRD" bila ada
+     * karyawan tanpa jenis layanan. Bila difilter per jenis layanan, hanya layanan itu yang ditampilkan.
+     *
+     * @param  Collection<int, object>  $semua
+     * @param  Collection<int, object>  $daftarLayanan
+     * @return Collection<int, object{nama: string, jumlah: int}>
+     */
+    private function sebaranPerLayanan(Collection $semua, Collection $daftarLayanan, ?int $idLayananTerpilih): Collection
+    {
+        $jumlah = $semua->countBy(static fn (object $item): string => $item->nama_layanan ?? self::LAYANAN_KOSONG);
+        $semuaNama = $daftarLayanan
+            ->when($idLayananTerpilih !== null, fn (Collection $daftar) => $daftar->where('id', $idLayananTerpilih))
+            ->mapWithKeys(static fn (object $layanan): array => [$layanan->nama_layanan => 0]);
+
+        return $this->jumlahPer($semuaNama->merge($jumlah));
+    }
+
+    /**
+     * @param  Collection<string, int>  $jumlahPerNama
+     * @return Collection<int, object{nama: string, jumlah: int}>
+     */
+    private function jumlahPer(Collection $jumlahPerNama): Collection
+    {
+        return $jumlahPerNama
+            ->map(static fn (int $jumlah, string $nama): object => (object) ['nama' => $nama, 'jumlah' => $jumlah])
+            ->sortBy([['jumlah', 'desc'], ['nama', 'asc']])
+            ->values();
     }
 
     /**

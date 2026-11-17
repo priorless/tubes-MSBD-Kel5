@@ -82,6 +82,23 @@
                 </select>
                 @error('status') <p class="form-error">{{ $message }}</p> @enderror
             </div>
+            @if ($managementFeeTersedia)
+                <div>
+                    <label for="management_fee" class="form-label">Management Fee (opsional)</label>
+                    <div class="flex max-w-48 items-center gap-2">
+                        <input id="management_fee" name="management_fee" type="number" inputmode="decimal" min="0" max="100" step="0.01"
+                            placeholder="Contoh: 7.50"
+                            @class(['form-input', 'form-input-error' => $errors->has('management_fee')]) value="{{ old('management_fee', $klien?->management_fee) }}">
+                        <span class="text-sm text-gray-600">%</span>
+                    </div>
+                    @error('management_fee') <p class="form-error">{{ $message }}</p> @enderror
+                    <p class="form-hint">Persentase yang disepakati dengan klien. Kosongkan bila belum ditentukan; isi 0 bila disepakati tanpa fee.</p>
+                </div>
+            @else
+                <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
+                    Isian Management Fee belum tersedia karena database belum dimigrasi. Hubungi admin untuk menjalankan <code>php artisan migrate</code>.
+                </p>
+            @endif
         </div>
 
         <div class="card-footer justify-start">

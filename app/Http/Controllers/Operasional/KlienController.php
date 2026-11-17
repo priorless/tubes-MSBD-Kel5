@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -64,6 +65,7 @@ class KlienController extends Controller
             'riwayatPenempatan' => $penempatan->where('status', '!=', 'Aktif')->values(),
             'layanan' => $this->layananAktifPerKlien([$klien])->get($klien, collect()),
             'kerjaSamaSejak' => $penempatan->min('tgl_mulai'),
+            'managementFeeTersedia' => $this->managementFeeTersedia(),
         ]);
     }
 
@@ -89,21 +91,15 @@ class KlienController extends Controller
 
     public function create(): View
     {
-        return view('operasional.klien.form', ['klien' => null]);
+        return view('operasional.klien.form', [
+            'klien' => null,
+            'managementFeeTersedia' => $this->managementFeeTersedia(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'kode_klien' => ['bail', 'required', 'string', 'max:10', Rule::unique('tbl_klien', 'kode_klien')],
-            'nama_perusahaan' => ['bail', 'required', 'string', 'max:150'],
-            'alamat' => ['bail', 'required', 'string'],
-            'pic_nama' => ['bail', 'required', 'string', 'max:100'],
-            'pic_jabatan' => ['nullable', 'string', 'max:50'],
-            'pic_telp' => ['bail', 'required', 'string', 'max:15'],
-            'pic_email' => ['nullable', 'email', 'max:100'],
-            'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
-        ], $this->validationMessages());
+        $validated = $request->validate($this->validationRules($request), $this->validationMessages());
 
         try {
             $idKlien = (int) DB::table('tbl_klien')->insertGetId($validated);
@@ -123,6 +119,7 @@ class KlienController extends Controller
     {
         return view('operasional.klien.form', [
             'klien' => DB::table('tbl_klien')->where('id', $klien)->firstOrFail(),
+            'managementFeeTersedia' => $this->managementFeeTersedia(),
         ]);
     }
 
@@ -130,16 +127,7 @@ class KlienController extends Controller
     {
         $existingClient = DB::table('tbl_klien')->where('id', $klien)->firstOrFail();
 
-        $validated = $request->validate([
-            'kode_klien' => ['bail', 'required', 'string', 'max:10', Rule::unique('tbl_klien', 'kode_klien')->ignore($existingClient->id)],
-            'nama_perusahaan' => ['bail', 'required', 'string', 'max:150'],
-            'alamat' => ['bail', 'required', 'string'],
-            'pic_nama' => ['bail', 'required', 'string', 'max:100'],
-            'pic_jabatan' => ['nullable', 'string', 'max:50'],
-            'pic_telp' => ['bail', 'required', 'string', 'max:15'],
-            'pic_email' => ['nullable', 'email', 'max:100'],
-            'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
-        ], $this->validationMessages());
+        $validated = $request->validate($this->validationRules($request, $existingClient->id), $this->validationMessages());
 
         try {
             DB::table('tbl_klien')->where('id', $existingClient->id)->update($validated);
@@ -197,11 +185,57 @@ class KlienController extends Controller
     }
 
     /**
+     * Kolom tbl_klien.management_fee dibuat migrasi 2026_11_17_065725. Selama belum dimigrasi, form dan detail
+     * klien tetap berjalan tanpa Management Fee dan menampilkan peringatan (kegagalan migrasi tidak disembunyikan).
+     */
+    private function managementFeeTersedia(): bool
+    {
+        return Schema::hasColumn('tbl_klien', 'management_fee');
+    }
+
+    /**
+     * Aturan validasi tambah/ubah klien. Management Fee: kosong = belum ditentukan (NULL), 0 = tanpa fee,
+     * maksimal dua angka desimal; koma desimal ("7,5") diterima dan diubah menjadi titik.
+     *
+     * @return array<string, list<mixed>>
+     */
+    private function validationRules(Request $request, ?int $abaikanIdKlien = null): array
+    {
+        $aturan = [
+            'kode_klien' => ['bail', 'required', 'string', 'max:10', Rule::unique('tbl_klien', 'kode_klien')->ignore($abaikanIdKlien)],
+            'nama_perusahaan' => ['bail', 'required', 'string', 'max:150'],
+            'alamat' => ['bail', 'required', 'string'],
+            'pic_nama' => ['bail', 'required', 'string', 'max:100'],
+            'pic_jabatan' => ['nullable', 'string', 'max:50'],
+            'pic_telp' => ['bail', 'required', 'string', 'max:15'],
+            'pic_email' => ['nullable', 'email', 'max:100'],
+            'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
+        ];
+
+        if (! $this->managementFeeTersedia()) {
+            return $aturan;
+        }
+
+        if (is_string($request->input('management_fee'))) {
+            $request->merge(['management_fee' => str_replace(',', '.', trim($request->input('management_fee')))]);
+        }
+
+        return [
+            ...$aturan,
+            'management_fee' => ['bail', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:100'],
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     private function validationMessages(): array
     {
         return [
+            'management_fee.numeric' => 'Management Fee harus berupa angka.',
+            'management_fee.decimal' => 'Management Fee maksimal dua angka di belakang koma.',
+            'management_fee.min' => 'Management Fee tidak boleh kurang dari 0%.',
+            'management_fee.max' => 'Management Fee tidak boleh lebih dari 100%.',
             'kode_klien.required' => 'Kode klien wajib diisi.',
             'kode_klien.max' => 'Kode klien maksimal 10 karakter.',
             'kode_klien.unique' => 'Kode klien sudah digunakan.',

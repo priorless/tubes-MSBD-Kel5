@@ -5,29 +5,85 @@
 @section('content')
     @php
         $ringkasan ??= null;
+        $filter ??= ['id_klien' => null, 'id_jenis_layanan' => null];
+        $filterTersedia ??= false;
+        $daftarKlien ??= collect();
+        $daftarLayanan ??= collect();
+        $adaFilter = $filter['id_klien'] !== null || $filter['id_jenis_layanan'] !== null;
         $labelSisa = static fn (int $sisa): string => match (true) {
             $sisa < 0 => 'Lewat '.abs($sisa).' hari',
             $sisa === 0 => 'Berakhir hari ini',
             default => 'Sisa '.$sisa.' hari',
         };
+        $warnaStatus = [
+            \App\Http\Controllers\OperasionalController::STATUS_BERJALAN => 'success',
+            \App\Http\Controllers\OperasionalController::STATUS_BELUM_MULAI => 'info',
+            \App\Http\Controllers\OperasionalController::STATUS_LEWAT_KONTRAK => 'danger',
+        ];
+        $penjelasanStatus = [
+            \App\Http\Controllers\OperasionalController::STATUS_BERJALAN => 'Sedang bertugas dan belum melewati tanggal selesai',
+            \App\Http\Controllers\OperasionalController::STATUS_BELUM_MULAI => 'Tanggal mulai masih di masa depan',
+            \App\Http\Controllers\OperasionalController::STATUS_LEWAT_KONTRAK => 'Tanggal selesai sudah lewat, tetapi belum diakhiri',
+        ];
     @endphp
 
     <x-ui.page-header title="Monitoring Sebaran"
-        description="Sebaran karyawan aktif per klien dan per jenis layanan.">
+        description="Sebaran karyawan pada penempatan berstatus Aktif, per klien dan per jenis layanan.">
         <a href="{{ route('operasional.penempatan.create') }}" class="btn-primary">+ Penempatan Baru</a>
     </x-ui.page-header>
 
+    <form method="GET" action="{{ route('operasional.monitoring') }}" class="card mb-6">
+        <div class="card-body flex flex-col gap-4 md:flex-row md:items-end">
+            <div class="md:w-64">
+                <label for="filter_klien" class="form-label">Klien</label>
+                <select id="filter_klien" name="id_klien" class="form-input" @disabled(! $filterTersedia)>
+                    <option value="">Semua klien</option>
+                    @foreach ($daftarKlien as $item)
+                        <option value="{{ $item->id }}" @selected($filter['id_klien'] === (int) $item->id)>
+                            {{ $item->nama_perusahaan }}{{ $item->status === 'Nonaktif' ? ' (Nonaktif)' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="md:w-56">
+                <label for="filter_layanan" class="form-label">Jenis Layanan</label>
+                <select id="filter_layanan" name="id_jenis_layanan" class="form-input" @disabled(! $filterTersedia)>
+                    <option value="">Semua jenis layanan</option>
+                    @foreach ($daftarLayanan as $item)
+                        <option value="{{ $item->id }}" @selected($filter['id_jenis_layanan'] === (int) $item->id)>{{ $item->nama_layanan }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="btn-primary" @disabled(! $filterTersedia)>Terapkan</button>
+                @if ($adaFilter)
+                    <a href="{{ route('operasional.monitoring') }}" class="btn-secondary">Reset</a>
+                @endif
+            </div>
+        </div>
+        @if (! $filterTersedia)
+            <p class="border-t border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800" role="status">
+                Filter klien dan jenis layanan belum tersedia karena database belum dimigrasi. Data di bawah menampilkan semua penempatan aktif.
+                Hubungi admin untuk menjalankan <code>php artisan migrate</code>.
+            </p>
+        @elseif ($adaFilter)
+            <p class="border-t border-gray-200 px-6 py-3 text-sm text-gray-600">
+                Ringkasan dan tabel di bawah hanya menampilkan penempatan yang sesuai filter.
+            </p>
+        @endif
+    </form>
+
     @if ($ringkasan !== null)
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <x-ui.stat-card label="Karyawan ditempatkan" :value="$ringkasan['jumlah_karyawan']" hint="Dengan penempatan berstatus Aktif" />
+            <x-ui.stat-card label="Karyawan ditempatkan" :value="$ringkasan['jumlah_karyawan']" hint="Dengan penempatan berstatus Aktif, termasuk yang belum mulai" />
             <x-ui.stat-card label="Klien yang dilayani" :value="$ringkasan['per_klien']->count()" hint="Klien dengan minimal satu karyawan aktif"
                 :href="route('operasional.klien.index')" />
             <x-ui.stat-card label="Perlu diperiksa" :value="$ringkasan['perlu_diperiksa']->count()" hint="Kontrak kurang dari 30 hari atau sudah lewat"
                 :tone="$ringkasan['perlu_diperiksa']->isEmpty() ? 'success' : 'warning'" />
         </div>
 
-        <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            @foreach (['per_klien' => 'Karyawan per klien', 'per_layanan' => 'Karyawan per jenis layanan'] as $kunci => $judul)
+        <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+            @foreach (['per_klien' => 'Karyawan per klien', 'per_layanan' => 'Karyawan per jenis layanan', 'per_status' => 'Status penempatan'] as $kunci => $judul)
                 <section class="card">
                     <div class="card-header"><h3 class="card-title">{{ $judul }}</h3></div>
                     <div class="card-body space-y-3">
@@ -36,11 +92,14 @@
                             <div>
                                 <div class="flex items-center justify-between text-sm">
                                     <span class="text-gray-700">{{ $baris->nama }}</span>
-                                    <span class="font-medium tabular-nums text-gray-800">{{ $baris->jumlah }} orang</span>
+                                    <span class="font-medium tabular-nums text-gray-800">{{ $baris->jumlah }} {{ $kunci === 'per_status' ? 'penempatan' : 'orang' }}</span>
                                 </div>
                                 <div class="mt-1 h-2 rounded-full bg-gray-100" aria-hidden="true">
                                     <div class="h-2 rounded-full bg-sji-biru" style="width: {{ $persen }}%"></div>
                                 </div>
+                                @if ($kunci === 'per_status')
+                                    <p class="mt-1 text-xs text-gray-500">{{ $penjelasanStatus[$baris->nama] }}</p>
+                                @endif
                             </div>
                         @empty
                             <p class="text-sm text-gray-500">Belum ada penempatan aktif.</p>
@@ -102,6 +161,7 @@
                         <th>Jam Datang</th>
                         <th>Jam Pulang</th>
                         <th>Periode</th>
+                        <th>Status</th>
                         <th>Sisa Kontrak</th>
                         <th class="text-right">Aksi</th>
                     </tr>
@@ -111,7 +171,7 @@
                         <tr @class(['table-danger' => $item->sisa_hari_kontrak < 30])>
                             <td class="font-mono text-gray-600">{{ $item->nip }}</td>
                             <td class="whitespace-nowrap"><a href="{{ route('operasional.penempatan.show', $item->id_penempatan) }}" class="text-sji-biru hover:underline">{{ $item->nama }}</a></td>
-                            <td>{{ $item->nama_layanan }}</td>
+                            <td>{{ $item->nama_layanan ?? 'Belum diisi HRD' }}</td>
                             <td>{{ $item->nama_perusahaan }}</td>
                             <td>{{ $item->lokasi_kerja }}</td>
                             <td class="whitespace-nowrap font-mono">{{ $item->jam_datang ? substr($item->jam_datang, 0, 5) : '-' }}</td>
@@ -120,6 +180,13 @@
                                 {{ \Illuminate\Support\Carbon::parse($item->tgl_mulai)->format('d/m/Y') }}
                                 &ndash;
                                 {{ $item->tgl_selesai ? \Illuminate\Support\Carbon::parse($item->tgl_selesai)->format('d/m/Y') : 'Tanpa batas akhir' }}
+                            </td>
+                            <td class="whitespace-nowrap">
+                                @isset($item->status_penempatan)
+                                    <span class="badge badge-{{ $warnaStatus[$item->status_penempatan] }}" title="{{ $penjelasanStatus[$item->status_penempatan] }}">{{ $item->status_penempatan }}</span>
+                                @else
+                                    &mdash;
+                                @endisset
                             </td>
                             <td>
                                 @if ((int) $item->sisa_hari_kontrak === 9999)
@@ -146,7 +213,13 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="table-empty">Belum ada penempatan aktif.</td>
+                            <td colspan="11" class="table-empty">
+                                @if ($adaFilter)
+                                    Tidak ada penempatan aktif yang sesuai filter. <a href="{{ route('operasional.monitoring') }}" class="text-sji-biru hover:underline">Tampilkan semua</a>
+                                @else
+                                    Belum ada penempatan aktif.
+                                @endif
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>

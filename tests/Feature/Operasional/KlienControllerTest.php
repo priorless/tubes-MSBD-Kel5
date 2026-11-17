@@ -4,7 +4,9 @@ namespace Tests\Feature\Operasional;
 
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\CreatesSjiAuthTables;
 use Tests\Concerns\CreatesTemplateJadwalTables;
@@ -211,6 +213,115 @@ class KlienControllerTest extends TestCase
             ->assertDontSeeText('Orang yang dihubungi untuk urusan penempatan')
             ->assertSee('action="'.route('operasional.klien.update', 1).'"', false)
             ->assertSee('href="'.route('operasional.klien.show', 1).'" class="btn-secondary">Batal</a>', false);
+    }
+
+    public function test_management_fee_is_saved_with_two_decimals_and_shown_on_the_detail(): void
+    {
+        $this->createTables();
+
+        $this->actingAs($this->operasional())
+            ->post(route('operasional.klien.store'), [...$this->newClientInput('KL010'), 'management_fee' => '7,5'])
+            ->assertRedirect(route('operasional.klien.show', 1));
+
+        $this->assertEquals(7.5, DB::table('tbl_klien')->where('kode_klien', 'KL010')->value('management_fee'));
+
+        $this->get(route('operasional.klien.show', 1))
+            ->assertOk()
+            ->assertSeeTextInOrder(['Management fee', '7,50%']);
+    }
+
+    public function test_empty_management_fee_stays_undetermined_and_differs_from_zero_percent(): void
+    {
+        $this->createTables();
+        $this->actingAs($this->operasional());
+
+        $this->post(route('operasional.klien.store'), [...$this->newClientInput('KL011'), 'management_fee' => ''])->assertSessionHasNoErrors();
+        $this->post(route('operasional.klien.store'), [...$this->newClientInput('KL012'), 'management_fee' => '0'])->assertSessionHasNoErrors();
+
+        $this->assertNull(DB::table('tbl_klien')->where('kode_klien', 'KL011')->value('management_fee'));
+        $this->assertEquals(0, DB::table('tbl_klien')->where('kode_klien', 'KL012')->value('management_fee'));
+        $this->assertNotNull(DB::table('tbl_klien')->where('kode_klien', 'KL012')->value('management_fee'));
+
+        $this->get(route('operasional.klien.show', 1))->assertSeeTextInOrder(['Management fee', 'Belum ditentukan']);
+        $this->get(route('operasional.klien.show', 2))->assertSeeTextInOrder(['Management fee', '0,00%'])->assertDontSeeText('Belum ditentukan');
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function invalidManagementFees(): array
+    {
+        return [
+            'negatif' => ['-0.01', 'Management Fee tidak boleh kurang dari 0%.'],
+            'lebih dari 100' => ['100.01', 'Management Fee tidak boleh lebih dari 100%.'],
+            'tiga desimal' => ['7.555', 'Management Fee maksimal dua angka di belakang koma.'],
+            'bukan angka' => ['tujuh', 'Management Fee harus berupa angka.'],
+        ];
+    }
+
+    #[DataProvider('invalidManagementFees')]
+    public function test_invalid_management_fee_is_rejected_without_saving(string $nilai, string $pesan): void
+    {
+        $this->createTables();
+
+        $this->actingAs($this->operasional())
+            ->from(route('operasional.klien.create'))
+            ->post(route('operasional.klien.store'), [...$this->newClientInput('KL013'), 'management_fee' => $nilai])
+            ->assertRedirect(route('operasional.klien.create'))
+            ->assertSessionHasErrors(['management_fee' => $pesan]);
+
+        $this->assertDatabaseCount('tbl_klien', 0);
+    }
+
+    public function test_edit_form_shows_the_saved_fee_and_update_can_change_or_clear_it(): void
+    {
+        $this->createClientData();
+        DB::table('tbl_klien')->where('id', 1)->update(['management_fee' => 5]);
+        $this->actingAs($this->operasional());
+
+        $this->get(route('operasional.klien.edit', 1))
+            ->assertOk()
+            ->assertSee('name="management_fee"', false)
+            ->assertSeeTextInOrder(['Status kerja sama', 'Management Fee (opsional)']);
+
+        $inputAlpha = [...$this->newClientInput('KL001'), 'nama_perusahaan' => 'PT Alpha'];
+
+        $this->put(route('operasional.klien.update', 1), [...$inputAlpha, 'management_fee' => '12.25'])->assertSessionHasNoErrors();
+        $this->assertEquals(12.25, DB::table('tbl_klien')->where('id', 1)->value('management_fee'));
+
+        $this->put(route('operasional.klien.update', 1), [...$inputAlpha, 'management_fee' => ''])->assertSessionHasNoErrors();
+        $this->assertNull(DB::table('tbl_klien')->where('id', 1)->value('management_fee'));
+    }
+
+    public function test_client_pages_keep_working_and_warn_when_the_fee_column_is_not_migrated(): void
+    {
+        $this->createClientData();
+        Schema::table('tbl_klien', fn (Blueprint $table) => $table->dropColumn('management_fee'));
+        $this->actingAs($this->operasional());
+
+        $this->get(route('operasional.klien.create'))
+            ->assertOk()
+            ->assertDontSee('name="management_fee"', false)
+            ->assertSeeText('Isian Management Fee belum tersedia karena database belum dimigrasi.');
+        $this->get(route('operasional.klien.show', 1))
+            ->assertOk()
+            ->assertSeeText('Belum tersedia — database belum dimigrasi');
+
+        $this->post(route('operasional.klien.store'), [...$this->newClientInput('KL014'), 'management_fee' => '5'])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+        $this->assertDatabaseHas('tbl_klien', ['kode_klien' => 'KL014']);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function newClientInput(string $kode): array
+    {
+        return [
+            'kode_klien' => $kode, 'nama_perusahaan' => 'PT '.$kode, 'alamat' => 'Jl. Baru', 'pic_nama' => 'Pak Dodi',
+            'pic_telp' => '0812', 'status' => 'Aktif',
+        ];
     }
 
     /**

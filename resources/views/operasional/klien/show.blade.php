@@ -29,6 +29,16 @@
                     <dt class="text-gray-500">Status kerja sama</dt>
                     <dd><span class="badge badge-{{ $aktif ? 'success' : 'secondary' }}">{{ $klien->status }}</span></dd>
                 </div>
+                <div>
+                    <dt class="text-gray-500">Management fee</dt>
+                    @if (! $managementFeeTersedia)
+                        <dd class="text-amber-700">Belum tersedia &mdash; database belum dimigrasi</dd>
+                    @elseif ($klien->management_fee === null)
+                        <dd class="text-gray-500">Belum ditentukan</dd>
+                    @else
+                        <dd class="font-medium text-gray-800">{{ number_format((float) $klien->management_fee, 2, ',', '.') }}%</dd>
+                    @endif
+                </div>
             </dl>
         </section>
 
