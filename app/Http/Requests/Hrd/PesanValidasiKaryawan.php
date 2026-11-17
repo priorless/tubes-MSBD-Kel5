@@ -57,6 +57,7 @@ trait PesanValidasiKaryawan
             'jenis_kelamin' => 'jenis kelamin',
             'status_pernikahan' => 'status pernikahan',
             'nama_ibu_kandung' => 'nama ibu kandung',
+            'jenis_jaminan_kesehatan' => 'jenis jaminan kesehatan',
             'alamat' => 'alamat',
             'no_telp' => 'nomor telepon',
             'email' => 'email',

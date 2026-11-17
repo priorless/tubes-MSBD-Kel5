@@ -192,6 +192,49 @@ class HrdModulTest extends TestCase
         ]);
     }
 
+    public function test_jenis_jaminan_kesehatan_disimpan_diubah_dan_tampil_di_daftar_karyawan(): void
+    {
+        $idLama = $this->buatKaryawanLangsung(['nip' => 'TST-LAMA', 'no_ktp' => '5555555555555555', 'nama' => 'Karyawan Lama Uji']);
+        $this->assertNull(DB::table('tbl_karyawan')->where('id', $idLama)->value('jenis_jaminan_kesehatan'));
+
+        $this->get(route('hrd.karyawan.create'))
+            ->assertOk()
+            ->assertSee('Jenis Jaminan Kesehatan')
+            ->assertSee('<option value="BPJS"', false)
+            ->assertSee('<option value="Asuransi Kesehatan Swasta"', false);
+
+        $this->post(route('hrd.karyawan.store'), $this->dataKaryawan([
+            'kategori' => 'Lapangan',
+            'id_jenis_layanan' => $this->idLayanan('Satpam'),
+            'jenis_jaminan_kesehatan' => 'BPJS',
+        ]))->assertRedirect(route('hrd.karyawan.index'));
+
+        $idBaru = DB::table('tbl_karyawan')->where('nip', 'TST-001')->value('id');
+        $this->assertSame('BPJS', DB::table('tbl_karyawan')->where('id', $idBaru)->value('jenis_jaminan_kesehatan'));
+
+        $this->get(route('hrd.karyawan.edit', $idBaru))
+            ->assertOk()
+            ->assertSee('<option value="BPJS" selected', false);
+
+        $this->put(route('hrd.karyawan.update', $idBaru), $this->dataKaryawan([
+            'id_jenis_layanan' => $this->idLayanan('Satpam'),
+            'jenis_jaminan_kesehatan' => 'Asuransi Kesehatan Swasta',
+        ]))->assertRedirect(route('hrd.karyawan.index'));
+        $this->assertSame('Asuransi Kesehatan Swasta', DB::table('tbl_karyawan')->where('id', $idBaru)->value('jenis_jaminan_kesehatan'));
+
+        $this->put(route('hrd.karyawan.update', $idBaru), $this->dataKaryawan([
+            'id_jenis_layanan' => $this->idLayanan('Satpam'),
+            'jenis_jaminan_kesehatan' => 'Jamsostek',
+        ]))->assertSessionHasErrors(['jenis_jaminan_kesehatan' => 'Jenis jaminan kesehatan yang dipilih tidak valid.']);
+        $this->assertSame('Asuransi Kesehatan Swasta', DB::table('tbl_karyawan')->where('id', $idBaru)->value('jenis_jaminan_kesehatan'));
+
+        $this->get(route('hrd.karyawan.index', ['q' => 'TST']))
+            ->assertOk()
+            ->assertSee('Jaminan Kesehatan')
+            ->assertSeeInOrder(['Karyawan Lama Uji', 'Belum diisi'])
+            ->assertSeeInOrder(['Karyawan Uji', 'Asuransi Kesehatan Swasta']);
+    }
+
     public function test_ubah_karyawan_internal_tidak_boleh_mengosongkan_gaji_dan_nip_tetap(): void
     {
         $id = $this->buatKaryawanLangsung(['kategori' => 'Internal', 'gaji_pokok' => 5000000]);
