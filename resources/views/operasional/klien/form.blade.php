@@ -8,20 +8,21 @@
 @section('page-title', $isEditing ? 'Ubah Data Klien' : 'Tambah Klien')
 
 @section('content')
+    <x-ui.page-header :title="$isEditing ? 'Edit informasi '.$klien->nama_perusahaan : 'Tambah klien baru'" />
+
     <form action="{{ $isEditing ? route('operasional.klien.update', $klien->id) : route('operasional.klien.store') }}" method="POST" class="card max-w-3xl">
         @csrf
         @if ($isEditing)
             @method('PUT')
         @endif
 
-        <div class="card-header">
-            <h2 class="card-title">{{ $isEditing ? 'Perbarui informasi klien' : 'Masukkan informasi klien baru' }}</h2>
-        </div>
-
         <div class="card-body space-y-4">
             <div>
+                <h3 class="font-semibold text-gray-800">Informasi perusahaan</h3>
+            </div>
+            <div>
                 <label for="kode_klien" class="form-label">Kode Klien</label>
-                <input id="kode_klien" name="kode_klien" type="text" maxlength="10" required
+                <input id="kode_klien" name="kode_klien" type="text" maxlength="10" required placeholder="Contoh: KL001"
                     @class(['form-input', 'form-input-error' => $errors->has('kode_klien')]) value="{{ old('kode_klien', $klien?->kode_klien) }}">
                 @error('kode_klien') <p class="form-error">{{ $message }}</p> @enderror
             </div>
@@ -37,9 +38,12 @@
                     @class(['form-input', 'form-input-error' => $errors->has('alamat')])>{{ old('alamat', $klien?->alamat) }}</textarea>
                 @error('alamat') <p class="form-error">{{ $message }}</p> @enderror
             </div>
+            <div class="border-t border-gray-200 pt-4">
+                <h3 class="font-semibold text-gray-800">Kontak perusahaan</h3>
+            </div>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                    <label for="pic_nama" class="form-label">Nama PIC</label>
+                    <label for="pic_nama" class="form-label">Nama Penanggung Jawab (PIC)</label>
                     <input id="pic_nama" name="pic_nama" type="text" maxlength="100" required
                         @class(['form-input', 'form-input-error' => $errors->has('pic_nama')]) value="{{ old('pic_nama', $klien?->pic_nama) }}">
                     @error('pic_nama') <p class="form-error">{{ $message }}</p> @enderror
@@ -65,6 +69,10 @@
                     @error('pic_email') <p class="form-error">{{ $message }}</p> @enderror
                 </div>
             </div>
+            <div class="border-t border-gray-200 pt-4">
+                <h3 class="font-semibold text-gray-800">Status kerja sama</h3>
+                <p class="form-hint">Hanya klien Aktif dapat dipilih untuk penempatan.</p>
+            </div>
             <div>
                 <label for="status" class="form-label">Status Klien</label>
                 <select id="status" name="status" @class(['form-input', 'form-input-error' => $errors->has('status')]) required>
@@ -78,7 +86,7 @@
 
         <div class="card-footer justify-start">
             <button type="submit" class="btn-primary">{{ $isEditing ? 'Simpan Perubahan' : 'Simpan Klien' }}</button>
-            <a href="{{ route('operasional.klien.index') }}" class="btn-secondary">Batal</a>
+            <a href="{{ $isEditing ? route('operasional.klien.show', $klien->id) : route('operasional.klien.index') }}" class="btn-secondary">Batal</a>
         </div>
     </form>
 @endsection

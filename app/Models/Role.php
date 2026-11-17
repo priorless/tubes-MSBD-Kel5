@@ -40,7 +40,7 @@ class Role extends Model
      */
     private const array HOME_ROUTES = [
         self::Hrd => 'hrd.dashboard',
-        self::Operasional => 'operasional.monitoring',
+        self::Operasional => 'operasional.beranda',
         self::Keuangan => 'keuangan.payroll.index',
         self::Ceo => 'ceo.dashboard',
         self::KaryawanLapangan => 'tenaga-kerja.absensi',

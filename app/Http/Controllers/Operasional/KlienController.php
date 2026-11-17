@@ -6,17 +6,85 @@ use App\Http\Controllers\Controller;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class KlienController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        return view('operasional.klien.index', [
-            'klien' => DB::table('tbl_klien')->orderByDesc('id')->paginate(15),
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', Rule::in(['Aktif', 'Nonaktif'])],
+        ], [
+            'q.max' => 'Kata pencarian maksimal 100 karakter.',
+            'status.in' => 'Filter status tidak valid.',
         ]);
+        $kataKunci = trim((string) ($validated['q'] ?? ''));
+        $status = $validated['status'] ?? null;
+
+        $klien = DB::table('tbl_klien')
+            ->when($kataKunci !== '', fn ($query) => $query->where(fn ($cari) => $cari
+                ->where('nama_perusahaan', 'like', '%'.$kataKunci.'%')
+                ->orWhere('kode_klien', 'like', '%'.$kataKunci.'%')))
+            ->when($status !== null, fn ($query) => $query->where('status', $status))
+            ->orderBy('nama_perusahaan')
+            ->paginate(15)
+            ->withQueryString();
+        $layananPerKlien = $this->layananAktifPerKlien($klien->pluck('id')->all());
+
+        return view('operasional.klien.index', [
+            'klien' => $klien,
+            'kataKunci' => $kataKunci,
+            'status' => $status,
+            'jumlahPerStatus' => DB::table('tbl_klien')->groupBy('status')->selectRaw('status, COUNT(*) as jumlah')->pluck('jumlah', 'status'),
+            'layananPerKlien' => $layananPerKlien,
+        ]);
+    }
+
+    /**
+     * Detail klien: informasi, kontak, jenis layanan, karyawan yang sedang ditempatkan, dan riwayat kerja sama.
+     */
+    public function show(int $klien): View
+    {
+        $dataKlien = DB::table('tbl_klien')->where('id', $klien)->firstOrFail();
+        $penempatan = DB::table('tbl_penempatan as p')
+            ->join('tbl_karyawan as k', 'k.id', '=', 'p.id_karyawan')
+            ->leftJoin('tbl_jenis_layanan as jl', 'jl.id', '=', 'k.id_jenis_layanan')
+            ->where('p.id_klien', $klien)
+            ->orderByDesc('p.tgl_mulai')
+            ->get(['p.id', 'p.id_karyawan', 'p.lokasi_kerja', 'p.tgl_mulai', 'p.tgl_selesai', 'p.status', 'k.nip', 'k.nama', 'jl.nama_layanan']);
+        $penempatanAktif = $penempatan->where('status', 'Aktif')->sortBy('nama')->values();
+
+        return view('operasional.klien.show', [
+            'klien' => $dataKlien,
+            'penempatanAktif' => $penempatanAktif,
+            'riwayatPenempatan' => $penempatan->where('status', '!=', 'Aktif')->values(),
+            'layanan' => $this->layananAktifPerKlien([$klien])->get($klien, collect()),
+            'kerjaSamaSejak' => $penempatan->min('tgl_mulai'),
+        ]);
+    }
+
+    /**
+     * Mengubah status kerja sama tanpa menghapus data; penempatan yang ada tidak ikut berubah.
+     */
+    public function updateStatus(Request $request, int $klien): RedirectResponse
+    {
+        $dataKlien = DB::table('tbl_klien')->where('id', $klien)->firstOrFail();
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
+        ], [
+            'status.required' => 'Status klien wajib dipilih.',
+            'status.in' => 'Status klien tidak valid.',
+        ]);
+
+        DB::table('tbl_klien')->where('id', $dataKlien->id)->update(['status' => $validated['status']]);
+
+        return back()->with('success', $validated['status'] === 'Aktif'
+            ? "Kerja sama dengan {$dataKlien->nama_perusahaan} diaktifkan kembali."
+            : "Kerja sama dengan {$dataKlien->nama_perusahaan} dinonaktifkan. Data dan riwayatnya tetap tersimpan.");
     }
 
     public function create(): View
@@ -38,7 +106,7 @@ class KlienController extends Controller
         ], $this->validationMessages());
 
         try {
-            DB::table('tbl_klien')->insert($validated);
+            $idKlien = (int) DB::table('tbl_klien')->insertGetId($validated);
         } catch (QueryException $exception) {
             if ((string) ($exception->errorInfo[0] ?? $exception->getCode()) !== '23000') {
                 throw $exception;
@@ -47,7 +115,8 @@ class KlienController extends Controller
             return back()->withInput()->with('error', 'Kode klien sudah digunakan. Periksa kembali data klien.');
         }
 
-        return redirect()->route('operasional.klien.index')->with('success', 'Data klien berhasil ditambahkan.');
+        return redirect()->route('operasional.klien.show', $idKlien)
+            ->with('success', 'Klien berhasil ditambahkan. Langkah berikutnya: buat penempatan karyawan untuk klien ini.');
     }
 
     public function edit(int $klien): View
@@ -82,7 +151,7 @@ class KlienController extends Controller
             return back()->withInput()->with('error', 'Kode klien sudah digunakan. Periksa kembali data klien.');
         }
 
-        return redirect()->route('operasional.klien.index')->with('success', 'Data klien berhasil diperbarui.');
+        return redirect()->route('operasional.klien.show', $existingClient->id)->with('success', 'Data klien berhasil diperbarui.');
     }
 
     public function destroy(int $klien): RedirectResponse
@@ -100,6 +169,31 @@ class KlienController extends Controller
         }
 
         return redirect()->route('operasional.klien.index')->with('success', 'Data klien berhasil dihapus.');
+    }
+
+    /**
+     * Jenis layanan karyawan yang sedang ditempatkan (penempatan Aktif) per klien, beserta jumlah karyawannya.
+     * Jenis layanan berasal dari data HRD (tbl_karyawan.id_jenis_layanan).
+     *
+     * @param  list<int>  $idKlien
+     * @return Collection<int, Collection<int, object>>
+     */
+    private function layananAktifPerKlien(array $idKlien): Collection
+    {
+        if ($idKlien === []) {
+            return collect();
+        }
+
+        return DB::table('tbl_penempatan as p')
+            ->join('tbl_karyawan as k', 'k.id', '=', 'p.id_karyawan')
+            ->leftJoin('tbl_jenis_layanan as jl', 'jl.id', '=', 'k.id_jenis_layanan')
+            ->whereIn('p.id_klien', $idKlien)
+            ->where('p.status', 'Aktif')
+            ->groupBy('p.id_klien', 'jl.nama_layanan')
+            ->orderBy('jl.nama_layanan')
+            ->selectRaw('p.id_klien, jl.nama_layanan, COUNT(DISTINCT p.id_karyawan) as jumlah')
+            ->get()
+            ->groupBy(static fn (object $baris): int => (int) $baris->id_klien);
     }
 
     /**

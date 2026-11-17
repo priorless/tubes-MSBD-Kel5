@@ -53,7 +53,7 @@ class LoginTest extends TestCase
     {
         return [
             'HRD' => [Role::Hrd, 'hrd.dashboard'],
-            'Operasional' => [Role::Operasional, 'operasional.monitoring'],
+            'Operasional' => [Role::Operasional, 'operasional.beranda'],
             'Keuangan' => [Role::Keuangan, 'keuangan.payroll.index'],
         ];
     }

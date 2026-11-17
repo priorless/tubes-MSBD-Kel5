@@ -65,6 +65,15 @@ GRANT SELECT ON v_pool_karyawan_hrd TO 'sji_role_operasional';
 GRANT EXECUTE ON PROCEDURE sp_assign_penempatan TO 'sji_role_operasional';
 GRANT EXECUTE ON PROCEDURE sp_rotasi_karyawan TO 'sji_role_operasional';
 GRANT EXECUTE ON PROCEDURE sp_selesai_penempatan TO 'sji_role_operasional';
+-- Jadwal Kerja (roster): tanpa DELETE, template dinonaktifkan dan riwayat hanya ditambah.
+GRANT SELECT, INSERT, UPDATE ON tbl_template_shift TO 'sji_role_operasional';
+GRANT SELECT, INSERT, UPDATE ON tbl_jadwal_kerja TO 'sji_role_operasional';
+GRANT SELECT, INSERT ON tbl_jadwal_kerja_riwayat TO 'sji_role_operasional';
+-- Template Jadwal Bulanan: template dinonaktifkan (tanpa DELETE); DELETE pada detail diperlukan
+-- karena mengosongkan hari = menghapus baris pola (Belum Diatur); log penerapan hanya ditambah.
+GRANT SELECT, INSERT, UPDATE ON tbl_template_jadwal TO 'sji_role_operasional';
+GRANT SELECT, INSERT, UPDATE, DELETE ON tbl_template_jadwal_detail TO 'sji_role_operasional';
+GRANT SELECT, INSERT ON tbl_template_jadwal_penerapan TO 'sji_role_operasional';
 
 -- ------------------------------------------------------------
 -- Keuangan — payroll, invoice, buku kas
@@ -107,6 +116,11 @@ GRANT SELECT ON v_arus_kas_bulanan TO 'sji_role_ceo';
 GRANT SELECT ON v_monitoring_sebaran_operasional TO 'sji_role_ceo';
 GRANT SELECT ON v_slip_gaji_detail TO 'sji_role_ceo';
 GRANT SELECT ON tbl_log_aktivitas TO 'sji_role_ceo';
+GRANT SELECT ON tbl_template_shift TO 'sji_role_ceo';
+GRANT SELECT ON tbl_jadwal_kerja TO 'sji_role_ceo';
+GRANT SELECT ON tbl_template_jadwal TO 'sji_role_ceo';
+GRANT SELECT ON tbl_template_jadwal_detail TO 'sji_role_ceo';
+GRANT SELECT ON tbl_template_jadwal_penerapan TO 'sji_role_ceo';
 GRANT EXECUTE ON FUNCTION fn_profit_klien TO 'sji_role_ceo';
 GRANT EXECUTE ON FUNCTION fn_total_piutang TO 'sji_role_ceo';
 

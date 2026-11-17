@@ -40,10 +40,19 @@
 
         if ($penggunaAktif->hasRole(Role::Operasional)) {
             $menu['Operasional'] = [
-                ['Monitoring Sebaran', 'operasional.monitoring', 'operasional.monitoring'],
+                ['Beranda', 'operasional.beranda', 'operasional.beranda'],
+            ];
+            $menu['Data Utama'] = [
                 ['Data Klien', 'operasional.klien.index', 'operasional.klien.*'],
-                ['Penempatan', 'operasional.penempatan.create', 'operasional.penempatan.*'],
+                ['Penempatan', 'operasional.penempatan.index', 'operasional.penempatan.*'],
+            ];
+            $menu['Kegiatan Operasional'] = [
                 ['Rotasi Karyawan', 'operasional.rotasi.create', 'operasional.rotasi.*'],
+                ['Jadwal Kerja', 'operasional.jadwal-kerja', 'operasional.jadwal-kerja*'],
+                ['Monitoring Sebaran', 'operasional.monitoring', 'operasional.monitoring'],
+            ];
+            $menu['Laporan'] = [
+                ['Rekap & Laporan', 'operasional.rekap.index', 'operasional.rekap.*'],
             ];
         }
 

@@ -13,7 +13,12 @@ use App\Http\Controllers\Hrd\PoolKaryawanController;
 use App\Http\Controllers\Hrd\SertifikatController;
 use App\Http\Controllers\KeuanganController;
 use App\Http\Controllers\Operasional\AkhiriPenempatanController;
+use App\Http\Controllers\Operasional\BerandaOperasionalController;
+use App\Http\Controllers\Operasional\JadwalKerjaController;
 use App\Http\Controllers\Operasional\KlienController;
+use App\Http\Controllers\Operasional\RekapOperasionalController;
+use App\Http\Controllers\Operasional\TemplateJadwalController;
+use App\Http\Controllers\Operasional\TemplateShiftController;
 use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\TenagaKerjaController;
 use App\Http\Controllers\UserManagementController;
@@ -76,15 +81,57 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
      * Operasional
      * ===================================================================== */
     Route::middleware('role:'.Role::Operasional)->prefix('operasional')->name('operasional.')->group(function () {
-        Route::resource('klien', KlienController::class)->except('show');
+        Route::get('beranda', BerandaOperasionalController::class)->name('beranda');
+        Route::get('rekap', [RekapOperasionalController::class, 'index'])->name('rekap.index');
+        Route::get('rekap/ekspor', [RekapOperasionalController::class, 'export'])->name('rekap.export');
+        Route::resource('klien', KlienController::class);
+        Route::patch('klien/{klien}/status', [KlienController::class, 'updateStatus'])->whereNumber('klien')->name('klien.status');
+        Route::get('jadwal-kerja', JadwalKerjaController::class)->name('jadwal-kerja');
+        Route::get('jadwal-kerja/template-shift', [TemplateShiftController::class, 'index'])
+            ->name('jadwal-kerja.template-shift.index');
+        Route::post('jadwal-kerja/template-shift', [TemplateShiftController::class, 'store'])
+            ->name('jadwal-kerja.template-shift.store');
+        Route::put('jadwal-kerja/template-shift/{templateShift}', [TemplateShiftController::class, 'update'])
+            ->whereNumber('templateShift')
+            ->name('jadwal-kerja.template-shift.update');
+        Route::patch('jadwal-kerja/template-shift/{templateShift}/nonaktifkan', [TemplateShiftController::class, 'deactivate'])
+            ->whereNumber('templateShift')
+            ->name('jadwal-kerja.template-shift.deactivate');
+        Route::post('jadwal-kerja/template-shift/standar', [TemplateShiftController::class, 'storeStandar'])
+            ->name('jadwal-kerja.template-shift.standar');
+        Route::controller(TemplateJadwalController::class)
+            ->prefix('jadwal-kerja/template-jadwal')
+            ->name('jadwal-kerja.template-jadwal.')
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::get('buat', 'create')->name('create');
+                Route::get('{templateJadwal}', 'show')->whereNumber('templateJadwal')->name('show');
+                Route::get('{templateJadwal}/edit', 'edit')->whereNumber('templateJadwal')->name('edit');
+                Route::get('{templateJadwal}/terapkan', 'applyPreview')->whereNumber('templateJadwal')->name('apply.preview');
+                Route::post('/', 'store')->name('store');
+                Route::post('dari-jadwal', 'storeFromSchedule')->name('store-from-schedule');
+                Route::put('{templateJadwal}', 'update')->whereNumber('templateJadwal')->name('update');
+                Route::patch('{templateJadwal}/nonaktifkan', 'deactivate')->whereNumber('templateJadwal')->name('deactivate');
+                Route::post('{templateJadwal}/terapkan', 'apply')->whereNumber('templateJadwal')->name('apply');
+            });
+        Route::post('jadwal-kerja/atur', [JadwalKerjaController::class, 'atur'])->name('jadwal-kerja.atur');
+        Route::post('jadwal-kerja', [JadwalKerjaController::class, 'store'])->name('jadwal-kerja.store');
+        Route::put('jadwal-kerja/{jadwal}', [JadwalKerjaController::class, 'update'])
+            ->whereNumber('jadwal')
+            ->name('jadwal-kerja.update');
+        Route::get('jadwal-kerja/salin/pratinjau', [JadwalKerjaController::class, 'previewCopy'])
+            ->name('jadwal-kerja.copy.preview');
+        Route::post('jadwal-kerja/salin', [JadwalKerjaController::class, 'copy'])
+            ->name('jadwal-kerja.copy');
 
-        Route::get('penempatan', [OperasionalController::class, 'createPenempatan'])->name('penempatan.create');
-        Route::get('penempatan/create', [OperasionalController::class, 'createPenempatan']);
+        Route::get('penempatan', [OperasionalController::class, 'indexPenempatan'])->name('penempatan.index');
+        Route::get('penempatan/create', [OperasionalController::class, 'createPenempatan'])->name('penempatan.create');
+        Route::get('penempatan/{penempatan}', [OperasionalController::class, 'showPenempatan'])->whereNumber('penempatan')->name('penempatan.show');
         Route::post('penempatan', [OperasionalController::class, 'storePenempatan'])->name('penempatan.store');
         Route::post('penempatan/{penempatan}/akhiri', AkhiriPenempatanController::class)->whereNumber('penempatan')->name('penempatan.akhiri');
 
         Route::get('rotasi', [OperasionalController::class, 'createRotasi'])->name('rotasi.create');
-        Route::get('rotasi/create', [OperasionalController::class, 'createRotasi']);
+        Route::permanentRedirect('rotasi/create', '/operasional/rotasi')->name('rotasi.create-alias');
         Route::post('rotasi', [OperasionalController::class, 'storeRotasi'])->name('rotasi.store');
 
         Route::get('monitoring', [OperasionalController::class, 'monitoring'])->name('monitoring');
