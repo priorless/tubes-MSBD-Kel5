@@ -4,6 +4,8 @@
 
 @section('content')
     <div class="space-y-6">
+        @include('operasional.jadwal-kerja._tab', ['tabAktif' => 'jadwal', 'jumlahMenunggu' => $jumlahPertukaranMenunggu ?? 0])
+
         <div class="card">
             <div class="card-header">
                 <div>

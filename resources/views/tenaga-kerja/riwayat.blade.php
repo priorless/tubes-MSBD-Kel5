@@ -155,6 +155,8 @@
                                 <td class="whitespace-nowrap">
                                     @if ($hari->jadwal_datang || $hari->jadwal_pulang)
                                         <span class="font-mono">{{ FormatKolom::jam($hari->jadwal_datang) }}&ndash;{{ FormatKolom::jam($hari->jadwal_pulang) }}</span>
+                                    @elseif (($hari->sumber_jadwal ?? null) === 'Libur')
+                                        <span class="tk-badge-netral">Libur</span>
                                     @else
                                         <span class="text-xs text-gray-500">Jadwal belum ditentukan</span>
                                     @endif

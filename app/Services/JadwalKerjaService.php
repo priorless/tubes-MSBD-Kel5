@@ -611,7 +611,7 @@ class JadwalKerjaService
     /**
      * @return array<string, mixed>|null
      */
-    private function snapshot(?object $jadwal): ?array
+    public function snapshot(?object $jadwal): ?array
     {
         if ($jadwal === null) {
             return null;

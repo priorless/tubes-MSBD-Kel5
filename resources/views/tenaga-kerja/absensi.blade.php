@@ -170,7 +170,10 @@
                         <dd class="mt-1 font-mono text-lg font-semibold text-gray-800">
                             {{ FormatKolom::jam($penugasan->jadwal_datang) }}&ndash;{{ FormatKolom::jam($penugasan->jadwal_pulang) }}
                         </dd>
-                        <dd class="text-gray-600">Dari penempatan &middot; toleransi terlambat 30 menit</dd>
+                        <dd class="text-gray-600">{{ ($penugasan->sumber_jadwal ?? null) === 'Jadwal Harian' ? 'Jadwal harian' : 'Dari penempatan' }} &middot; toleransi terlambat 30 menit</dd>
+                    @elseif (($penugasan->sumber_jadwal ?? null) === 'Libur')
+                        <dd class="mt-1 font-semibold text-gray-800">Hari ini Libur</dd>
+                        <dd class="text-gray-600">Sesuai jadwal harian dari Operasional. Bila tetap masuk, keterlambatan dan indikasi lembur tidak dihitung otomatis.</dd>
                     @else
                         <dd class="mt-1 font-semibold text-gray-800">Jadwal belum ditentukan</dd>
                         <dd class="text-gray-600">Keterlambatan dan indikasi lembur tidak dihitung sampai jadwal penempatan diisi Operasional.</dd>
@@ -184,6 +187,139 @@
             </dl>
         @endif
     </section>
+
+    {{-- ===================== Tukar shift dengan rekan ===================== --}}
+    @if ($tukarShift['tersedia'])
+        @php
+            $layananTukar = $tukarShift['layanan'];
+            $idSaya = \App\Support\KaryawanAktif::id();
+            $hariId = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+            $labelTanggal = static fn (string $tgl): string => $hariId[\Carbon\CarbonImmutable::parse($tgl)->dayOfWeek].', '.\Carbon\CarbonImmutable::parse($tgl)->format('d/m/Y');
+        @endphp
+        <section class="tk-reveal card p-6 xl:col-span-12" id="tukar-shift">
+            <div class="mb-4">
+                <h2 class="card-title">Tukar Shift dengan Rekan</h2>
+                <p class="mt-1 text-sm text-gray-500">Tukar jadwal satu tanggal dengan rekan di lokasi yang sama. Ajukan paling lambat H-1; jadwal baru berlaku setelah disetujui Operasional.</p>
+            </div>
+
+            @if ($tukarShift['opsi'] === [])
+                <x-ui.empty-state title="Belum ada jadwal yang dapat ditukar."
+                    message="Tukar shift tersedia untuk tanggal mulai besok yang sudah dijadwalkan Operasional dan memiliki rekan dengan shift berbeda di lokasi yang sama." />
+            @else
+                <form method="POST" action="{{ route('tenaga-kerja.tukar-shift.store') }}" id="formTukarShift" class="grid grid-cols-1 gap-4 lg:grid-cols-3"
+                      onsubmit="return confirm('Kirim pengajuan tukar shift? Pastikan rekan Anda sudah setuju.')">
+                    @csrf
+                    <div class="rounded-md bg-gray-50 p-4">
+                        <label for="tanggal_kerja" class="form-label"><span class="mr-1 inline-flex size-5 items-center justify-center rounded-full bg-sji-biru text-xs font-bold text-white">1</span> Pilih tanggal shift Anda</label>
+                        <select id="tanggal_kerja" name="tanggal_kerja" class="form-input" required>
+                            <option value="">Pilih tanggal</option>
+                            @foreach ($tukarShift['opsi'] as $opsi)
+                                <option value="{{ $opsi['tanggal'] }}" @selected(old('tanggal_kerja') === $opsi['tanggal'])>
+                                    {{ $labelTanggal($opsi['tanggal']) }} &mdash; {{ $opsi['shift'] }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="rounded-md bg-gray-50 p-4">
+                        <label for="id_karyawan_rekan" class="form-label"><span class="mr-1 inline-flex size-5 items-center justify-center rounded-full bg-sji-biru text-xs font-bold text-white">2</span> Pilih rekan</label>
+                        <select id="id_karyawan_rekan" name="id_karyawan_rekan" class="form-input" required disabled>
+                            <option value="">Pilih tanggal terlebih dahulu</option>
+                        </select>
+                        <p class="form-hint" id="ringkasanTukar">Hanya rekan dengan shift berbeda pada tanggal itu yang ditampilkan.</p>
+                    </div>
+
+                    <div class="rounded-md bg-gray-50 p-4">
+                        <label for="alasan" class="form-label"><span class="mr-1 inline-flex size-5 items-center justify-center rounded-full bg-sji-biru text-xs font-bold text-white">3</span> Alasan</label>
+                        <textarea id="alasan" name="alasan" rows="2" minlength="10" maxlength="500" required class="form-input"
+                                  placeholder="Contoh: ada keperluan keluarga pada pagi hari">{{ old('alasan') }}</textarea>
+                        <label class="mt-3 flex items-start gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="konfirmasi_rekan" value="1" class="form-check mt-0.5" required @checked(old('konfirmasi_rekan'))>
+                            <span>Rekan yang saya pilih sudah setuju untuk bertukar shift.</span>
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end lg:col-span-3">
+                        <button type="submit" class="btn-primary">Ajukan Tukar Shift</button>
+                    </div>
+                </form>
+
+                @push('scripts')
+                    <script>
+                        (() => {
+                            const opsi = @js($tukarShift['opsi']);
+                            const rekanLama = @js((string) old('id_karyawan_rekan', ''));
+                            const pilihTanggal = document.getElementById('tanggal_kerja');
+                            const pilihRekan = document.getElementById('id_karyawan_rekan');
+                            const ringkasan = document.getElementById('ringkasanTukar');
+                            const ringkasanAwal = ringkasan.textContent;
+
+                            const isiRekan = (pilihanAwal = '') => {
+                                const tanggal = opsi.find((item) => item.tanggal === pilihTanggal.value);
+                                pilihRekan.replaceChildren(new Option(tanggal ? 'Pilih rekan' : 'Pilih tanggal terlebih dahulu', ''));
+                                pilihRekan.disabled = !tanggal;
+                                ringkasan.textContent = ringkasanAwal;
+                                if (!tanggal) return;
+                                tanggal.rekan.forEach((rekan) => {
+                                    const pilihan = new Option(`${rekan.nama} (${rekan.nip}) — ${rekan.shift}`, rekan.id_karyawan);
+                                    pilihan.dataset.shift = rekan.shift;
+                                    pilihan.selected = String(rekan.id_karyawan) === pilihanAwal;
+                                    pilihRekan.add(pilihan);
+                                });
+                                tampilkanRingkasan(tanggal);
+                            };
+                            const tampilkanRingkasan = (tanggal) => {
+                                const terpilih = pilihRekan.selectedOptions[0];
+                                ringkasan.textContent = terpilih && terpilih.value
+                                    ? `Shift Anda: ${tanggal.shift} → menjadi ${terpilih.dataset.shift}.`
+                                    : ringkasanAwal;
+                            };
+
+                            pilihTanggal.addEventListener('change', () => isiRekan());
+                            pilihRekan.addEventListener('change', () => tampilkanRingkasan(opsi.find((item) => item.tanggal === pilihTanggal.value)));
+                            isiRekan(rekanLama);
+                        })();
+                    </script>
+                @endpush
+            @endif
+
+            @if ($tukarShift['riwayat']->isNotEmpty())
+                <h3 class="mb-2 mt-6 text-sm font-semibold text-gray-700">Status Pengajuan Tukar Shift</h3>
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Tanggal Shift</th>
+                                <th>Bertukar Dengan</th>
+                                <th>Shift Anda</th>
+                                <th>Menjadi</th>
+                                <th>Status</th>
+                                <th>Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($tukarShift['riwayat'] as $item)
+                                @php
+                                    $sayaPengaju = (int) $item->id_karyawan_pengaju === $idSaya;
+                                @endphp
+                                <tr>
+                                    <td class="whitespace-nowrap">{{ $labelTanggal($item->tanggal_kerja) }}</td>
+                                    <td>
+                                        {{ $sayaPengaju ? $item->nama_rekan : $item->nama_pengaju }}
+                                        <p class="text-xs text-gray-400">{{ $sayaPengaju ? 'Anda yang mengajukan' : 'Diajukan oleh rekan' }}</p>
+                                    </td>
+                                    <td class="whitespace-nowrap">{{ $layananTukar->labelShift($sayaPengaju ? $item->snapshot_pengaju : $item->snapshot_rekan) }}</td>
+                                    <td class="whitespace-nowrap font-medium text-gray-800">{{ $layananTukar->labelShift($sayaPengaju ? $item->snapshot_rekan : $item->snapshot_pengaju) }}</td>
+                                    <td><span class="badge {{ \App\Services\PertukaranShiftService::kelasBadge($item->status) }}">{{ \App\Services\PertukaranShiftService::labelStatus($item->status) }}</span></td>
+                                    <td class="text-sm text-gray-600">{{ $item->catatan_keputusan ?? '-' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+    @endif
 
     {{-- ===================== Akses cepat ===================== --}}
     <div class="grid grid-cols-1 gap-6 md:grid-cols-3 xl:col-span-12">

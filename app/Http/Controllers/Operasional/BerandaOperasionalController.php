@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Operasional;
 
 use App\Http\Controllers\Controller;
+use App\Services\PertukaranShiftService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -20,7 +21,7 @@ class BerandaOperasionalController extends Controller
 
     private const int BATAS_DAFTAR = 5;
 
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request, PertukaranShiftService $pertukaranShiftService): View
     {
         $hariIni = CarbonImmutable::now((string) config('app.timezone', 'UTC'))->startOfDay();
         $awalBulan = $hariIni->startOfMonth();
@@ -58,6 +59,8 @@ class BerandaOperasionalController extends Controller
                 ->filter(fn (object $item): bool => $item->tgl_selesai !== null && $item->tgl_selesai < $hariIni->toDateString())
                 ->sortBy('tgl_selesai')
                 ->values(),
+            'pertukaranShiftTersedia' => $pertukaranShiftService->tersedia(),
+            'ringkasanPertukaranShift' => $pertukaranShiftService->ringkasanStatus(),
             'batasDaftar' => self::BATAS_DAFTAR,
             'batasHariKontrak' => self::BATAS_HARI_KONTRAK,
         ]);

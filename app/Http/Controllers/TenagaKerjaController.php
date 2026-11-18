@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PertukaranShiftService;
 use App\Services\TenagaKerjaService;
 use App\Support\FormatKolom;
 use App\Support\FotoAbsensiTidakValid;
@@ -11,6 +12,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -27,7 +29,7 @@ class TenagaKerjaController extends Controller
      * Absensi
      * ===================================================================== */
 
-    public function absensi()
+    public function absensi(PertukaranShiftService $pertukaranShiftService)
     {
         $id = KaryawanAktif::id();
         $data = ['hariIni' => null, 'waktuServer' => now()->toDateTimeString(), 'status' => 'belum', 'masukIso' => null, 'penugasan' => null];
@@ -45,6 +47,7 @@ class TenagaKerjaController extends Controller
         }
 
         $data['foto'] = $this->urlFoto($data['hariIni']);
+        $data['tukarShift'] = $this->dataTukarShift($pertukaranShiftService, $id);
 
         return view('tenaga-kerja.absensi', $data + $this->dataUmum() + $this->kolomAbsensi());
     }
@@ -109,6 +112,28 @@ class TenagaKerjaController extends Controller
         }
 
         return $this->balasAbsensi($request, true, $this->pesanSukses('keluar', $selesai), baris: $selesai);
+    }
+
+    /**
+     * Data bagian Tukar Shift di halaman Absensi. Kegagalan di sini tidak boleh mengganggu absensi.
+     *
+     * @return array{tersedia: bool, opsi: list<array<string, mixed>>, riwayat: Collection<int, object>, layanan: PertukaranShiftService}
+     */
+    private function dataTukarShift(PertukaranShiftService $pertukaranShiftService, int $idKaryawan): array
+    {
+        $hasil = ['tersedia' => false, 'opsi' => [], 'riwayat' => collect(), 'layanan' => $pertukaranShiftService];
+
+        try {
+            if ($pertukaranShiftService->tersedia()) {
+                $hasil['tersedia'] = true;
+                $hasil['opsi'] = $pertukaranShiftService->opsiPengajuan($idKaryawan);
+                $hasil['riwayat'] = $pertukaranShiftService->riwayatKaryawan($idKaryawan);
+            }
+        } catch (QueryException) {
+            $hasil['tersedia'] = false;
+        }
+
+        return $hasil;
     }
 
     /** Primary key baris absensi (kolom sesuai config), atau null. */
