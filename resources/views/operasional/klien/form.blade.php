@@ -112,7 +112,7 @@
                 <fieldset>
                     <legend class="form-label">Metode Perhitungan</legend>
                     <div class="flex flex-wrap gap-x-6 gap-y-2">
-                        @foreach (['' => 'Tanpa BPJS', 'Persentase' => 'Persentase', 'Nominal' => 'Nominal tetap per tenaga'] as $nilaiMetode => $labelMetode)
+                        @foreach (['' => 'Tanpa BPJS', 'Persentase' => 'Persentase'] as $nilaiMetode => $labelMetode)
                             <label class="flex items-center gap-2 text-sm text-gray-700">
                                 <input type="radio" name="bpjs_metode" value="{{ $nilaiMetode }}" class="form-check" data-bpjs-metode @checked((string) $metodeBpjs === $nilaiMetode)>
                                 {{ $labelMetode }}

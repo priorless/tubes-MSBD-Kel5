@@ -88,16 +88,16 @@
                         <span class="text-gray-500">Klik tanggal untuk memilih; Shift+klik untuk memilih rentang.</span>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                        <div class="overflow-x-auto xl:col-span-2">
-                            <div class="min-w-[640px]">
+                    <div class="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                        <div class="min-w-0 overflow-x-auto rounded-lg border border-gray-200">
+                       <div class="min-w-[680px]">
                                 <div class="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
                                     @foreach ($namaHari as $hari)
-                                        <div class="px-2 py-2 text-center text-xs font-semibold tracking-wide text-gray-500 uppercase">{{ $hari }}</div>
+                                        <div class="px-3 py-2.5 text-center text-xs font-semibold tracking-wide text-gray-500 uppercase">{{ $hari }}</div>
                                     @endforeach
                                 </div>
 
-                                <div class="grid grid-cols-7" id="kalender-jadwal">
+                                <div class="-mb-px grid grid-cols-7 [&>*:nth-child(7n)]:border-r-0" id="kalender-jadwal">
                                     @foreach ($hariKalender as $hari)
                                         @php
                                             $jadwalHari = $hari['jadwal'];
@@ -113,42 +113,48 @@
                                                 aria-label="{{ $hari['tanggal']->format('d/m/Y') }} {{ $hari['status'] }}"
                                             @endif
                                             @class([
-                                                'js-tanggal min-h-28 border-b border-r border-gray-200 p-2 text-left align-top',
+                                                'js-tanggal flex min-h-32 flex-col border-b border-r border-gray-200 p-2.5 text-left align-top',
                                                 'cursor-pointer bg-white transition-colors hover:bg-blue-50' => $hari['dapat_diatur'],
                                                 'bg-gray-50 text-gray-400' => ! $hari['dapat_diatur'],
                                             ])>
                                             @if ($hari['dalam_bulan'])
                                                 <div class="flex items-center justify-between gap-1">
-                                                    <span @class(['text-sm font-semibold', 'text-sji-biru' => $hari['hari_ini'], 'text-gray-700' => ! $hari['hari_ini'] && $hari['dapat_diatur']])>
+                                                    <span @class([
+                                                        'inline-flex size-7 items-center justify-center rounded-full text-sm font-semibold tabular-nums',
+                                                        'bg-sji-biru text-white' => $hari['hari_ini'],
+                                                        'text-gray-800' => ! $hari['hari_ini'] && $hari['dapat_diatur'],
+                                                    ])>
                                                         {{ $hari['tanggal']->format('j') }}
                                                     </span>
                                                     @if ($hari['hari_ini'])
-                                                        <span class="text-[10px] font-medium text-sji-biru">Hari ini</span>
+                                                        <span class="text-xs font-medium text-sji-biru">Hari ini</span>
                                                     @endif
                                                 </div>
 
                                                 @if ($hari['status'] === 'Kerja')
-                                                    <div class="mt-2 space-y-0.5">
+                                                    <div class="mt-2 space-y-1">
                                                         <span class="badge badge-success">Kerja</span>
-                                                        <p class="text-xs font-medium text-gray-700">
+                                                        <p class="text-sm font-semibold text-gray-800 tabular-nums">
                                                             {{ substr($jadwalHari->jam_masuk, 0, 5) }}&ndash;{{ substr($jadwalHari->jam_pulang, 0, 5) }}
-                                                            @if ($hari['pulang_besok']) <span class="text-gray-500">(+1 hari)</span> @endif
                                                         </p>
-                                                        <p class="truncate text-[11px] text-gray-500">{{ $jadwalHari->nama_shift_snapshot ?? 'Jam manual' }}</p>
+                                                        @if ($hari['pulang_besok'])
+                                                            <p class="text-xs text-gray-500">(+1 hari)</p>
+                                                        @endif
+                                                        <p class="truncate text-xs text-gray-500" title="{{ $jadwalHari->nama_shift_snapshot ?? 'Jam manual' }}">{{ $jadwalHari->nama_shift_snapshot ?? 'Jam manual' }}</p>
                                                     </div>
                                                 @elseif ($hari['status'] === 'Libur')
                                                     <div class="mt-2"><span class="badge badge-secondary">Libur</span></div>
                                                 @elseif ($hari['status'] === 'Belum Diatur')
-                                                    <div class="mt-2 space-y-0.5">
+                                                    <div class="mt-2 space-y-1">
                                                         <span class="badge badge-warning">Belum Diatur</span>
-                                                        <p class="text-[11px] text-gray-500">Jadwal belum ditentukan</p>
+                                                        <p class="text-xs text-gray-500">Jadwal belum ditentukan</p>
                                                     </div>
                                                 @elseif ($hari['status'] === 'Di Luar Penempatan')
-                                                    <p class="mt-2 text-[11px]">Di luar penempatan</p>
+                                                    <p class="mt-2 text-xs">Di luar penempatan</p>
                                                 @endif
 
                                                 @if (! $hari['dapat_diatur'] && $hari['penempatan'] !== null && $hari['penempatan']->status !== 'Aktif')
-                                                    <p class="mt-1 text-[10px] text-gray-400">Penempatan {{ $hari['penempatan']->status }} (hanya lihat)</p>
+                                                    <p class="mt-1 text-xs text-gray-400">Penempatan {{ $hari['penempatan']->status }} (hanya lihat)</p>
                                                 @endif
                                             @endif
                                         </{{ $elemen }}>
@@ -164,19 +170,20 @@
                                 </div>
                             @else
                                 <form id="panel-tanggal" method="POST" action="{{ route('operasional.jadwal-kerja.atur') }}"
-                                      class="space-y-4 rounded-lg border border-gray-200 p-4 xl:sticky xl:top-4">
+                                      class="space-y-5 rounded-lg border border-gray-200 bg-white p-5 shadow-sm xl:sticky xl:top-4">
                                     @csrf
                                     <input type="hidden" name="id_karyawan" value="{{ $karyawanTerpilih->id }}">
                                     <input type="hidden" name="bulan" value="{{ $awalBulan->format('Y-m') }}">
                                     <div id="input-tanggal"></div>
 
-                                    <div>
-                                        <h3 class="font-semibold text-gray-800">Pengaturan Tanggal</h3>
+                                    <div class="border-b border-gray-200 pb-4">
+                                        <h3 class="text-base font-semibold text-gray-800">Pengaturan Tanggal</h3>
+                                        <p class="mt-0.5 text-xs text-gray-500">Atur jam kerja atau hari libur untuk tanggal yang dipilih.</p>
                                     </div>
 
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-700"><span id="jumlah-dipilih">0</span> tanggal dipilih</p>
-                                        <div id="daftar-dipilih" class="mt-2 flex flex-wrap gap-1"></div>
+                                    <div class="rounded-md bg-gray-50 p-3">
+                                        <p class="text-sm font-medium text-gray-700"><span id="jumlah-dipilih" class="font-semibold text-sji-biru tabular-nums">0</span> tanggal dipilih</p>
+                                        <div id="daftar-dipilih" class="mt-2 flex flex-wrap gap-1.5"></div>
                                         <p id="kosong-dipilih" class="mt-1 text-xs text-gray-500">Klik tanggal pada kalender untuk memilih.</p>
                                     </div>
 
@@ -211,8 +218,8 @@
                                     <p id="info-durasi" class="form-hint" aria-live="polite"></p>
                                     <p id="pesan-panel" class="form-error" role="alert" hidden></p>
 
-                                    <div class="grid grid-cols-1 gap-2">
-                                        <button type="submit" name="aksi" value="kerja" class="btn-primary js-butuh-pilihan">Atur Jam Kerja</button>
+                                    <div class="grid grid-cols-1 gap-2 border-t border-gray-200 pt-4 sm:grid-cols-2 xl:grid-cols-1">
+                                        <button type="submit" name="aksi" value="kerja" class="btn-primary js-butuh-pilihan sm:col-span-2 xl:col-span-1">Atur Jam Kerja</button>
                                         <button type="submit" name="aksi" value="libur" class="btn-secondary js-butuh-pilihan">Tandai Hari Libur</button>
                                         <button type="submit" name="aksi" value="jadikan_kerja" id="tombol-jadikan-kerja" class="btn-secondary js-butuh-pilihan">Jadikan Hari Kerja</button>
                                         <button type="button" id="tombol-batal" class="btn-secondary js-butuh-pilihan">Batalkan Pilihan Tanggal</button>
