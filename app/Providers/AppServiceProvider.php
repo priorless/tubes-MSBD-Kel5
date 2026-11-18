@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Role;
 use App\Services\PertukaranShiftService;
+use App\Support\JamServer;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -14,7 +15,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Satu titik waktu server per request (dapat dibekukan dalam pengujian).
+        $this->app->scoped(JamServer::class);
     }
 
     /**

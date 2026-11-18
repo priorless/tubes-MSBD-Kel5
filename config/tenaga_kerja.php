@@ -109,4 +109,20 @@ return [
         'sisi_maksimal' => 1920,
         'piksel_maks' => 8000,
     ],
+
+    /*
+    | Aturan absensi berbasis shift & dokumentasi per jenis layanan (tbl_jenis_layanan.nama_layanan).
+    |   buka_check_in_menit : check-in dibuka sekian menit sebelum jam mulai shift
+    |   interval_menit      : panjang satu periode monitoring berkala, dihitung dari JAM MULAI SHIFT
+    |   maks_upload         : unggahan per laporan/periode (1 utama + 1 koreksi)
+    |   layanan_berkala     : monitoring per jam (foto patroli / kebersihan)
+    |   layanan_perjalanan  : monitoring dinamis per tahapan perjalanan + P2H kendaraan
+    */
+    'absensi' => [
+        'buka_check_in_menit' => 30,
+        'interval_menit' => 60,
+        'maks_upload' => 2,
+        'layanan_berkala' => ['Satpam', 'Cleaning Service'],
+        'layanan_perjalanan' => ['Driver'],
+    ],
 ];
