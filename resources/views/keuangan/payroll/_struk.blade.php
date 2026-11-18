@@ -88,6 +88,15 @@
                         <td class="px-4 py-3 text-red-600">Potongan Absensi</td>
                         <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_absen) }}</td>
                     </tr>
+                    <tr>
+                        <td class="px-4 py-3 text-red-600">
+                            Potongan BPJS
+                            @if (($payroll->bpjs_metode ?? null) !== null)
+                                <span class="block text-xs text-gray-500">{{ \App\Support\LabelBpjs::aturan($payroll->bpjs_metode, $payroll->bpjs_nilai) }}@if (filled($payroll->nama_klien_bpjs ?? null)) &middot; klien {{ $payroll->nama_klien_bpjs }}@endif</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_bpjs ?? 0) }}</td>
+                    </tr>
                 </tbody>
                 <tfoot class="border-t-2 border-gray-200 bg-gray-50">
                     <tr>

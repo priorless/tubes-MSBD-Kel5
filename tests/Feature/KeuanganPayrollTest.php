@@ -37,6 +37,10 @@ class KeuanganPayrollTest extends TestCase
             $table->unsignedSmallInteger('hari_wajib')->nullable();
             $table->unsignedSmallInteger('hari_masuk')->nullable();
             $table->unsignedSmallInteger('hari_absen')->nullable();
+            $table->unsignedInteger('id_klien_bpjs')->nullable();
+            $table->string('bpjs_metode')->nullable();
+            $table->decimal('bpjs_nilai', 12, 2)->nullable();
+            $table->decimal('potongan_bpjs', 12, 2)->default(0);
             $table->decimal('total_gaji', 12, 2);
             $table->string('status_bayar');
             $table->date('tgl_bayar')->nullable();
@@ -47,7 +51,8 @@ class KeuanganPayrollTest extends TestCase
             SELECT p.id, k.nip, k.nama, k.kategori,
                    p.periode_bulan, p.periode_tahun, p.gaji_pokok,
                    p.total_lembur, p.potongan_absen, p.total_gaji,
-                   p.status_bayar, p.tgl_bayar, p.hari_wajib, p.hari_masuk, p.hari_absen
+                   p.status_bayar, p.tgl_bayar, p.hari_wajib, p.hari_masuk, p.hari_absen,
+                   p.potongan_bpjs, p.bpjs_metode, p.bpjs_nilai, p.id_klien_bpjs, NULL AS nama_klien_bpjs
             FROM tbl_payroll p
             JOIN tbl_karyawan k ON p.id_karyawan = k.id
             SQL);

@@ -39,6 +39,16 @@
                         <dd class="font-medium text-gray-800">{{ number_format((float) $klien->management_fee, 2, ',', '.') }}%</dd>
                     @endif
                 </div>
+                <div>
+                    <dt class="text-gray-500">BPJS</dt>
+                    @if (! $bpjsTersedia)
+                        <dd class="text-amber-700">Belum tersedia &mdash; database belum dimigrasi</dd>
+                    @elseif ($klien->bpjs_metode === null)
+                        <dd class="text-gray-500">Tanpa BPJS</dd>
+                    @else
+                        <dd class="font-medium text-gray-800">{{ \App\Support\LabelBpjs::aturan($klien->bpjs_metode, $klien->bpjs_nilai) }}</dd>
+                    @endif
+                </div>
             </dl>
         </section>
 

@@ -8,6 +8,9 @@
 
     $sudahLunas = $invoice->status === 'Lunas';
     $rupiah = fn ($nilai): string => 'Rp '.number_format((float) $nilai, 0, ',', '.');
+    // total_tagihan sudah termasuk biaya BPJS; tagihan tenaga = total - BPJS.
+    $biayaBpjs = (float) ($invoice->biaya_bpjs ?? 0);
+    $tagihanTenaga = (float) $invoice->total_tagihan - $biayaBpjs;
     $tanggalIndonesia = fn ($tanggal): string => Carbon::parse($tanggal)->locale('id')->translatedFormat('d F Y');
 @endphp
 <article class="struk-dokumen overflow-hidden rounded-lg bg-white text-gray-800" data-judul="Invoice {{ $invoice->nomor_invoice }}">
@@ -106,8 +109,20 @@
                         </td>
                         <td class="px-4 py-4 whitespace-nowrap text-gray-700">{{ $labelPeriode }}</td>
                         <td class="px-4 py-4 text-center text-gray-700 tabular-nums">{{ $invoice->jumlah_tenaga }} orang</td>
-                        <td class="px-4 py-4 text-right font-medium whitespace-nowrap text-gray-800 tabular-nums">{{ $rupiah($invoice->total_tagihan) }}</td>
+                        <td class="px-4 py-4 text-right font-medium whitespace-nowrap text-gray-800 tabular-nums">{{ $rupiah($tagihanTenaga) }}</td>
                     </tr>
+                    @if ($biayaBpjs > 0)
+                        <tr class="align-top">
+                            <td class="px-4 py-4 text-center text-gray-500">2</td>
+                            <td class="px-4 py-4">
+                                <p class="font-medium text-gray-800">Biaya BPJS</p>
+                                <p class="mt-0.5 text-xs text-gray-500">{{ \App\Support\LabelBpjs::aturan($invoice->bpjs_metode, $invoice->bpjs_nilai, 'Sesuai payroll periode ini') }}</p>
+                            </td>
+                            <td class="px-4 py-4 whitespace-nowrap text-gray-700">{{ $labelPeriode }}</td>
+                            <td class="px-4 py-4 text-center text-gray-700 tabular-nums">&mdash;</td>
+                            <td class="px-4 py-4 text-right font-medium whitespace-nowrap text-gray-800 tabular-nums">{{ $rupiah($biayaBpjs) }}</td>
+                        </tr>
+                    @endif
                 </tbody>
             </table>
         </div>

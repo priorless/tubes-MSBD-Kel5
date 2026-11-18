@@ -24,6 +24,8 @@ trait CreatesTemplateJadwalTables
             $table->string('pic_telp')->nullable();
             $table->string('pic_email')->nullable();
             $table->decimal('management_fee', 5, 2)->nullable();
+            $table->string('bpjs_metode')->nullable();
+            $table->decimal('bpjs_nilai', 12, 2)->nullable();
             $table->string('status')->default('Aktif');
         });
         Schema::create('tbl_jenis_layanan', function (Blueprint $table): void {
