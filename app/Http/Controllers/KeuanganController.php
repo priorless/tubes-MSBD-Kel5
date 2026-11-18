@@ -43,10 +43,21 @@ class KeuanganController extends Controller
         ]);
     }
 
-    public function generatePayroll(): RedirectResponse
+    /**
+     * Generate payroll untuk periode yang dipilih. Seluruh perhitungan ada di sp_generate_payroll_bulanan
+     * (sql/Komponen/16): karyawan yang sudah punya payroll periode itu dilewati tanpa ditimpa, dan
+     * unique key (id_karyawan, periode) mencegah payroll ganda walau tombol diklik berulang.
+     */
+    public function generatePayroll(Request $request): RedirectResponse
     {
-        $bulan = now()->month;
-        $tahun = now()->year;
+        $validated = $request->validate([
+            'bulan' => ['required', 'integer', 'between:1,12'],
+            'tahun' => ['required', 'integer', 'between:2000,2100'],
+        ], $this->pesanValidasi());
+
+        $bulan = (int) $validated['bulan'];
+        $tahun = (int) $validated['tahun'];
+        $sudahAda = $this->jumlahPayroll($bulan, $tahun);
 
         $gagal = $this->jalankanProsedur('CALL sp_generate_payroll_bulanan(?, ?)', [$bulan, $tahun]);
 
@@ -54,11 +65,20 @@ class KeuanganController extends Controller
             return $gagal;
         }
 
+        $dibuat = $this->jumlahPayroll($bulan, $tahun) - $sudahAda;
+
         return redirect()
             ->route('keuangan.payroll.index', ['bulan' => $bulan, 'tahun' => $tahun])
-            ->with('success', 'Payroll periode '.self::DAFTAR_BULAN[$bulan].' '.$tahun.' berhasil di-generate.');
+            ->with('success', sprintf(
+                'Generate payroll %s %d selesai: %d payroll baru dibuat, %d dilewati karena sudah ada.',
+                self::DAFTAR_BULAN[$bulan], $tahun, $dibuat, $sudahAda,
+            ));
     }
 
+    /**
+     * Pencairan: status 'Belum Dibayar' -> 'Sudah Lunas' + tanggal hari ini (sp_update_status_bayar).
+     * Pencairan kedua ditolak database. Tidak ada pencatatan Mutasi Kas.
+     */
     public function tandaiPayrollCair(int $id): RedirectResponse
     {
         abort_unless(DB::table('tbl_payroll')->where('id', $id)->exists(), 404);
@@ -69,9 +89,13 @@ class KeuanganController extends Controller
             now()->toDateString(),
         ]);
 
-        return $gagal ?? back()->with('success', 'Status payroll berhasil ditandai cair.');
+        return $gagal ?? back()->with('success', 'Gaji berhasil dicairkan. Status payroll: Sudah Lunas.');
     }
 
+    /**
+     * Rincian gaji (hanya dilihat, tidak dicetak) dari data payroll tersimpan (v_slip_gaji_detail), tanpa hitung ulang.
+     * AJAX -> HTML untuk modal; selain itu kembali ke halaman payroll dengan modal terbuka.
+     */
     public function strukPayroll(Request $request, int $id): View|RedirectResponse
     {
         if (! $request->ajax()) {
@@ -85,21 +109,24 @@ class KeuanganController extends Controller
                 'nip',
                 'nama',
                 'kategori',
+                'jenis_pekerjaan',
+                'status_ptkp',
                 'periode_bulan',
                 'periode_tahun',
                 'gaji_pokok',
+                'komponen_tunjangan',
+                'upah_backup',
                 'total_lembur',
                 'potongan_absen',
-                'komponen_tunjangan',
                 'potongan_bpjs',
                 'potongan_pinjaman',
+                'pph21',
                 'total_gaji',
                 'status_bayar',
                 'tgl_bayar',
                 'hari_wajib',
                 'hari_masuk',
                 'hari_absen',
-                'potongan_bpjs',
                 'bpjs_metode',
                 'bpjs_nilai',
                 'nama_klien_bpjs',
@@ -111,6 +138,11 @@ class KeuanganController extends Controller
             'payroll' => $payroll,
             'labelPeriode' => (self::DAFTAR_BULAN[(int) $payroll->periode_bulan] ?? $payroll->periode_bulan).' '.$payroll->periode_tahun,
         ]);
+    }
+
+    private function jumlahPayroll(int $bulan, int $tahun): int
+    {
+        return DB::table('tbl_payroll')->where('periode_bulan', $bulan)->where('periode_tahun', $tahun)->count();
     }
 
     public function invoice(): View

@@ -107,7 +107,7 @@ class LogAktivitasTest extends TestCase
         $this->assertStringContainsString('Aktif -> Nonaktif', $logKlien[1]->keterangan);
     }
 
-    public function test_status_bayar_payroll_dan_invoice_tercatat_tanpa_mengganggu_buku_kas(): void
+    public function test_status_bayar_payroll_dan_invoice_tercatat_tanpa_menulis_mutasi_kas(): void
     {
         $idKaryawan = $this->buatKaryawan('Internal');
         $idPayroll = DB::table('tbl_payroll')->insertGetId([
@@ -119,13 +119,14 @@ class LogAktivitasTest extends TestCase
             'jumlah_tenaga' => 1, 'total_tagihan' => 2000000,
         ]);
 
-        DB::table('tbl_payroll')->where('id', $idPayroll)->update(['status_bayar' => 'Sudah Dibayar', 'tgl_bayar' => $this->hariIniDb()]);
+        DB::table('tbl_payroll')->where('id', $idPayroll)->update(['status_bayar' => 'Sudah Lunas', 'tgl_bayar' => $this->hariIniDb()]);
         DB::table('tbl_invoice')->where('id', $idInvoice)->update(['status' => 'Lunas', 'tgl_pembayaran' => $this->hariIniDb()]);
 
-        $this->assertStringContainsString('Belum Dibayar -> Sudah Dibayar', $this->log('tbl_payroll', $idPayroll)[0]->keterangan);
+        $this->assertStringContainsString('Belum Dibayar -> Sudah Lunas', $this->log('tbl_payroll', $idPayroll)[0]->keterangan);
         $this->assertStringContainsString('INV-TSTX-LOG: Belum Lunas -> Lunas', $this->log('tbl_invoice', $idInvoice)[0]->keterangan);
-        $this->assertTrue(DB::table('tbl_mutasi_keuangan')->where('referensi', 'PAYROLL-'.$idPayroll)->exists());
-        $this->assertTrue(DB::table('tbl_mutasi_keuangan')->where('referensi', 'INV-TSTX-LOG')->exists());
+        // Pencairan payroll & pelunasan invoice tidak lagi dicatat ke Mutasi Kas (sql/Komponen/16).
+        $this->assertFalse(DB::table('tbl_mutasi_keuangan')->where('referensi', 'PAYROLL-'.$idPayroll)->exists());
+        $this->assertFalse(DB::table('tbl_mutasi_keuangan')->where('referensi', 'INV-TSTX-LOG')->exists());
     }
 
     public function test_perubahan_role_akun_tercatat(): void

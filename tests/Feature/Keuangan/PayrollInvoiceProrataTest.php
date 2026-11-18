@@ -221,7 +221,7 @@ class PayrollInvoiceProrataTest extends TestCase
 
         $this->get(route('keuangan.payroll.index', ['bulan' => self::BULAN, 'tahun' => self::TAHUN]))
             ->assertOk()
-            ->assertSee('Hari (W/M/A)')
+            ->assertSee('Hari (Wajib / Hadir / Absen)')
             ->assertSee('13 / 11 / 2');
 
         $this->withHeader('X-Requested-With', 'XMLHttpRequest')
