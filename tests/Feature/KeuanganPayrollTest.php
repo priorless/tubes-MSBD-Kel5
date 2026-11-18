@@ -34,6 +34,9 @@ class KeuanganPayrollTest extends TestCase
             $table->decimal('gaji_pokok', 12, 2);
             $table->decimal('total_lembur', 12, 2);
             $table->decimal('potongan_absen', 12, 2);
+            $table->decimal('komponen_tunjangan', 12, 2)->default(0);
+            $table->decimal('potongan_bpjs', 12, 2)->default(0);
+            $table->decimal('potongan_pinjaman', 12, 2)->default(0);
             $table->unsignedSmallInteger('hari_wajib')->nullable();
             $table->unsignedSmallInteger('hari_masuk')->nullable();
             $table->unsignedSmallInteger('hari_absen')->nullable();
@@ -46,7 +49,8 @@ class KeuanganPayrollTest extends TestCase
             CREATE VIEW v_slip_gaji_detail AS
             SELECT p.id, k.nip, k.nama, k.kategori,
                    p.periode_bulan, p.periode_tahun, p.gaji_pokok,
-                   p.total_lembur, p.potongan_absen, p.total_gaji,
+                   p.total_lembur, p.potongan_absen, p.komponen_tunjangan,
+                   p.potongan_bpjs, p.potongan_pinjaman, p.total_gaji,
                    p.status_bayar, p.tgl_bayar, p.hari_wajib, p.hari_masuk, p.hari_absen
             FROM tbl_payroll p
             JOIN tbl_karyawan k ON p.id_karyawan = k.id
@@ -93,7 +97,8 @@ class KeuanganPayrollTest extends TestCase
             ->assertSee('Rp 50.000')
             ->assertSee('Rp 80.000')
             ->assertSee('Rp 1.170.000')
-            ->assertDontSee('Tunjangan')
+            ->assertSee('Tunjangan')
+            ->assertSee('Potongan BPJS')
             ->assertDontSee('Rp 300.000');
     }
 }

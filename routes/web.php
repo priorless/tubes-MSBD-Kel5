@@ -13,6 +13,7 @@ use App\Http\Controllers\Hrd\PersetujuanLemburController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
 use App\Http\Controllers\Hrd\SertifikatController;
 use App\Http\Controllers\KeuanganController;
+use App\Http\Controllers\KeuanganKomponenGajiController;
 use App\Http\Controllers\Operasional\AkhiriPenempatanController;
 use App\Http\Controllers\Operasional\BerandaOperasionalController;
 use App\Http\Controllers\Operasional\JadwalKerjaController;
@@ -165,6 +166,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
      * Keuangan
      * ===================================================================== */
     Route::middleware('role:'.Role::Keuangan)->prefix('keuangan')->name('keuangan.')->controller(KeuanganController::class)->group(function () {
+        Route::get('komponen-gaji', [KeuanganKomponenGajiController::class, 'index'])->name('komponen-gaji.index');
+        Route::put('komponen-gaji', [KeuanganKomponenGajiController::class, 'store'])->name('komponen-gaji.store');
         Route::get('payroll', 'payroll')->name('payroll.index');
         Route::post('payroll/generate', 'generatePayroll')->name('payroll.generate');
         Route::patch('payroll/{id}/cair', 'tandaiPayrollCair')->whereNumber('id')->name('payroll.cair');
@@ -174,8 +177,6 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::post('invoice', 'generateInvoice')->name('invoice.generate');
         Route::patch('invoice/{id}/lunas', 'tandaiInvoiceLunas')->whereNumber('id')->name('invoice.lunas');
         Route::get('invoice/{id}/struk', 'strukInvoice')->whereNumber('id')->name('invoice.struk');
-
-        Route::get('mutasi', 'mutasi')->name('mutasi.index');
     });
 
     /* =====================================================================

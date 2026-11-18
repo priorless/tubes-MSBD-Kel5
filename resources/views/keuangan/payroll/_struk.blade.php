@@ -85,8 +85,20 @@
                         <td class="px-4 py-3 text-right tabular-nums">{{ $rupiah($payroll->total_lembur) }}</td>
                     </tr>
                     <tr>
+                        <td class="px-4 py-3 text-gray-700">Tunjangan</td>
+                        <td class="px-4 py-3 text-right tabular-nums">{{ $rupiah($payroll->komponen_tunjangan) }}</td>
+                    </tr>
+                    <tr>
                         <td class="px-4 py-3 text-red-600">Potongan Absensi</td>
                         <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_absen) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-4 py-3 text-red-600">Potongan BPJS</td>
+                        <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_bpjs) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-4 py-3 text-red-600">Potongan Pinjaman / Koperasi</td>
+                        <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_pinjaman) }}</td>
                     </tr>
                 </tbody>
                 <tfoot class="border-t-2 border-gray-200 bg-gray-50">
