@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Support\JamServer;
 use App\Support\KolomTidakDitemukan;
+use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -26,7 +28,7 @@ class TenagaKerjaService
     /** @var array<string, array<string, string>> cache: tabel => [nama_kolom => tipe] */
     private array $kolomCache = [];
 
-    public function __construct(private FotoAbsensiService $foto) {}
+    public function __construct(private FotoAbsensiService $foto, private JamServer $jam) {}
 
     /* =====================================================================
      * Utilitas kolom & error
@@ -106,7 +108,7 @@ class TenagaKerjaService
     /** Waktu server database saat ini — dipakai untuk menyinkronkan jam digital. */
     public function waktuServer(): string
     {
-        return DB::selectOne('SELECT NOW() AS sekarang')->sekarang;
+        return $this->jam->sekarang()->format('Y-m-d H:i:s');
     }
 
     /**
@@ -116,7 +118,13 @@ class TenagaKerjaService
      */
     private function waktuTransaksi(): object
     {
-        return DB::selectOne('SELECT NOW() AS sekarang, CURDATE() AS tgl, CURTIME() AS jam');
+        $sekarang = $this->jam->sekarang();
+
+        return (object) [
+            'sekarang' => $sekarang->format('Y-m-d H:i:s'),
+            'tgl' => $sekarang->toDateString(),
+            'jam' => $sekarang->format('H:i:s'),
+        ];
     }
 
     public function karyawan(int $idKaryawan): ?object
@@ -207,8 +215,12 @@ class TenagaKerjaService
      * lalu INSERT baris baru dengan waktu server database dan simpan foto dalam satu transaksi.
      * Penolakan absensi ganda, penempatan, dan status terlambat SENGAJA tidak dicek di sini —
      * itu tugas trigger database. Pesan SIGNAL-nya akan ditangkap controller.
+     *
+     * @param  string|null  $tanggalShift  tanggal shift (Y-m-d) yang divalidasi JadwalAbsensiService; null = hari ini
+     * @param  (Closure(int, object): void)|null  $lanjutan  dokumentasi tambahan (mis. P2H) di dalam transaksi yang sama,
+     *                                                       menerima id absensi baru dan waktu transaksi
      */
-    public function checkIn(int $idKaryawan, string $isiFoto): void
+    public function checkIn(int $idKaryawan, string $isiFoto, ?string $tanggalShift = null, ?Closure $lanjutan = null): void
     {
         $jpeg = $this->foto->siapkan($isiFoto);
         $tabel = $this->tabel('absensi');
@@ -219,8 +231,9 @@ class TenagaKerjaService
         $path = null;
 
         try {
-            DB::transaction(function () use ($tabel, $kolomId, $kolomMasuk, $kolomTanggal, $kolomFoto, $idKaryawan, $jpeg, &$path): void {
+            DB::transaction(function () use ($tabel, $kolomId, $kolomMasuk, $kolomTanggal, $kolomFoto, $idKaryawan, $jpeg, $tanggalShift, $lanjutan, &$path): void {
                 $waktu = $this->waktuTransaksi();
+                $waktu->tgl_shift = $tanggalShift ?? $waktu->tgl;
                 $path = $this->foto->pathBaru('masuk', $waktu->tgl);
 
                 $data = [
@@ -229,10 +242,13 @@ class TenagaKerjaService
                     $kolomFoto => $path,
                 ];
                 if ($kolomTanggal && $kolomTanggal !== $kolomMasuk) {
-                    $data[$kolomTanggal] = $this->bertipeDatetime($tabel, $kolomTanggal) ? $waktu->sekarang : $waktu->tgl;
+                    $data[$kolomTanggal] = $this->bertipeDatetime($tabel, $kolomTanggal) ? $waktu->sekarang : $waktu->tgl_shift;
                 }
 
-                DB::table($tabel)->insert($data);
+                $idAbsensi = (int) DB::table($tabel)->insertGetId($data);
+                if ($lanjutan !== null) {
+                    $lanjutan($idAbsensi, $waktu);
+                }
                 $this->foto->simpan($path, $jpeg);
             });
         } catch (Throwable $e) {
@@ -247,8 +263,11 @@ class TenagaKerjaService
      * Check-out berfoto: UPDATE jam_keluar + foto pada baris absensi aktif yang belum check-out.
      * Minimal durasi & lembur diperiksa trigger trg_auto_hitung_lembur.
      * Mengembalikan jumlah baris yang ter-update (0 = tidak ada yang bisa di-check-out; foto tidak disimpan).
+     *
+     * @param  (Closure(int, object): void)|null  $lanjutan  dokumentasi tambahan (mis. kondisi akhir kendaraan) di dalam
+     *                                                       transaksi yang sama, menerima id absensi dan waktu transaksi
      */
-    public function checkOut(int $idKaryawan, string $isiFoto): int
+    public function checkOut(int $idKaryawan, string $isiFoto, ?Closure $lanjutan = null): int
     {
         $jpeg = $this->foto->siapkan($isiFoto);
         $tabel = $this->tabel('absensi');
@@ -259,7 +278,7 @@ class TenagaKerjaService
         $path = null;
 
         try {
-            return DB::transaction(function () use ($tabel, $kolomId, $kolomKeluar, $kolomPk, $kolomFoto, $idKaryawan, $jpeg, &$path): int {
+            return DB::transaction(function () use ($tabel, $kolomId, $kolomKeluar, $kolomPk, $kolomFoto, $idKaryawan, $jpeg, $lanjutan, &$path): int {
                 $idAktif = $kolomPk ? $this->idAbsensiAktif($idKaryawan) : false;
                 if ($idAktif === null) {
                     return 0;
@@ -281,6 +300,12 @@ class TenagaKerjaService
                     $path = null;
 
                     return 0;
+                }
+
+                if ($lanjutan !== null && $kolomPk) {
+                    $idBaris = $idAktif !== false ? $idAktif : (int) DB::table($tabel)->where($kolomId, $idKaryawan)
+                        ->where($kolomFoto, $path)->value($kolomPk);
+                    $lanjutan((int) $idBaris, $waktu);
                 }
 
                 $this->foto->simpan($path, $jpeg);

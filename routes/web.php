@@ -4,6 +4,7 @@ use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\Ceo\LogAktivitasController;
 use App\Http\Controllers\CeoController;
 use App\Http\Controllers\FotoAbsensiController;
+use App\Http\Controllers\FotoLaporanAktivitasController;
 use App\Http\Controllers\Hrd\AbsensiKaryawanController;
 use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
@@ -21,7 +22,9 @@ use App\Http\Controllers\Operasional\RekapOperasionalController;
 use App\Http\Controllers\Operasional\TemplateJadwalController;
 use App\Http\Controllers\Operasional\TemplateShiftController;
 use App\Http\Controllers\OperasionalController;
+use App\Http\Controllers\TenagaKerja\LaporanAktivitasController;
 use App\Http\Controllers\TenagaKerja\PengajuanTukarShiftController;
+use App\Http\Controllers\TenagaKerja\TanggapanTukarShiftController;
 use App\Http\Controllers\TenagaKerjaController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Middleware\PastikanKaryawan;
@@ -46,6 +49,14 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         ->whereNumber('absensi')
         ->whereIn('jenis', ['masuk', 'keluar'])
         ->name('absensi.foto');
+    Route::get('/absensi/laporan/{laporan}/foto/{versi}', [FotoLaporanAktivitasController::class, 'laporan'])
+        ->whereNumber('laporan')
+        ->whereIn('versi', ['utama', 'koreksi'])
+        ->name('absensi.laporan.foto');
+    Route::get('/absensi/p2h/{absensi}/foto/{jenis}', [FotoLaporanAktivitasController::class, 'kendaraan'])
+        ->whereNumber('absensi')
+        ->whereIn('jenis', ['awal', 'akhir'])
+        ->name('absensi.p2h.foto');
 
     /* =====================================================================
      * Manajemen User (CEO & HRD)
@@ -181,6 +192,13 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             Route::post('/absensi/check-in', 'checkIn')->middleware('throttle:10,1')->name('absensi.check-in');
             Route::post('/absensi/check-out', 'checkOut')->middleware('throttle:10,1')->name('absensi.check-out');
             Route::post('/absensi/tukar-shift', PengajuanTukarShiftController::class)->middleware('throttle:10,1')->name('tukar-shift.store');
+            Route::patch('/absensi/tukar-shift/{pertukaranShift}/tanggapi', TanggapanTukarShiftController::class)
+                ->whereNumber('pertukaranShift')->middleware('throttle:10,1')->name('tukar-shift.tanggapi');
+
+            // Laporan aktivitas: monitoring per jam (Satpam/Cleaning Service) & perjalanan (Driver).
+            Route::post('/absensi/laporan', [LaporanAktivitasController::class, 'store'])->middleware('throttle:20,1')->name('laporan.store');
+            Route::post('/absensi/laporan/{laporanAktivitas}/koreksi', [LaporanAktivitasController::class, 'koreksi'])
+                ->whereNumber('laporanAktivitas')->middleware('throttle:20,1')->name('laporan.koreksi');
 
             Route::get('/riwayat-absensi', 'riwayat')->name('riwayat');
             Route::get('/riwayat-absensi/unduh', 'riwayatCsv')->name('riwayat.unduh');

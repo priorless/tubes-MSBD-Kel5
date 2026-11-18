@@ -16,6 +16,7 @@ use Illuminate\Validation\ValidationException;
  * Aturan:
  * - pengajuan paling lambat H-1 (tanggal shift harus setelah hari ini);
  * - kedua karyawan punya penempatan Aktif di klien yang sama dan jadwal pada tanggal itu;
+ * - rekan menerima pengajuan lebih dulu (status_rekan 'Diterima'); bila rekan menolak, pengajuan langsung Ditolak;
  * - shift keduanya berbeda, belum ada absensi, dan belum ada pengajuan lain yang menunggu;
  * - saat disetujui, jadwal harus masih sama dengan saat pengajuan dan shift baru tidak
  *   boleh bertumpuk dengan shift hari sebelum/sesudahnya;
@@ -28,6 +29,12 @@ class PertukaranShiftService
     public const string STATUS_DISETUJUI = 'Disetujui';
 
     public const string STATUS_DITOLAK = 'Ditolak';
+
+    public const string REKAN_MENUNGGU = 'Menunggu';
+
+    public const string REKAN_DITERIMA = 'Diterima';
+
+    public const string REKAN_DITOLAK = 'Ditolak';
 
     /** Rentang tanggal mendatang yang ditawarkan pada form pengajuan karyawan. */
     public const int HARI_KE_DEPAN = 45;
@@ -208,6 +215,67 @@ class PertukaranShiftService
     }
 
     /**
+     * Tanggapan rekan atas pengajuan yang ditujukan kepadanya. Menerima = diteruskan ke Operasional;
+     * menolak = pengajuan langsung Ditolak. Jadwal tidak pernah disentuh di tahap ini.
+     */
+    public function tanggapiRekan(int $idPengajuan, int $idKaryawanRekan, bool $terima, ?string $catatan, int $idUser): void
+    {
+        DB::transaction(function () use ($idPengajuan, $idKaryawanRekan, $terima, $catatan, $idUser): void {
+            $pengajuan = $this->ambilUntukDiproses($idPengajuan);
+
+            if ((int) $pengajuan->id_karyawan_rekan !== $idKaryawanRekan) {
+                $this->gagal('pengajuan', 'Pengajuan pertukaran shift tidak ditemukan.');
+            }
+
+            if (($pengajuan->status_rekan ?? self::REKAN_DITERIMA) !== self::REKAN_MENUNGGU) {
+                $this->gagal('pengajuan', 'Anda sudah menanggapi pengajuan ini sebelumnya.');
+            }
+
+            if ($terima && $this->tanggalSudahLewat((string) $pengajuan->tanggal_kerja)) {
+                $this->gagal('pengajuan', 'Tanggal shift sudah lewat atau sedang berlangsung, pengajuan tidak dapat diterima.');
+            }
+
+            $nilai = [
+                'status_rekan' => $terima ? self::REKAN_DITERIMA : self::REKAN_DITOLAK,
+                'catatan_rekan' => $catatan,
+                'ditanggapi_rekan_pada' => now(),
+                'updated_at' => now(),
+            ];
+
+            if (! $terima) {
+                $nilai += [
+                    'status' => self::STATUS_DITOLAK,
+                    'catatan_keputusan' => 'Ditolak oleh rekan'.(filled($catatan) ? ': '.$catatan : '.'),
+                    'diproses_oleh' => $idUser,
+                    'diproses_pada' => now(),
+                ];
+            }
+
+            DB::table('tbl_pertukaran_shift')
+                ->where('id', $idPengajuan)
+                ->where('status', self::STATUS_MENUNGGU)
+                ->where('status_rekan', self::REKAN_MENUNGGU)
+                ->update($nilai);
+        });
+    }
+
+    /**
+     * Label tahap pengajuan untuk tampilan, mempertimbangkan persetujuan rekan.
+     */
+    public static function labelTahap(object $pengajuan): string
+    {
+        if ($pengajuan->status === self::STATUS_MENUNGGU && ($pengajuan->status_rekan ?? self::REKAN_DITERIMA) === self::REKAN_MENUNGGU) {
+            return 'Menunggu Persetujuan Rekan';
+        }
+
+        if ($pengajuan->status === self::STATUS_MENUNGGU) {
+            return 'Menunggu Persetujuan Operasional';
+        }
+
+        return ($pengajuan->status_rekan ?? null) === self::REKAN_DITOLAK ? 'Ditolak Rekan' : $pengajuan->status;
+    }
+
+    /**
      * Menolak pengajuan. Jadwal kedua karyawan tidak disentuh.
      */
     public function tolak(int $idPengajuan, int $idUser, ?string $catatan): void
@@ -228,6 +296,10 @@ class PertukaranShiftService
     {
         if ($pengajuan->status !== self::STATUS_MENUNGGU) {
             return ['Pengajuan ini sudah diproses sebelumnya.'];
+        }
+
+        if (($pengajuan->status_rekan ?? self::REKAN_DITERIMA) !== self::REKAN_DITERIMA) {
+            return ['Rekan belum menerima pengajuan ini. Persetujuan Operasional baru dapat diberikan setelah rekan menerima.'];
         }
 
         $tanggal = (string) $pengajuan->tanggal_kerja;
