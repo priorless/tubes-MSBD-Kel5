@@ -58,6 +58,7 @@
 
         if ($penggunaAktif->hasRole(Role::Keuangan)) {
             $menu['Keuangan'] = [
+                ['Komponen Gaji', 'keuangan.komponen-gaji.index', 'keuangan.komponen-gaji.*'],
                 ['Payroll', 'keuangan.payroll.index', 'keuangan.payroll.*'],
                 ['Invoice Klien', 'keuangan.invoice.index', 'keuangan.invoice.*'],
             ];
