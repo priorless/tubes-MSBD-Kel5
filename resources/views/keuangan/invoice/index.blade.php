@@ -36,12 +36,20 @@
                     <select name="id_klien" id="id_klien" @class(['form-input', 'form-input-error' => $errors->has('id_klien')]) required>
                         <option value="">&mdash; Pilih klien &mdash;</option>
                         @foreach ($klien as $item)
-                            <option value="{{ $item->id }}" @selected((int) old('id_klien') === (int) $item->id)>
+                            <option value="{{ $item->id }}" @selected((int) old('id_klien') === (int) $item->id)
+                                    data-bpjs="{{ \App\Support\LabelBpjs::aturan($item->bpjs_metode, $item->bpjs_nilai) }}"
+                                    data-bpjs-aktif="{{ $item->bpjs_metode === null ? '0' : '1' }}">
                                 {{ $item->kode_klien }} &mdash; {{ $item->nama_perusahaan }}
                             </option>
                         @endforeach
                     </select>
                     @error('id_klien') <p class="form-error">{{ $message }}</p> @enderror
+                </div>
+
+                <div id="info_bpjs_klien" class="hidden rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm" aria-live="polite">
+                    <p class="text-xs text-gray-500">BPJS default klien</p>
+                    <p class="font-semibold text-gray-800" id="info_bpjs_aturan"></p>
+                    <p class="mt-1 text-xs text-gray-500" id="info_bpjs_keterangan"></p>
                 </div>
 
                 <div class="grid grid-cols-12 gap-3">
@@ -63,7 +71,8 @@
                 </div>
 
                 <p class="text-xs text-gray-500">
-                    Jumlah tenaga dan total tagihan dihitung otomatis oleh database dari penempatan aktif klien pada periode tersebut.
+                    Jumlah tenaga dan total tagihan dihitung otomatis oleh database dari penempatan aktif klien pada periode tersebut,
+                    ditambah biaya BPJS sesuai pengaturan klien.
                 </p>
             </div>
 
@@ -97,7 +106,12 @@
                                 <td>{{ $item->nama_perusahaan }}</td>
                                 <td class="whitespace-nowrap">{{ $daftarBulan[$item->periode_bulan] ?? $item->periode_bulan }} {{ $item->periode_tahun }}</td>
                                 <td class="text-center">{{ $item->jumlah_tenaga }}</td>
-                                <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->total_tagihan, 0, ',', '.') }}</td>
+                                <td class="text-right whitespace-nowrap tabular-nums">
+                                    Rp {{ number_format((float) $item->total_tagihan, 0, ',', '.') }}
+                                    @if ((float) $item->biaya_bpjs > 0)
+                                        <p class="text-xs text-gray-400">termasuk BPJS Rp {{ number_format((float) $item->biaya_bpjs, 0, ',', '.') }}</p>
+                                    @endif
+                                </td>
                                 <td class="whitespace-nowrap">
                                     @if ($item->status === 'Lunas')
                                         <span class="badge badge-success">Lunas</span>
@@ -164,6 +178,24 @@
 
 @push('scripts')
     <script>
+        (() => {
+            // BPJS default klien terisi otomatis saat klien dipilih (hanya ditampilkan, diatur di data klien).
+            const pilihKlien = document.getElementById('id_klien');
+            const infoBpjs = document.getElementById('info_bpjs_klien');
+            const tampilkanBpjs = () => {
+                const opsi = pilihKlien.selectedOptions[0];
+                infoBpjs.classList.toggle('hidden', !opsi || opsi.value === '');
+                if (!opsi || opsi.value === '') return;
+                const aktif = opsi.dataset.bpjsAktif === '1';
+                document.getElementById('info_bpjs_aturan').textContent = opsi.dataset.bpjs;
+                document.getElementById('info_bpjs_keterangan').textContent = aktif
+                    ? 'Biaya BPJS invoice = total potongan BPJS karyawan klien ini pada payroll periode yang dipilih. Generate payroll periode tersebut terlebih dahulu.'
+                    : 'Klien ini tidak memakai BPJS; invoice hanya berisi tagihan tenaga.';
+            };
+            pilihKlien.addEventListener('change', tampilkanBpjs);
+            tampilkanBpjs();
+        })();
+
         (() => {
             const modal = document.getElementById('strukModal');
             const isi = document.getElementById('strukModalIsi');

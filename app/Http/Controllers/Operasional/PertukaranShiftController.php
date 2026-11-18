@@ -48,11 +48,19 @@ class PertukaranShiftController extends Controller
         ]);
         $status = $validated['status'] ?? 'Semua';
         $cari = trim((string) ($validated['cari'] ?? ''));
+        $tanggalDari = $validated['tanggal_dari'] ?? null;
+        $tanggalSampai = $validated['tanggal_sampai'] ?? null;
 
         $query = $pertukaranShiftService->queryDaftar()
             ->when($status !== 'Semua', fn (Builder $query) => $query->where('ps.status', $status))
-            ->when($validated['tanggal_dari'] ?? null, fn (Builder $query, string $tanggal) => $query->where('ps.tanggal_kerja', '>=', $tanggal))
-            ->when($validated['tanggal_sampai'] ?? null, fn (Builder $query, string $tanggal) => $query->where('ps.tanggal_kerja', '<=', $tanggal))
+            // Pengajuan cocok bila tanggal jadwal pengaju ATAU tanggal jadwal rekan berada dalam rentang.
+            ->when($tanggalDari !== null || $tanggalSampai !== null, fn (Builder $query) => $query->where(function (Builder $query) use ($tanggalDari, $tanggalSampai): void {
+                foreach (['ps.tanggal_kerja', 'ps.tanggal_kerja_rekan'] as $kolom) {
+                    $query->orWhere(fn (Builder $query) => $query
+                        ->when($tanggalDari, fn (Builder $query, string $tanggal) => $query->where($kolom, '>=', $tanggal))
+                        ->when($tanggalSampai, fn (Builder $query, string $tanggal) => $query->where($kolom, '<=', $tanggal)));
+                }
+            }))
             ->when($validated['id_klien'] ?? null, fn (Builder $query, int|string $idKlien) => $query->where('pp.id_klien', (int) $idKlien))
             ->when($cari !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($cari): void {
                 $pola = '%'.addcslashes($cari, '%_\\').'%';
@@ -72,8 +80,8 @@ class PertukaranShiftController extends Controller
                 ->withQueryString(),
             'filter' => [
                 'status' => $status,
-                'tanggal_dari' => $validated['tanggal_dari'] ?? null,
-                'tanggal_sampai' => $validated['tanggal_sampai'] ?? null,
+                'tanggal_dari' => $tanggalDari,
+                'tanggal_sampai' => $tanggalSampai,
                 'cari' => $cari,
                 'id_klien' => isset($validated['id_klien']) ? (int) $validated['id_klien'] : null,
             ],
@@ -119,7 +127,7 @@ class PertukaranShiftController extends Controller
 
         return redirect()
             ->route('operasional.jadwal-kerja.pertukaran-shift.show', $pertukaranShift)
-            ->with('success', 'Pengajuan disetujui. Jadwal kedua karyawan sudah ditukar.');
+            ->with('success', 'Pengajuan disetujui. Tanggal dan shift kedua jadwal sudah ditukar.');
     }
 
     public function reject(Request $request, int $pertukaranShift, PertukaranShiftService $pertukaranShiftService): RedirectResponse

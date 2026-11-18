@@ -52,6 +52,7 @@
                         <th class="text-right">Gaji Pokok</th>
                         <th class="text-right">Lembur</th>
                         <th class="text-right">Potongan Absen</th>
+                        <th class="text-right">Potongan BPJS</th>
                         <th class="text-right">Total Gaji</th>
                         <th>Status</th>
                         <th class="text-center">Aksi</th>
@@ -71,6 +72,12 @@
                             <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->gaji_pokok, 0, ',', '.') }}</td>
                             <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->total_lembur, 0, ',', '.') }}</td>
                             <td class="text-right whitespace-nowrap text-red-600 tabular-nums">Rp {{ number_format((float) $item->potongan_absen, 0, ',', '.') }}</td>
+                            <td class="text-right whitespace-nowrap text-red-600 tabular-nums">
+                                Rp {{ number_format((float) $item->potongan_bpjs, 0, ',', '.') }}
+                                @if ($item->bpjs_metode !== null)
+                                    <p class="text-xs text-gray-400">{{ \App\Support\LabelBpjs::aturan($item->bpjs_metode, $item->bpjs_nilai) }}</p>
+                                @endif
+                            </td>
                             <td class="text-right font-semibold whitespace-nowrap text-gray-800 tabular-nums">Rp {{ number_format((float) $item->total_gaji, 0, ',', '.') }}</td>
                             <td class="whitespace-nowrap">
                                 @if ($item->status_bayar === 'Sudah Dibayar')
@@ -97,7 +104,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="table-empty">Belum ada data payroll untuk periode {{ $daftarBulan[$bulan] }} {{ $tahun }}.</td>
+                            <td colspan="11" class="table-empty">Belum ada data payroll untuk periode {{ $daftarBulan[$bulan] }} {{ $tahun }}.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -133,6 +140,14 @@
                         <div class="flex justify-between gap-3">
                             <dt class="text-gray-500">Potongan Absen</dt>
                             <dd class="whitespace-nowrap font-medium text-red-600 tabular-nums">Rp {{ number_format((float) $item->potongan_absen, 0, ',', '.') }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-3">
+                            <dt class="text-gray-500">Potongan BPJS
+                                @if ($item->bpjs_metode !== null)
+                                    <span class="text-gray-400">({{ \App\Support\LabelBpjs::aturan($item->bpjs_metode, $item->bpjs_nilai) }})</span>
+                                @endif
+                            </dt>
+                            <dd class="whitespace-nowrap font-medium text-red-600 tabular-nums">Rp {{ number_format((float) $item->potongan_bpjs, 0, ',', '.') }}</dd>
                         </div>
                         <div class="flex justify-between gap-3 border-t border-gray-100 pt-2">
                             <dt class="font-semibold text-gray-700">Total Gaji</dt>

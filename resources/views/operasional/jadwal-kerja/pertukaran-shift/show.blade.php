@@ -6,7 +6,8 @@
 
 @php
     $menunggu = $pengajuan->status === PertukaranShiftService::STATUS_MENUNGGU;
-    $tanggalShift = \Carbon\CarbonImmutable::parse($pengajuan->tanggal_kerja)->format('d/m/Y');
+    $tanggalPengaju = \Carbon\CarbonImmutable::parse($pengajuan->tanggal_kerja)->format('d/m/Y');
+    $tanggalRekan = \Carbon\CarbonImmutable::parse($pertukaranShift->tanggalKerjaRekan($pengajuan))->format('d/m/Y');
     $shiftPengaju = $pertukaranShift->labelShift($pengajuan->snapshot_pengaju);
     $shiftRekan = $pertukaranShift->labelShift($pengajuan->snapshot_rekan);
 @endphp
@@ -32,7 +33,7 @@
                         <div class="rounded-md bg-gray-50 p-4">
                             <dt class="text-xs text-gray-500">Perusahaan klien</dt>
                             <dd class="mt-1 font-semibold text-gray-800">{{ $pengajuan->nama_perusahaan }}</dd>
-                            <dd class="text-gray-600">Tanggal shift {{ $tanggalShift }}</dd>
+                            <dd class="text-gray-600">Tanggal {{ $tanggalPengaju }} &#8644; {{ $tanggalRekan }}</dd>
                         </div>
                         <div class="rounded-md bg-gray-50 p-4">
                             <dt class="text-xs text-gray-500">Pengaju</dt>
@@ -58,30 +59,31 @@
 
                 {{-- Langkah 2: perubahan jadwal --}}
                 <section>
-                    <h3 class="mb-3 text-sm font-semibold text-gray-700">2. Perubahan jadwal pada {{ $tanggalShift }}</h3>
+                    <h3 class="mb-3 text-sm font-semibold text-gray-700">2. Perubahan jadwal</h3>
                     <div class="overflow-x-auto">
                         <table class="table">
                             <thead>
                                 <tr>
                                     <th>Karyawan</th>
-                                    <th>Shift Awal</th>
-                                    <th>{{ $pengajuan->status === PertukaranShiftService::STATUS_DISETUJUI ? 'Shift Sekarang' : 'Shift Jika Disetujui' }}</th>
+                                    <th>Jadwal Awal</th>
+                                    <th>{{ $pengajuan->status === PertukaranShiftService::STATUS_DISETUJUI ? 'Jadwal Setelah Ditukar' : 'Jadwal Jika Disetujui' }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td class="font-medium text-gray-800">{{ $pengajuan->nama_pengaju }}</td>
-                                    <td>{{ $shiftPengaju }}</td>
-                                    <td class="font-medium text-sji-biru">{{ $shiftRekan }}</td>
+                                    <td>{{ $tanggalPengaju }} &middot; {{ $shiftPengaju }}</td>
+                                    <td class="font-medium text-sji-biru">{{ $tanggalRekan }} &middot; {{ $shiftRekan }}</td>
                                 </tr>
                                 <tr>
                                     <td class="font-medium text-gray-800">{{ $pengajuan->nama_rekan }}</td>
-                                    <td>{{ $shiftRekan }}</td>
-                                    <td class="font-medium text-sji-biru">{{ $shiftPengaju }}</td>
+                                    <td>{{ $tanggalRekan }} &middot; {{ $shiftRekan }}</td>
+                                    <td class="font-medium text-sji-biru">{{ $tanggalPengaju }} &middot; {{ $shiftPengaju }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
+                    <p class="mt-2 text-xs text-gray-500">Penempatan masing-masing karyawan tidak berubah; hanya tanggal dan isi shift yang ditukar.</p>
                 </section>
 
                 {{-- Langkah 3: keputusan --}}
@@ -101,18 +103,18 @@
                         @else
                             <div class="callout callout-info mb-4">
                                 <p class="font-semibold">Siap disetujui</p>
-                                <p class="mt-1">Kedua jadwal masih sesuai pengajuan, belum ada absensi, dan tidak ada shift yang bertumpuk.</p>
+                                <p class="mt-1">Kedua jadwal masih sesuai pengajuan, belum ada absensi, tanggal tujuan masih kosong, dan tidak ada shift yang bertumpuk.</p>
                             </div>
                         @endif
 
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <form method="POST" action="{{ route('operasional.jadwal-kerja.pertukaran-shift.approve', $pengajuan->id) }}"
                                   class="rounded-md border border-gray-200 p-4"
-                                  onsubmit="return confirm(@js('Setujui pertukaran ini? Jadwal '.$pengajuan->nama_pengaju.' dan '.$pengajuan->nama_rekan.' pada '.$tanggalShift.' akan langsung ditukar.'))">
+                                  onsubmit="return confirm(@js('Setujui pertukaran ini? Jadwal '.$pengajuan->nama_pengaju.' ('.$tanggalPengaju.') dan '.$pengajuan->nama_rekan.' ('.$tanggalRekan.') akan langsung ditukar.'))">
                                 @csrf
                                 @method('PATCH')
                                 <p class="text-sm font-medium text-gray-800">Setujui</p>
-                                <p class="mt-1 text-sm text-gray-500">Jadwal kedua karyawan ditukar dan tercatat di riwayat jadwal.</p>
+                                <p class="mt-1 text-sm text-gray-500">Tanggal dan shift kedua jadwal ditukar dan tercatat di riwayat jadwal.</p>
                                 <button type="submit" class="btn-primary mt-4" @disabled($masalah !== [])>Approve</button>
                             </form>
 

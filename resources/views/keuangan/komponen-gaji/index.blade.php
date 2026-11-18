@@ -6,9 +6,10 @@
 @section('content')
     <div class="callout callout-info mb-6">
         <p class="font-semibold">Data otomatis hanya-baca</p>
-        <p class="mt-1 text-sm">Gaji pokok, lembur yang disetujui, dan potongan absensi mengikuti sumber serta rumus Generate Payroll yang berlaku.</p>
-        <p class="mt-2 text-sm"><span class="font-semibold">Upah back-up:</span> Rp0 karena belum ada sumber nominal atau aturan perhitungannya di sistem.</p>
-        <p class="mt-1 text-sm"><span class="font-semibold">Potongan BPJS:</span> konfigurasi persentase belum tersedia pada data klien; nilai awal Rp0. Nominal dapat diisi manual.</p>
+        <p class="mt-1 text-sm">Gaji pokok dan potongan absensi mengikuti sumber serta rumus Generate Payroll yang berlaku. Hanya Tunjangan dan Potongan Pinjaman / Koperasi yang diisi manual.</p>
+        <p class="mt-2 text-sm"><span class="font-semibold">Upah lembur:</span> dari absensi valid yang sudah check-in dan check-out. Lembur dihitung per jam penuh setelah jam selesai shift (kelebihan di bawah 60 menit tidak dihitung). Upah per jam = gaji pokok / 173; jam pertama 1,5&times;, jam berikutnya 2&times;.</p>
+        <p class="mt-1 text-sm"><span class="font-semibold">Potongan BPJS:</span> persentase BPJS klien penempatan &times; gaji pokok, sesuai pengaturan klien (Operasional &rsaquo; Klien). Bila persentase belum diatur, potongan tidak dihitung.</p>
+        <p class="mt-1 text-sm"><span class="font-semibold">Upah back-up:</span> Rp0 karena data penugasan Back-up (Pengganti Kosong) beserta persetujuan Operasional dan aturan nominalnya belum tersedia di sistem. Tukar shift (barter) tidak termasuk back-up.</p>
     </div>
 
     <div class="card mb-6">
@@ -97,11 +98,16 @@
                                     <div class="grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-1"><span>Rp</span><input id="tunjangan-{{ $item->id }}" class="form-input min-w-0 w-full text-right tabular-nums" type="number" name="komponen[{{ $item->id }}][tunjangan]" min="0" max="9999999999.99" step="0.01" value="{{ old('komponen.'.$item->id.'.tunjangan', $item->tunjangan) }}" required></div>
                                 </td>
                                 <td class="whitespace-nowrap text-right tabular-nums">Rp {{ number_format($item->upah_backup, 0, ',', '.') }}<span class="block text-xs text-gray-400">Aturan nominal belum tersedia</span></td>
-                                <td class="whitespace-nowrap text-right tabular-nums">Rp {{ number_format($item->upah_lembur, 0, ',', '.') }}</td>
+                                <td class="whitespace-nowrap text-right tabular-nums">Rp {{ number_format($item->upah_lembur, 0, ',', '.') }}@if ($item->jam_lembur > 0)<span class="block text-xs text-gray-400">{{ $item->jam_lembur }} jam lembur</span>@endif</td>
                                 <td class="whitespace-nowrap text-right text-red-600 tabular-nums">Rp {{ number_format($item->potongan_absen, 0, ',', '.') }}</td>
-                                <td>
-                                    <label class="sr-only" for="bpjs-{{ $item->id }}">Potongan BPJS {{ $item->nama }}</label>
-                                    <div class="grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-1"><span>Rp</span><input id="bpjs-{{ $item->id }}" class="form-input min-w-0 w-full text-right tabular-nums" type="number" name="komponen[{{ $item->id }}][potongan_bpjs]" min="0" max="9999999999.99" step="0.01" value="{{ old('komponen.'.$item->id.'.potongan_bpjs', $item->potongan_bpjs) }}" required></div>
+                                <td class="text-right tabular-nums">
+                                    @if ($item->potongan_bpjs !== null)
+                                        <span class="whitespace-nowrap text-red-600">Rp {{ number_format($item->potongan_bpjs, 0, ',', '.') }}</span>
+                                        <span class="block text-xs text-gray-400">{{ $item->keterangan_bpjs }}</span>
+                                    @else
+                                        <span class="text-gray-400">&mdash;</span>
+                                        <span class="block text-xs text-amber-700">{{ $item->keterangan_bpjs }}</span>
+                                    @endif
                                 </td>
                                 <td>
                                     <label class="sr-only" for="pinjaman-{{ $item->id }}">Potongan Pinjaman / Koperasi {{ $item->nama }}</label>

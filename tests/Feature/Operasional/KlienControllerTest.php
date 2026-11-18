@@ -313,6 +313,84 @@ class KlienControllerTest extends TestCase
         $this->assertDatabaseHas('tbl_klien', ['kode_klien' => 'KL014']);
     }
 
+    public function test_percentage_bpjs_is_saved_and_shown_on_the_detail(): void
+    {
+        $this->createTables();
+
+        $this->actingAs($this->operasional())
+            ->post(route('operasional.klien.store'), [...$this->newClientInput('KL020'), 'bpjs_metode' => 'Persentase', 'bpjs_nilai' => '4,5'])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('operasional.klien.show', 1));
+
+        $this->assertDatabaseHas('tbl_klien', ['kode_klien' => 'KL020', 'bpjs_metode' => 'Persentase', 'bpjs_nilai' => 4.5]);
+        $this->get(route('operasional.klien.show', 1))
+            ->assertOk()
+            ->assertSeeTextInOrder(['BPJS', '4,5% dari gaji']);
+    }
+
+    public function test_fixed_bpjs_can_be_changed_and_cleared_from_the_edit_form(): void
+    {
+        $this->createClientData();
+        DB::table('tbl_klien')->where('id', 1)->update(['bpjs_metode' => 'Nominal', 'bpjs_nilai' => 100000]);
+        $this->actingAs($this->operasional());
+        $inputAlpha = [...$this->newClientInput('KL001'), 'nama_perusahaan' => 'PT Alpha'];
+
+        $this->get(route('operasional.klien.edit', 1))
+            ->assertOk()
+            ->assertSeeTextInOrder(['Pengaturan BPJS', 'Metode Perhitungan', 'Nilai BPJS'])
+            ->assertSee('value="Nominal" class="form-check" data-bpjs-metode checked', false)
+            ->assertSee('value="100000', false);
+        $this->get(route('operasional.klien.show', 1))->assertSeeTextInOrder(['BPJS', 'Rp 100.000 per tenaga']);
+
+        $this->put(route('operasional.klien.update', 1), [...$inputAlpha, 'bpjs_metode' => 'Persentase', 'bpjs_nilai' => '5'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('tbl_klien', ['id' => 1, 'bpjs_metode' => 'Persentase', 'bpjs_nilai' => 5]);
+
+        $this->put(route('operasional.klien.update', 1), [...$inputAlpha, 'bpjs_metode' => '', 'bpjs_nilai' => '5'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('tbl_klien', ['id' => 1, 'bpjs_metode' => null, 'bpjs_nilai' => null]);
+        $this->get(route('operasional.klien.show', 1))->assertSeeTextInOrder(['BPJS', 'Tanpa BPJS']);
+    }
+
+    /**
+     * @return array<string, array{0: array<string, string>, 1: string}>
+     */
+    public static function invalidBpjsSettings(): array
+    {
+        return [
+            'persentase di atas 100' => [['bpjs_metode' => 'Persentase', 'bpjs_nilai' => '100.01'], 'Persentase BPJS tidak boleh lebih dari 100%.'],
+            'nilai kosong' => [['bpjs_metode' => 'Nominal', 'bpjs_nilai' => ''], 'Nilai BPJS wajib diisi untuk metode yang dipilih.'],
+            'nominal nol' => [['bpjs_metode' => 'Nominal', 'bpjs_nilai' => '0'], 'Nilai BPJS harus lebih dari 0. Pilih "Tanpa BPJS" bila klien tidak memakai BPJS.'],
+            'tiga desimal' => [['bpjs_metode' => 'Persentase', 'bpjs_nilai' => '4.555'], 'Nilai BPJS maksimal dua angka di belakang koma.'],
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $pengaturan
+     */
+    #[DataProvider('invalidBpjsSettings')]
+    public function test_invalid_bpjs_setting_is_rejected_without_saving(array $pengaturan, string $pesan): void
+    {
+        $this->createTables();
+
+        $this->actingAs($this->operasional())
+            ->from(route('operasional.klien.create'))
+            ->post(route('operasional.klien.store'), [...$this->newClientInput('KL021'), ...$pengaturan])
+            ->assertRedirect(route('operasional.klien.create'))
+            ->assertSessionHasErrors(['bpjs_nilai' => $pesan]);
+
+        $this->assertDatabaseCount('tbl_klien', 0);
+    }
+
+    public function test_unknown_bpjs_method_is_rejected(): void
+    {
+        $this->createTables();
+
+        $this->actingAs($this->operasional())
+            ->post(route('operasional.klien.store'), [...$this->newClientInput('KL022'), 'bpjs_metode' => 'Kesehatan', 'bpjs_nilai' => '4'])
+            ->assertSessionHasErrors(['bpjs_metode' => 'Metode BPJS tidak valid.']);
+
+        $this->assertDatabaseCount('tbl_klien', 0);
+    }
+
     /**
      * @return array<string, string>
      */

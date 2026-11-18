@@ -99,6 +99,83 @@
                     Isian Management Fee belum tersedia karena database belum dimigrasi. Hubungi admin untuk menjalankan <code>php artisan migrate</code>.
                 </p>
             @endif
+
+            <div class="border-t border-gray-200 pt-4">
+                <h3 class="font-semibold text-gray-800">Pengaturan BPJS</h3>
+                <p class="form-hint">Nilai default BPJS klien. Dipotong dari gaji karyawan yang ditempatkan di klien ini (setelah potongan absensi) dan ditagihkan dengan nilai yang sama pada invoice klien.</p>
+            </div>
+            @if ($bpjsTersedia)
+                @php
+                    $metodeBpjs = old('bpjs_metode', $klien?->bpjs_metode ?? '');
+                    $nilaiBpjs = old('bpjs_nilai', $klien?->bpjs_nilai);
+                @endphp
+                <fieldset>
+                    <legend class="form-label">Metode Perhitungan</legend>
+                    <div class="flex flex-wrap gap-x-6 gap-y-2">
+                        @foreach (['' => 'Tanpa BPJS', 'Persentase' => 'Persentase', 'Nominal' => 'Nominal tetap per tenaga'] as $nilaiMetode => $labelMetode)
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="radio" name="bpjs_metode" value="{{ $nilaiMetode }}" class="form-check" data-bpjs-metode @checked((string) $metodeBpjs === $nilaiMetode)>
+                                {{ $labelMetode }}
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('bpjs_metode') <p class="form-error">{{ $message }}</p> @enderror
+                </fieldset>
+                <div id="bpjs_nilai_wrapper" @class(['hidden' => (string) $metodeBpjs === ''])>
+                    <label for="bpjs_nilai" class="form-label">Nilai BPJS</label>
+                    <div class="flex max-w-64 items-center gap-2">
+                        <span id="bpjs_prefix" @class(['text-sm text-gray-600', 'hidden' => $metodeBpjs !== 'Nominal'])>Rp</span>
+                        <input id="bpjs_nilai" name="bpjs_nilai" type="number" inputmode="decimal" min="0.01" step="0.01"
+                            @if ($metodeBpjs === 'Persentase') max="100" @endif
+                            placeholder="{{ $metodeBpjs === 'Nominal' ? 'Contoh: 100000' : 'Contoh: 4' }}"
+                            @disabled((string) $metodeBpjs === '')
+                            @class(['form-input', 'form-input-error' => $errors->has('bpjs_nilai')]) value="{{ $nilaiBpjs }}">
+                        <span id="bpjs_suffix" @class(['text-sm text-gray-600', 'hidden' => $metodeBpjs !== 'Persentase'])>%</span>
+                    </div>
+                    @error('bpjs_nilai') <p class="form-error">{{ $message }}</p> @enderror
+                    <p class="form-hint" id="bpjs_hint">
+                        {{ $metodeBpjs === 'Nominal'
+                            ? 'Nominal dipotong per karyawan setiap periode payroll.'
+                            : 'Persentase dari gaji pokok + lembur setelah dikurangi potongan absensi.' }}
+                    </p>
+                </div>
+                <p class="form-hint">Perubahan pengaturan hanya berlaku untuk payroll dan invoice yang dibuat setelahnya.</p>
+
+                @push('scripts')
+                    <script>
+                        (() => {
+                            const pilihan = document.querySelectorAll('[data-bpjs-metode]');
+                            const wrapper = document.getElementById('bpjs_nilai_wrapper');
+                            const input = document.getElementById('bpjs_nilai');
+                            const prefix = document.getElementById('bpjs_prefix');
+                            const suffix = document.getElementById('bpjs_suffix');
+                            const hint = document.getElementById('bpjs_hint');
+
+                            const terapkan = () => {
+                                const metode = document.querySelector('[data-bpjs-metode]:checked')?.value ?? '';
+                                const persen = metode === 'Persentase';
+                                wrapper.classList.toggle('hidden', metode === '');
+                                input.disabled = metode === '';
+                                input.required = metode !== '';
+                                prefix.classList.toggle('hidden', metode !== 'Nominal');
+                                suffix.classList.toggle('hidden', !persen);
+                                persen ? input.setAttribute('max', '100') : input.removeAttribute('max');
+                                input.placeholder = persen ? 'Contoh: 4' : 'Contoh: 100000';
+                                hint.textContent = persen
+                                    ? 'Persentase dari gaji pokok + lembur setelah dikurangi potongan absensi.'
+                                    : 'Nominal dipotong per karyawan setiap periode payroll.';
+                            };
+
+                            pilihan.forEach((radio) => radio.addEventListener('change', terapkan));
+                            terapkan();
+                        })();
+                    </script>
+                @endpush
+            @else
+                <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
+                    Pengaturan BPJS belum tersedia karena database belum dimigrasi. Hubungi admin untuk menjalankan <code>php artisan migrate</code>.
+                </p>
+            @endif
         </div>
 
         <div class="card-footer justify-start">

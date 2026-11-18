@@ -99,6 +99,10 @@ class KeuanganController extends Controller
                 'hari_wajib',
                 'hari_masuk',
                 'hari_absen',
+                'potongan_bpjs',
+                'bpjs_metode',
+                'bpjs_nilai',
+                'nama_klien_bpjs',
             ]);
 
         abort_if($payroll === null, 404);
@@ -123,6 +127,7 @@ class KeuanganController extends Controller
                     'i.periode_bulan',
                     'i.periode_tahun',
                     'i.jumlah_tenaga',
+                    'i.biaya_bpjs',
                     'i.total_tagihan',
                     'i.status',
                     'i.tgl_pembayaran',
@@ -136,7 +141,8 @@ class KeuanganController extends Controller
             'klien' => DB::table('tbl_klien')
                 ->where('status', 'Aktif')
                 ->orderBy('nama_perusahaan')
-                ->get(['id', 'kode_klien', 'nama_perusahaan']),
+                // Pengaturan BPJS ditampilkan (tidak dapat diubah) saat Keuangan memilih klien.
+                ->get(['id', 'kode_klien', 'nama_perusahaan', 'bpjs_metode', 'bpjs_nilai']),
             'daftarBulan' => self::DAFTAR_BULAN,
             'bulanIni' => now()->month,
             'tahunIni' => now()->year,
@@ -194,6 +200,9 @@ class KeuanganController extends Controller
                 'i.periode_bulan',
                 'i.periode_tahun',
                 'i.jumlah_tenaga',
+                'i.bpjs_metode',
+                'i.bpjs_nilai',
+                'i.biaya_bpjs',
                 'i.total_tagihan',
                 'i.status',
                 'i.tgl_pembayaran',

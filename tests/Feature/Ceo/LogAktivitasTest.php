@@ -53,7 +53,7 @@ class LogAktivitasTest extends TestCase
             'pic_nama' => 'PIC',
             'pic_telp' => '08123456789',
             'status' => 'Aktif',
-        ])->assertRedirect(route('operasional.klien.index'));
+        ])->assertRedirect(route('operasional.klien.show', (int) DB::table('tbl_klien')->where('kode_klien', 'TSTXLOG1')->value('id')));
 
         $idKlien = (int) DB::table('tbl_klien')->where('kode_klien', 'TSTXLOG1')->value('id');
         $log = $this->log('tbl_klien', $idKlien);

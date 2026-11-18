@@ -27,8 +27,8 @@ class PengajuanTukarShiftController extends Controller
         try {
             $pertukaranShiftService->ajukan(
                 (int) KaryawanAktif::id(),
-                (int) $validated['id_karyawan_rekan'],
-                $validated['tanggal_kerja'],
+                (int) $validated['id_jadwal_pengaju'],
+                (int) $validated['id_jadwal_rekan'],
                 trim($validated['alasan']),
             );
         } catch (ValidationException $exception) {

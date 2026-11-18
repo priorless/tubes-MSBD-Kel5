@@ -86,25 +86,30 @@ class PayrollInvoiceProrataTest extends TestCase
         $this->assertEquals(1100000, (float) $p->total_gaji);
     }
 
-    public function test_hanya_lembur_disetujui_masuk_ke_payroll(): void
+    public function test_lembur_payroll_mengikuti_aturan_komponen_gaji(): void
     {
         $id = $this->buatKaryawan('Lapangan');
         $this->buatPenempatan($id, $this->buatKlien(), $this->tgl(1), null, [], 2500000, 25);
-        $this->absensiBanyak($id, range(1, 25), 'Hadir');
-        $lembur = fn (int $hari, int $jam, string $status) => DB::table('tbl_absensi')
-            ->where('id_karyawan', $id)->where('tgl', $this->tgl($hari))
-            ->update(['jam_lembur' => $jam, 'status_lembur' => $status]);
-        $lembur(3, 2, 'Disetujui');
-        $lembur(4, 5, 'Ditolak');
-        $lembur(5, 7, 'Menunggu');
+        $this->absensiBanyak($id, [1, 2, ...range(6, 25)], 'Hadir');
+        $checkInOut = function (int $hari, ?string $keluar) use ($id): void {
+            $idAbsen = $this->buatAbsensi($id, $this->tgl($hari), 'Hadir', ['jam_masuk' => '08:00:00']);
+            if ($keluar !== null) {
+                DB::table('tbl_absensi')->where('id', $idAbsen)->update(['jam_keluar' => $keluar]);
+            }
+        };
+        $checkInOut(3, '18:10:00'); // jadwal pulang 16:00 -> 2 jam penuh (1,5x + 2x)
+        $checkInOut(4, '16:59:00'); // lewat 59 menit -> belum lembur
+        $checkInOut(5, null);       // belum check-out -> tidak dihitung walau jam_lembur terisi
+        DB::table('tbl_absensi')->where('id_karyawan', $id)->where('tgl', $this->tgl(5))->update(['jam_lembur' => 4]);
 
         $this->generatePayroll();
         $p = $this->payroll($id);
 
         $this->assertSame(25, (int) $p->hari_wajib);
         $this->assertSame(0, (int) $p->hari_absen);
-        $this->assertEquals(50000, (float) $p->total_lembur, 'Hanya 2 jam yang disetujui x Rp25.000');
-        $this->assertEquals(2550000, (float) $p->total_gaji);
+        // 2.500.000 x (1,5 + 2) / 173 = 50.578,03
+        $this->assertEquals(50578.03, (float) $p->total_lembur);
+        $this->assertEquals(2550578.03, (float) $p->total_gaji);
     }
 
     public function test_rotasi_tengah_bulan_memakai_kontrak_terbaru_dan_profit_dibagi_per_klien(): void

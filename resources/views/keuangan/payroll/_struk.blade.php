@@ -93,8 +93,13 @@
                         <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_absen) }}</td>
                     </tr>
                     <tr>
-                        <td class="px-4 py-3 text-red-600">Potongan BPJS</td>
-                        <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_bpjs) }}</td>
+                        <td class="px-4 py-3 text-red-600">
+                            Potongan BPJS
+                            @if (($payroll->bpjs_metode ?? null) !== null)
+                                <span class="block text-xs text-gray-500">{{ \App\Support\LabelBpjs::aturan($payroll->bpjs_metode, $payroll->bpjs_nilai) }}@if (filled($payroll->nama_klien_bpjs ?? null)) &middot; klien {{ $payroll->nama_klien_bpjs }}@endif</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_bpjs ?? 0) }}</td>
                     </tr>
                     <tr>
                         <td class="px-4 py-3 text-red-600">Potongan Pinjaman / Koperasi</td>
