@@ -11,6 +11,11 @@
     $label = ['belum' => 'Belum Check-in', 'masuk' => 'Sedang Bekerja', 'selesai' => 'Selesai'];
     $menitTerlambat = (int) ($hariIni->menit_terlambat ?? 0);
     $adaJadwal = $penugasan && (filled($penugasan->jadwal_datang ?? null) || filled($penugasan->jadwal_pulang ?? null));
+    $jenisMonitoring = $monitoring['jenis'];
+    $driver = $jenisMonitoring === \App\Services\LaporanAktivitasService::JENIS_PERJALANAN;
+    $maksUpload = \App\Services\LaporanAktivitasService::maksUpload();
+    $shiftAktif = $monitoring['shift'];
+    $checkInTertutup = $status === 'belum' && $monitoring['pesanJadwal'] !== null;
 @endphp
 
 @section('content')
@@ -45,7 +50,9 @@
     </section>
 
     {{-- ===================== Status absensi hari ini ===================== --}}
-    <section class="tk-reveal card p-6 xl:col-span-5" id="tkStatusCard" data-status="{{ $status }}" data-masuk="{{ $masukIso }}">
+    <section class="tk-reveal card p-6 xl:col-span-5" id="tkStatusCard" data-status="{{ $status }}" data-masuk="{{ $masukIso }}"
+             @if ($jenisMonitoring && $monitoring['tersedia']) data-muat-ulang="1" @endif
+             @if ($checkInTertutup && $monitoring['muatUlangPada']) data-tk-muat-ulang-pada="{{ $monitoring['muatUlangPada'] }}" @endif>
         <div class="mb-4 flex items-center justify-between">
             <h2 class="card-title">Status Hari Ini</h2>
             <span class="badge" id="tkStatusBadge"><span id="tkStatusLabel">{{ $label[$status] }}</span></span>
@@ -54,10 +61,19 @@
         {{-- Panel: belum check-in --}}
         <div data-panel="belum" class="text-center">
             <p class="font-semibold text-gray-800">Anda belum check-in hari ini</p>
-            <p class="mt-1 text-sm text-gray-500">Tekan tombol di bawah lalu unggah foto saat Anda mulai bekerja.</p>
-            <form method="POST" action="{{ route('tenaga-kerja.absensi.check-in') }}" class="tk-form-absen mt-4" data-judul="Foto Check-in">
+            @if ($shiftAktif && ! $checkInTertutup)
+                <p class="mt-1 text-sm text-gray-500">Shift <b>{{ $shiftAktif->label() }}</b> &middot; check-in dibuka sejak {{ $shiftAktif->bukaCheckIn()->format('H:i') }}.</p>
+            @else
+                <p class="mt-1 text-sm text-gray-500">Tekan tombol di bawah lalu unggah foto saat Anda mulai bekerja.</p>
+            @endif
+            @if ($checkInTertutup)
+                <p class="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-800" id="tkPesanJadwal">{{ $monitoring['pesanJadwal'] }}</p>
+            @elseif ($driver)
+                <p class="mt-3 rounded-md bg-blue-50 px-3 py-2 text-left text-sm text-sji-biru">Lengkapi <a href="#p2h" data-no-transisi class="font-semibold underline">P2H kendaraan</a> dan foto kendaraan di bawah sebelum check-in.</p>
+            @endif
+            <form method="POST" action="{{ route('tenaga-kerja.absensi.check-in') }}" class="tk-form-absen mt-4" data-judul="Foto Diri (Check-in)" id="tkFormCheckIn" enctype="multipart/form-data">
                 @csrf
-                <button type="submit" class="tk-btn btn-primary w-full py-3 text-base">
+                <button type="submit" class="tk-btn btn-primary w-full py-3 text-base" @disabled($checkInTertutup)>
                     <span class="tk-btn-teks">Unggah Foto &amp; Check-in</span>
                     <span class="tk-btn-loading"><span class="tk-spinner"></span> Memproses…</span>
                 </button>
@@ -69,7 +85,10 @@
             <p class="font-semibold text-gray-800">Anda sedang bekerja</p>
             <p class="mt-1 text-sm text-gray-500">Durasi sejak check-in</p>
             <p class="mt-2 font-mono text-3xl font-bold text-sji-biru tabular-nums" id="tkDurasi">00:00:00</p>
-            <form method="POST" action="{{ route('tenaga-kerja.absensi.check-out') }}" class="tk-form-absen mt-4" data-judul="Foto Check-out" data-konfirmasi="Yakin ingin check-out sekarang?">
+            @if ($driver)
+                <p class="mt-3 rounded-md bg-blue-50 px-3 py-2 text-left text-sm text-sji-biru">Isi <a href="#kendaraan-akhir" data-no-transisi class="font-semibold underline">kondisi akhir kendaraan</a> sebelum check-out.</p>
+            @endif
+            <form method="POST" action="{{ route('tenaga-kerja.absensi.check-out') }}" class="tk-form-absen mt-4" data-judul="Foto Diri (Check-out)" data-konfirmasi="Yakin ingin check-out sekarang? Setelah check-out, monitoring aktivitas berhenti." id="tkFormCheckOut" enctype="multipart/form-data">
                 @csrf
                 <button type="submit" class="tk-btn btn-danger w-full py-3 text-base">
                     <span class="tk-btn-teks">Unggah Foto &amp; Check-out</span>
@@ -102,6 +121,7 @@
         </dl>
 
         <p class="mt-4 rounded-md bg-gray-50 px-3 py-2 text-center text-xs text-gray-500" id="tkInfoLokasi">
+            Check-in dibuka {{ (int) config('tenaga_kerja.absensi.buka_check_in_menit', 30) }} menit sebelum shift dimulai dan hanya untuk shift Anda yang dijadwalkan Operasional.
             Check-in dan check-out wajib mengunggah foto yang menampilkan wajah Anda serta keterangan tanggal, jam, dan lokasi.
         </p>
         <p @class(['mt-4 text-center text-xs text-gray-500', 'hidden' => ! $statusDb]) id="tkKeteranganStatus">
@@ -166,27 +186,52 @@
                 </div>
                 <div class="rounded-md bg-gray-50 p-4">
                     <dt class="text-xs text-gray-500">Jadwal Kerja</dt>
-                    @if ($adaJadwal)
+                    @if ($shiftAktif)
+                        <dd class="mt-1 font-mono text-lg font-semibold text-gray-800">{{ $shiftAktif->mulai->format('H:i') }}&ndash;{{ $shiftAktif->selesai->format('H:i') }}</dd>
+                        <dd class="text-gray-600">
+                            {{ $shiftAktif->namaShift ? $shiftAktif->namaShift.' · ' : '' }}{{ $shiftAktif->sumber === 'Jadwal Harian' ? 'Jadwal harian' : 'Dari penempatan' }}
+                            @if ($shiftAktif->tanggal !== substr($waktuServer, 0, 10))
+                                &middot; shift tanggal {{ \Carbon\CarbonImmutable::parse($shiftAktif->tanggal)->format('d/m/Y') }}
+                            @endif
+                        </dd>
+                        <dd class="text-gray-600">Check-in dibuka {{ $shiftAktif->bukaCheckIn()->format('H:i') }} &middot; toleransi terlambat 30 menit</dd>
+                    @elseif ($adaJadwal)
                         <dd class="mt-1 font-mono text-lg font-semibold text-gray-800">
                             {{ FormatKolom::jam($penugasan->jadwal_datang) }}&ndash;{{ FormatKolom::jam($penugasan->jadwal_pulang) }}
                         </dd>
                         <dd class="text-gray-600">{{ ($penugasan->sumber_jadwal ?? null) === 'Jadwal Harian' ? 'Jadwal harian' : 'Dari penempatan' }} &middot; toleransi terlambat 30 menit</dd>
                     @elseif (($penugasan->sumber_jadwal ?? null) === 'Libur')
                         <dd class="mt-1 font-semibold text-gray-800">Hari ini Libur</dd>
-                        <dd class="text-gray-600">Sesuai jadwal harian dari Operasional. Bila tetap masuk, keterlambatan dan indikasi lembur tidak dihitung otomatis.</dd>
+                        <dd class="text-gray-600">Sesuai jadwal harian dari Operasional. Absensi tidak dapat dilakukan pada hari libur.</dd>
                     @else
                         <dd class="mt-1 font-semibold text-gray-800">Jadwal belum ditentukan</dd>
-                        <dd class="text-gray-600">Keterlambatan dan indikasi lembur tidak dihitung sampai jadwal penempatan diisi Operasional.</dd>
+                        <dd class="text-gray-600">Absensi dapat dilakukan setelah Operasional mengatur jadwal shift Anda.</dd>
                     @endif
                 </div>
                 <div class="rounded-md bg-gray-50 p-4">
                     <dt class="text-xs text-gray-500">Foto Absensi</dt>
                     <dd class="mt-1 font-semibold text-gray-800">Wajib saat check-in &amp; check-out</dd>
                     <dd class="text-gray-600">Wajah terlihat jelas, dengan keterangan tanggal, jam, dan lokasi dari aplikasi kamera Anda.</dd>
+                    @if ($jenisMonitoring === \App\Services\LaporanAktivitasService::JENIS_BERKALA)
+                        <dd class="mt-1 text-gray-600">Ditambah laporan foto aktivitas setiap jam selama bekerja.</dd>
+                    @elseif ($driver)
+                        <dd class="mt-1 text-gray-600">Ditambah P2H &amp; foto kendaraan saat check-in/check-out serta laporan per tahapan perjalanan.</dd>
+                    @endif
                 </div>
             </dl>
         @endif
     </section>
+
+    {{-- ===================== Dokumentasi sesuai jenis layanan ===================== --}}
+    @if ($jenisMonitoring && $monitoring['tersedia'])
+        @if ($driver && $status === 'belum' && ! $checkInTertutup)
+            @include('tenaga-kerja._p2h-check-in')
+        @endif
+        @if ($driver && $status === 'masuk')
+            @include('tenaga-kerja._kendaraan-check-out')
+        @endif
+        @include($driver ? 'tenaga-kerja._monitoring-perjalanan' : 'tenaga-kerja._monitoring-berkala')
+    @endif
 
     {{-- ===================== Tukar shift dengan rekan ===================== --}}
     @if ($tukarShift['tersedia'])
@@ -199,7 +244,7 @@
         <section class="tk-reveal card p-6 xl:col-span-12" id="tukar-shift">
             <div class="mb-4">
                 <h2 class="card-title">Tukar Shift dengan Rekan</h2>
-                <p class="mt-1 text-sm text-gray-500">Tukar jadwal satu tanggal dengan rekan di lokasi yang sama. Ajukan paling lambat H-1; jadwal baru berlaku setelah disetujui Operasional.</p>
+                <p class="mt-1 text-sm text-gray-500">Tukar jadwal satu tanggal dengan rekan di lokasi yang sama. Ajukan paling lambat H-1; rekan menerima atau menolak, lalu Operasional memberi persetujuan akhir. Jadwal baru (beserta hak absensinya) berlaku hanya setelah disetujui Operasional.</p>
             </div>
 
             @if ($tukarShift['opsi'] === [])
@@ -310,8 +355,23 @@
                                     </td>
                                     <td class="whitespace-nowrap">{{ $layananTukar->labelShift($sayaPengaju ? $item->snapshot_pengaju : $item->snapshot_rekan) }}</td>
                                     <td class="whitespace-nowrap font-medium text-gray-800">{{ $layananTukar->labelShift($sayaPengaju ? $item->snapshot_rekan : $item->snapshot_pengaju) }}</td>
-                                    <td><span class="badge {{ \App\Services\PertukaranShiftService::kelasBadge($item->status) }}">{{ \App\Services\PertukaranShiftService::labelStatus($item->status) }}</span></td>
-                                    <td class="text-sm text-gray-600">{{ $item->catatan_keputusan ?? '-' }}</td>
+                                    <td>
+                                        <span class="badge {{ \App\Services\PertukaranShiftService::kelasBadge($item->status) }}">{{ \App\Services\PertukaranShiftService::labelTahap($item) }}</span>
+                                        @if (! $sayaPengaju && $item->status === \App\Services\PertukaranShiftService::STATUS_MENUNGGU && ($item->status_rekan ?? null) === \App\Services\PertukaranShiftService::REKAN_MENUNGGU)
+                                            <form method="POST" action="{{ route('tenaga-kerja.tukar-shift.tanggapi', $item->id) }}" class="mt-2 space-y-2">
+                                                @csrf
+                                                @method('PATCH')
+                                                <input type="text" name="catatan_rekan" maxlength="500" class="form-input text-sm" placeholder="Catatan (opsional)" aria-label="Catatan tanggapan">
+                                                <div class="flex gap-2">
+                                                    <button type="submit" name="tanggapan" value="terima" class="btn-primary px-3 py-1.5 text-xs"
+                                                            onclick="return confirm('Terima pertukaran shift ini? Pengajuan akan diteruskan ke Operasional.')">Terima</button>
+                                                    <button type="submit" name="tanggapan" value="tolak" class="btn-danger px-3 py-1.5 text-xs"
+                                                            onclick="return confirm('Tolak pertukaran shift ini?')">Tolak</button>
+                                                </div>
+                                            </form>
+                                        @endif
+                                    </td>
+                                    <td class="text-sm text-gray-600">{{ $item->catatan_keputusan ?? ($item->catatan_rekan ?? '-') }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -343,10 +403,10 @@
         <h2 class="card-title">Panduan Absensi</h2>
         <ol class="mt-4 grid grid-cols-1 gap-3 text-sm text-gray-600 md:grid-cols-2 xl:grid-cols-4">
             @foreach ([
-                'Tekan <b>Check-in</b> saat mulai bekerja, lalu unggah foto diri dari galeri atau kamera ponsel.',
-                'Tekan <b>Check-out</b> saat selesai bekerja dan unggah foto kembali.',
+                'Check-in hanya untuk <b>shift Anda</b> yang dijadwalkan Operasional, dibuka <b>30 menit sebelum shift</b> dimulai. Unggah foto diri dari galeri atau kamera ponsel.',
+                'Selama bekerja kirim <b>laporan aktivitas</b>: Satpam &amp; Cleaning Service setiap jam, Driver setiap tahapan perjalanan. Tiap laporan maksimal 2 kali unggah.',
                 'Foto harus menampilkan <b>wajah dengan jelas</b> dan memuat keterangan <b>tanggal, jam, dan lokasi</b> dari aplikasi kamera Anda.',
-                'Absensi <b>satu kali</b> per hari, check-out minimal <b>30 menit</b> setelah check-in. Shift malam boleh check-out keesokan harinya.',
+                'Absensi <b>satu kali</b> per shift, check-out minimal <b>30 menit</b> setelah check-in. Shift malam boleh check-out keesokan harinya.',
             ] as $nomor => $langkah)
                 <li class="flex items-start gap-3 rounded-md bg-gray-50 p-3">
                     <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-sji-biru text-xs font-bold text-white">{{ $nomor + 1 }}</span>

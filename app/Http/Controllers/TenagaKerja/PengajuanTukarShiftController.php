@@ -35,6 +35,6 @@ class PengajuanTukarShiftController extends Controller
             return $kembali->withInput()->with('gagal', $exception->validator->errors()->first());
         }
 
-        return $kembali->with('sukses', 'Pengajuan tukar shift terkirim dan menunggu persetujuan Operasional.');
+        return $kembali->with('sukses', 'Pengajuan tukar shift terkirim. Menunggu persetujuan rekan, lalu persetujuan akhir Operasional.');
     }
 }

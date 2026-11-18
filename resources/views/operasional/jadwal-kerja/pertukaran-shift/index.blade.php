@@ -120,7 +120,7 @@
                                         </td>
                                         <td class="max-w-xs"><span title="{{ $item->alasan }}">{{ \Illuminate\Support\Str::limit($item->alasan, 60) }}</span></td>
                                         <td class="whitespace-nowrap">
-                                            <span class="badge {{ PertukaranShiftService::kelasBadge($item->status) }}">{{ PertukaranShiftService::labelStatus($item->status) }}</span>
+                                            <span class="badge {{ PertukaranShiftService::kelasBadge($item->status) }}">{{ PertukaranShiftService::labelTahap($item) }}</span>
                                             @if ($kedaluwarsa)
                                                 <p class="mt-1 text-xs text-red-600">Tanggal sudah lewat</p>
                                             @elseif (! $menunggu)

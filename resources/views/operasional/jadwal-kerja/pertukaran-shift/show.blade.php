@@ -21,7 +21,7 @@
                     <h2 class="card-title">Detail Pengajuan Pertukaran Shift</h2>
                     <p class="mt-1 text-sm text-gray-500">{{ $pengajuan->nama_pengaju }} &#8644; {{ $pengajuan->nama_rekan }}</p>
                 </div>
-                <span class="badge {{ PertukaranShiftService::kelasBadge($pengajuan->status) }}">{{ PertukaranShiftService::labelStatus($pengajuan->status) }}</span>
+                <span class="badge {{ PertukaranShiftService::kelasBadge($pengajuan->status) }}">{{ PertukaranShiftService::labelTahap($pengajuan) }}</span>
             </div>
 
             <div class="card-body space-y-6">

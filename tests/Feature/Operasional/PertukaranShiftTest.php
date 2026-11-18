@@ -52,7 +52,7 @@ class PertukaranShiftTest extends TestCase
         $this->actingAs($this->employeeUser($this->requesterId))
             ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload())
             ->assertRedirect(route('tenaga-kerja.absensi').'#tukar-shift')
-            ->assertSessionHas('sukses', 'Pengajuan tukar shift terkirim dan menunggu persetujuan Operasional.');
+            ->assertSessionHas('sukses', 'Pengajuan tukar shift terkirim. Menunggu persetujuan rekan, lalu persetujuan akhir Operasional.');
 
         $this->assertDatabaseHas('tbl_pertukaran_shift', [
             'id_karyawan_pengaju' => $this->requesterId,
@@ -312,13 +312,21 @@ class PertukaranShiftTest extends TestCase
         ], static fn (mixed $nilai): bool => $nilai !== null);
     }
 
+    /**
+     * Pengajuan yang sudah diterima rekan sehingga menunggu keputusan Operasional.
+     */
     private function createPendingRequest(): int
     {
         $this->actingAs($this->employeeUser($this->requesterId))
             ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload())
             ->assertSessionHas('sukses');
+        $requestId = (int) DB::table('tbl_pertukaran_shift')->latest('id')->value('id');
 
-        return (int) DB::table('tbl_pertukaran_shift')->latest('id')->value('id');
+        $this->actingAs($this->employeeUser($this->partnerId))
+            ->patch(route('tenaga-kerja.tukar-shift.tanggapi', $requestId), ['tanggapan' => 'terima'])
+            ->assertSessionHas('sukses');
+
+        return $requestId;
     }
 
     /**
@@ -412,6 +420,7 @@ class PertukaranShiftTest extends TestCase
         });
 
         (require database_path('migrations/2026_11_17_132028_create_tbl_pertukaran_shift_table.php'))->up();
+        (require database_path('migrations/2026_11_17_230643_add_persetujuan_rekan_to_tbl_pertukaran_shift_table.php'))->up();
     }
 
     private function createClient(string $code): int

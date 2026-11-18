@@ -44,6 +44,10 @@ GRANT SELECT ON tbl_absensi TO 'sji_role_hrd';
 GRANT SELECT ON v_pool_karyawan_hrd TO 'sji_role_hrd';
 GRANT SELECT ON v_absensi_harian TO 'sji_role_hrd';
 GRANT SELECT ON v_rekap_absensi_pribadi TO 'sji_role_hrd';
+-- Dokumentasi absensi (laporan aktivitas Satpam/Cleaning Service/Driver & P2H Driver): hanya baca.
+GRANT SELECT ON tbl_laporan_aktivitas TO 'sji_role_hrd';
+GRANT SELECT ON tbl_p2h TO 'sji_role_hrd';
+GRANT SELECT ON tbl_p2h_item TO 'sji_role_hrd';
 GRANT SELECT ON v_dashboard_eksekutif TO 'sji_role_hrd';
 GRANT EXECUTE ON FUNCTION fn_sisa_hari_dokumen TO 'sji_role_hrd';
 GRANT EXECUTE ON PROCEDURE sp_input_ketidakhadiran TO 'sji_role_hrd';
