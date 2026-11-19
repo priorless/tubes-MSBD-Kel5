@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\TenagaKerja;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TenagaKerja\TanggapiTukarShiftRequest;
 use App\Services\PertukaranShiftService;
 use App\Support\KaryawanAktif;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -16,30 +15,23 @@ use Illuminate\Validation\ValidationException;
  */
 class TanggapanTukarShiftController extends Controller
 {
-    public function __invoke(Request $request, int $pertukaranShift, PertukaranShiftService $pertukaranShiftService): RedirectResponse
+    public function __invoke(TanggapiTukarShiftRequest $request, int $pertukaranShift, PertukaranShiftService $pertukaranShiftService): RedirectResponse
     {
-        $kembali = redirect()->to(route('tenaga-kerja.absensi').'#tukar-shift');
+        $kembali = redirect()->route('tenaga-kerja.tukar-shift.index');
 
         if (! $pertukaranShiftService->tersedia()) {
             return $kembali->with('gagal', 'Fitur tukar shift belum tersedia. Hubungi bagian Operasional.');
         }
 
-        $validated = $request->validate([
-            'tanggapan' => ['required', Rule::in(['terima', 'tolak'])],
-            'catatan_rekan' => ['nullable', 'string', 'max:500'],
-        ], [
-            'tanggapan.required' => 'Pilih terima atau tolak.',
-            'tanggapan.in' => 'Tanggapan tidak valid.',
-            'catatan_rekan.max' => 'Catatan maksimal 500 karakter.',
-        ]);
-        $terima = $validated['tanggapan'] === 'terima';
+        $terima = $request->menerima();
+        $catatan = $request->validated('catatan_rekan');
 
         try {
             $pertukaranShiftService->tanggapiRekan(
                 $pertukaranShift,
                 (int) KaryawanAktif::id(),
                 $terima,
-                filled($validated['catatan_rekan'] ?? null) ? trim($validated['catatan_rekan']) : null,
+                filled($catatan) ? trim($catatan) : null,
                 (int) $request->user()->id,
             );
         } catch (ValidationException $exception) {
