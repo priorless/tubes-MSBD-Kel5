@@ -143,6 +143,16 @@
                                                     data-email-subjek="{{ $item->email['subjek'] }}"
                                                     data-email-pesan="{{ $item->email['pesan'] }}">Kirim via Email</button>
                                         @endif
+                                        @if ($item->whatsapp !== null)
+                                            @if ($item->whatsapp['url'] !== null)
+                                                <a href="{{ $item->whatsapp['url'] }}" target="_blank" rel="noopener noreferrer"
+                                                   class="btn-success btn-sm whitespace-nowrap" style="background-color: #25D366; border-color: #25D366;"
+                                                   data-whatsapp-kirim>Kirim via WhatsApp</a>
+                                            @else
+                                                <button type="button" class="btn-success btn-sm whitespace-nowrap" style="background-color: #25D366; border-color: #25D366;"
+                                                        data-whatsapp-galat="{{ $item->whatsapp['galat'] }}">Kirim via WhatsApp</button>
+                                            @endif
+                                        @endif
                                         @if ($item->status !== 'Lunas')
                                             <form method="POST" action="{{ route('keuangan.invoice.lunas', $item->id) }}" class="flex items-center gap-2"
                                                   onsubmit="return confirm(@js('Tandai invoice '.$item->nomor_invoice.' sebagai lunas?'));">
@@ -359,6 +369,11 @@
                 if (e.target.matches('[data-mode-edit]') && !confirm('Simpan perubahan dokumen invoice ini?')) e.preventDefault();
             });
 
+
+            // ===== Kirim invoice via WhatsApp: nomor/rekening tidak valid -> beri tahu, jangan buka WhatsApp =====
+            document.querySelectorAll('[data-whatsapp-galat]').forEach((tombol) => {
+                tombol.addEventListener('click', () => alert(tombol.dataset.whatsappGalat));
+            });
 
             // ===== Kirim invoice via email =====
             const modalEmail = document.getElementById('emailModal');

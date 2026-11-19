@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Data dokumen tagihan klien (surat permohonan, invoice, lampiran) -- hanya MEMBACA.
@@ -309,6 +310,99 @@ class InvoiceKlienService
             'subjek' => 'Tagihan Invoice Jasa PT Satu Jaya Indonesia - '.$invoice->nama_perusahaan.' - Periode '.$periode,
             'pesan' => $pesan,
         ];
+    }
+
+    /**
+     * Nomor WhatsApp format internasional Indonesia tanpa "+": 62 + 8–13 digit (digit pertama setelah 62 bukan 0).
+     */
+    public const string POLA_NOMOR_WHATSAPP = '/^62[1-9][0-9]{7,12}$/';
+
+    /** Masa berlaku tautan publik PDF tagihan yang dibagikan lewat WhatsApp. */
+    public const int MASA_BERLAKU_TAUTAN_HARI = 30;
+
+    /**
+     * Normalisasi nomor telepon ke format wa.me: hapus karakter nonangka, 08xx -> 628xx, 8xx -> 628xx, 62xx tetap.
+     * Mengembalikan null bila kosong atau tidak valid.
+     */
+    public static function normalisasiNomorWhatsApp(?string $nomor): ?string
+    {
+        $angka = (string) preg_replace('/\D+/', '', (string) $nomor);
+
+        if (str_starts_with($angka, '08')) {
+            $angka = '62'.substr($angka, 1);
+        } elseif (str_starts_with($angka, '8')) {
+            $angka = '62'.$angka;
+        }
+
+        return preg_match(self::POLA_NOMOR_WHATSAPP, $angka) === 1 ? $angka : null;
+    }
+
+    /**
+     * Tautan wa.me berisi pesan penagihan untuk satu invoice, atau pesan galat bila nomor PIC / rekening resmi
+     * belum valid (tautan tidak dibuat). Tautan PDF di dalam pesan adalah signed URL yang hanya berlaku untuk
+     * invoice ini dan kedaluwarsa setelah MASA_BERLAKU_TAUTAN_HARI hari.
+     *
+     * @param  object  $invoice  baris tbl_invoice + nama_perusahaan, pic_telp
+     * @return array{url: string|null, galat: string|null}
+     */
+    public function tautanWhatsApp(object $invoice): array
+    {
+        $nomor = self::normalisasiNomorWhatsApp($invoice->pic_telp ?? null);
+
+        if ($nomor === null) {
+            return ['url' => null, 'galat' => blank($invoice->pic_telp ?? null)
+                ? 'Nomor WhatsApp PIC klien '.$invoice->nama_perusahaan.' belum diisi. Lengkapi nomor telepon PIC pada data klien.'
+                : 'Nomor WhatsApp PIC klien '.$invoice->nama_perusahaan.' ('.$invoice->pic_telp.') tidak valid. Gunakan nomor seluler, misalnya 081234567890.'];
+        }
+
+        $rekening = (array) config('perusahaan.rekening');
+        if (blank($rekening['bank'] ?? null) || blank($rekening['nomor'] ?? null) || blank($rekening['nama'] ?? null)) {
+            return ['url' => null, 'galat' => 'Informasi rekening resmi perusahaan belum lengkap (nama bank, nomor rekening, atas nama). '
+                .'Lengkapi konfigurasi rekening (SJI_REKENING_*) sebelum mengirim tagihan via WhatsApp.'];
+        }
+
+        $urlPdf = URL::temporarySignedRoute('invoice.publik.pdf', now()->addDays(self::MASA_BERLAKU_TAUTAN_HARI), ['id' => $invoice->id]);
+
+        return ['url' => 'https://wa.me/'.$nomor.'?text='.rawurlencode($this->pesanWhatsApp($invoice, $urlPdf, $rekening)), 'galat' => null];
+    }
+
+    /**
+     * Pesan penagihan WhatsApp. Nominal & periode dari tbl_invoice, rekening dari config/perusahaan.php.
+     *
+     * @param  array<string, string|null>  $rekening
+     */
+    public function pesanWhatsApp(object $invoice, string $urlPdf, array $rekening): string
+    {
+        return implode("\n", [
+            'Yth. Bapak/Ibu PIC '.$invoice->nama_perusahaan.',',
+            '',
+            'Dengan hormat,',
+            '',
+            'Kami dari Bagian Keuangan PT Satu Jaya Indonesia menyampaikan tagihan invoice jasa bulanan dengan rincian berikut:',
+            '',
+            'Nama Klien: '.$invoice->nama_perusahaan,
+            'Nomor Invoice: '.$invoice->nomor_invoice,
+            'Periode Tagihan: '.self::BULAN[(int) $invoice->periode_bulan].' '.$invoice->periode_tahun,
+            'Total Tagihan: Rp '.number_format((float) $invoice->total_tagihan, 0, ',', '.'),
+            '',
+            'Dokumen invoice lengkap (PDF 3 halaman) dapat dilihat atau diunduh melalui tautan berikut:',
+            '',
+            $urlPdf,
+            '',
+            'Pembayaran dapat dilakukan melalui rekening resmi PT Satu Jaya Indonesia:',
+            '',
+            (string) $rekening['bank'],
+            (string) $rekening['nomor'],
+            (string) $rekening['nama'],
+            '',
+            'Mohon konfirmasi setelah pembayaran dilakukan.',
+            '',
+            'Terima kasih atas perhatian dan kerja sama Bapak/Ibu.',
+            '',
+            'Hormat kami,',
+            'Bagian Keuangan',
+            'PT Satu Jaya Indonesia',
+        ]);
     }
 
     /**

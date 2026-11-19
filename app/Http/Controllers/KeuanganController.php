@@ -181,10 +181,16 @@ class KeuanganController extends Controller
                     'k.nama_perusahaan',
                     'k.pic_nama',
                     'k.pic_email',
+                    'k.pic_telp',
                 ])
                 ->paginate(15)
-                // Isian awal form "Kirim via Email" (subjek & pesan bawaan, dapat diedit sebelum dikirim).
-                ->through(fn (object $item): object => (object) [...(array) $item, 'email' => $layanan->templateEmail($item)]),
+                // Isian awal form "Kirim via Email" (subjek & pesan bawaan, dapat diedit sebelum dikirim) dan
+                // tautan "Kirim via WhatsApp" (hanya untuk invoice yang punya PDF tagihan).
+                ->through(fn (object $item): object => (object) [
+                    ...(array) $item,
+                    'email' => $layanan->templateEmail($item),
+                    'whatsapp' => (float) $item->sub_total > 0 ? $layanan->tautanWhatsApp($item) : null,
+                ]),
             'invoiceBaru' => session()->has('invoice_baru')
                 ? DB::table('tbl_invoice')->where('id', session('invoice_baru'))->first(['id', 'nomor_invoice'])
                 : null,
@@ -306,6 +312,19 @@ class KeuanganController extends Controller
         return redirect()->route('keuangan.invoice.index')
             ->with('success', 'Invoice '.$invoice->nomor_invoice.' berhasil dikirim ke '.$data['email_tujuan']
                 .(($data['daftar_cc'] ?? []) !== [] ? ' (CC '.count($data['daftar_cc']).' alamat)' : '').'.');
+    }
+
+    /**
+     * PDF tagihan untuk penerima tautan WhatsApp (tanpa login). Hanya dapat diakses lewat signed URL yang dibuat
+     * InvoiceKlienService::tautanWhatsApp() untuk invoice {id}; tanda tangan tidak valid/kedaluwarsa ditolak middleware
+     * "signed" (403). Tidak membuka daftar invoice maupun data klien lain.
+     */
+    public function pdfInvoicePublik(int $id, InvoiceKlienService $layanan): Response
+    {
+        $dokumen = $layanan->dokumen($id);
+        abort_if($dokumen === null || ! $dokumen['punyaRincian'], 404);
+
+        return $this->pdfTagihan($dokumen)->stream($this->namaFilePdfTagihan($dokumen['invoice']));
     }
 
     /**
