@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Keuangan\UpdateInvoiceDokumenRequest;
 use App\Services\InvoiceKlienService;
+use App\Support\DokumenInvoiceDitolak;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -246,6 +248,24 @@ class KeuanganController extends Controller
             ->setPaper('a4')
             ->setOption('defaultFont', 'DejaVu Sans')
             ->stream(sprintf('tagihan-%s.pdf', $dokumen['invoice']->nomor_invoice));
+    }
+
+    /**
+     * Simpan mode edit dokumen tagihan (teks surat & catatan manual) untuk invoice {id} saja.
+     * Nominal tidak diterima dari form; versi mencegah simpanan bersamaan saling menimpa.
+     */
+    public function simpanDokumenInvoice(UpdateInvoiceDokumenRequest $request, int $id, InvoiceKlienService $layanan): RedirectResponse
+    {
+        abort_unless(DB::table('tbl_invoice')->where('id', $id)->exists(), 404);
+
+        try {
+            $berubah = $layanan->simpanDokumen($id, $request->validated(), (int) $request->user()->getAuthIdentifier());
+        } catch (DokumenInvoiceDitolak $exception) {
+            return redirect()->route('keuangan.invoice.index')->with('error', $exception->getMessage());
+        }
+
+        return redirect()->route('keuangan.invoice.index', ['struk' => $id])
+            ->with('success', $berubah ? 'Perubahan dokumen invoice berhasil disimpan.' : 'Tidak ada perubahan pada dokumen invoice.');
     }
 
     public function tandaiInvoiceLunas(Request $request, int $id): RedirectResponse

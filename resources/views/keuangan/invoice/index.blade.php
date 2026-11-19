@@ -224,7 +224,10 @@
                 isi.appendChild(p);
             };
 
+            let urlStrukAktif = null;
+
             const bukaStruk = async (url) => {
+                urlStrukAktif = url;
                 judul.textContent = 'Invoice Digital';
                 aturPdf(null);
                 tampilkanPesan('Memuat invoice...', 'text-gray-500');
@@ -252,6 +255,36 @@
 
             modal.querySelector('[data-struk-tutup]').addEventListener('click', () => modal.close());
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+
+            // Mode edit dokumen (teks surat & catatan manual). Isi modal dimuat lewat fetch, jadi event didelegasikan.
+            isi.addEventListener('click', (e) => {
+                const dokumen = e.target.closest('[data-dokumen]');
+                if (!dokumen) return;
+                const form = dokumen.querySelector('[data-mode-edit]');
+
+                if (e.target.closest('[data-edit-mulai]')) {
+                    dokumen.querySelector('[data-mode-lihat]').classList.add('hidden');
+                    form.classList.remove('hidden');
+                    aturPdf(null);
+                    form.querySelector('input:not([type="hidden"]), textarea')?.focus();
+                } else if (e.target.closest('[data-edit-batal]')) {
+                    // Batal: buang semua perubahan dengan memuat ulang versi terakhir yang tersimpan.
+                    if (urlStrukAktif) bukaStruk(urlStrukAktif);
+                } else if (e.target.closest('[data-catatan-tambah]')) {
+                    const daftar = form.querySelector('[data-catatan-daftar]');
+                    const indeks = Number(daftar.dataset.catatanBerikut);
+                    const baris = form.querySelector('[data-catatan-template]').content.firstElementChild.cloneNode(true);
+                    baris.querySelector('[data-nama="isi"]').name = `catatan[${indeks}][isi]`;
+                    daftar.dataset.catatanBerikut = String(indeks + 1);
+                    daftar.appendChild(baris);
+                    baris.querySelector('textarea').focus();
+                } else if (e.target.closest('[data-catatan-hapus]')) {
+                    e.target.closest('[data-catatan-baris]').remove();
+                }
+            });
+            isi.addEventListener('submit', (e) => {
+                if (e.target.matches('[data-mode-edit]') && !confirm('Simpan perubahan dokumen invoice ini?')) e.preventDefault();
+            });
 
 
             const idStrukDiminta = new URLSearchParams(window.location.search).get('struk');

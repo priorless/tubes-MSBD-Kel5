@@ -144,6 +144,112 @@
         </section>
     @endif
 
+    {{-- ===================== Teks surat & catatan manual (mode edit Admin Keuangan) ===================== --}}
+    @if ($punyaRincian)
+        @php
+            $bisaDiedit = ! $sudahLunas;
+            $labelTeks = [
+                'penerima' => 'Penerima surat', 'hal' => 'Perihal (Hal)', 'paragraf_pembuka' => 'Paragraf pembuka',
+                'paragraf_penutup' => 'Paragraf penutup', 'salam_penutup' => 'Kalimat salam',
+            ];
+        @endphp
+        <section class="border-t border-gray-100 px-8 py-5 text-sm" data-dokumen>
+            <div data-mode-lihat>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <p class="font-semibold text-gray-700">Teks surat permohonan</p>
+                        @if ($perubahanTerakhir)
+                            <p class="text-xs text-gray-400">Versi {{ $versiDokumen }} &middot; diubah {{ $perubahanTerakhir['oleh'] }},
+                                {{ Carbon::parse($perubahanTerakhir['pada'])->locale('id')->translatedFormat('d F Y H:i') }}</p>
+                        @else
+                            <p class="text-xs text-gray-400">Memakai teks bawaan.</p>
+                        @endif
+                    </div>
+                    @if ($bisaDiedit)
+                        <button type="button" class="btn-secondary btn-sm" data-edit-mulai>Edit Dokumen</button>
+                    @else
+                        <span class="text-xs text-gray-400">Invoice lunas &mdash; dokumen terkunci.</span>
+                    @endif
+                </div>
+                <dl class="mt-3 space-y-2">
+                    @foreach ($labelTeks as $kolom => $label)
+                        <div>
+                            <dt class="text-xs text-gray-400">{{ $label }}</dt>
+                            <dd class="whitespace-pre-line text-gray-700">{{ $teksSurat[$kolom] }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+
+                <p class="mt-4 font-semibold text-gray-700">Catatan tambahan Keuangan</p>
+                @if ($catatanManual === [])
+                    <p class="mt-1 text-gray-500">Belum ada catatan tambahan.</p>
+                @else
+                    <ul class="mt-1 space-y-1 text-gray-600">
+                        @foreach ($catatanManual as $catatan)
+                            <li>&bull; {{ $catatan['isi'] }}
+                                <span class="text-xs text-gray-400">({{ $catatan['dibuat_oleh'] }}, {{ Carbon::parse($catatan['dibuat_pada'])->format('d/m/Y H:i') }})</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
+
+            @if ($bisaDiedit)
+                <form method="POST" action="{{ route('keuangan.invoice.dokumen', $invoice->id) }}" class="hidden space-y-3" data-mode-edit>
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="id_invoice" value="{{ $invoice->id }}">
+                    <input type="hidden" name="versi" value="{{ $versiDokumen }}">
+
+                    <p class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                        Mode edit invoice {{ $invoice->nomor_invoice }}. Hanya teks surat dan catatan tambahan yang dapat diubah;
+                        seluruh nominal tetap dihitung sistem. Kosongkan isian untuk kembali ke teks bawaan.
+                    </p>
+
+                    @foreach ($labelTeks as $kolom => $label)
+                        <div>
+                            <label for="dokumen_{{ $kolom }}_{{ $invoice->id }}" class="form-label">{{ $label }}</label>
+                            @if (str_starts_with($kolom, 'paragraf'))
+                                <textarea name="{{ $kolom }}" id="dokumen_{{ $kolom }}_{{ $invoice->id }}" rows="3" maxlength="2000" class="form-input">{{ $teksSurat[$kolom] }}</textarea>
+                            @else
+                                <input type="text" name="{{ $kolom }}" id="dokumen_{{ $kolom }}_{{ $invoice->id }}" value="{{ $teksSurat[$kolom] }}"
+                                       maxlength="{{ $kolom === 'penerima' ? 150 : ($kolom === 'hal' ? 200 : 255) }}" class="form-input">
+                            @endif
+                        </div>
+                    @endforeach
+
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <p class="form-label mb-0">Catatan tambahan Keuangan</p>
+                            <button type="button" class="btn-secondary btn-sm" data-catatan-tambah>Tambah catatan</button>
+                        </div>
+                        <p class="text-xs text-gray-400">Catatan otomatis dari Operasional (tukar shift) tidak dapat diubah di sini.</p>
+                        <div class="mt-2 space-y-2" data-catatan-daftar data-catatan-berikut="{{ count($catatanManual) }}">
+                            @foreach ($catatanManual as $catatan)
+                                <div class="flex items-start gap-2" data-catatan-baris>
+                                    <input type="hidden" name="catatan[{{ $loop->index }}][id]" value="{{ $catatan['id'] }}">
+                                    <textarea name="catatan[{{ $loop->index }}][isi]" rows="2" maxlength="500" class="form-input" aria-label="Catatan tambahan">{{ $catatan['isi'] }}</textarea>
+                                    <button type="button" class="btn-danger btn-sm" data-catatan-hapus>Hapus</button>
+                                </div>
+                            @endforeach
+                        </div>
+                        <template data-catatan-template>
+                            <div class="flex items-start gap-2" data-catatan-baris>
+                                <textarea data-nama="isi" rows="2" maxlength="500" class="form-input" aria-label="Catatan tambahan"></textarea>
+                                <button type="button" class="btn-danger btn-sm" data-catatan-hapus>Hapus</button>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="flex justify-end gap-2 border-t border-gray-100 pt-3">
+                        <button type="button" class="btn-secondary" data-edit-batal>Batal</button>
+                        <button type="submit" class="btn-primary">Simpan Perubahan</button>
+                    </div>
+                </form>
+            @endif
+        </section>
+    @endif
+
     <div class="border-t border-gray-200 bg-gray-50 px-8 py-5 text-center text-xs text-gray-500">
         Surat permohonan, invoice resmi, dan lampiran daftar gaji tersedia lewat tombol <span class="font-semibold">Unduh PDF Tagihan</span>.
     </div>

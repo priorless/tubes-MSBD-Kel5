@@ -86,21 +86,18 @@
     <table class="meta" style="margin-top: 6px;">
         <tr><td>No</td><td>:</td><td class="tebal">{{ $nomorSurat }}</td></tr>
         <tr><td>Lamp</td><td>:</td><td>1 (satu) Berkas</td></tr>
-        <tr><td>Hal</td><td>:</td><td class="tebal">Tagihan Jasa Tenaga Kerja Bulan {{ $labelPeriode }}</td></tr>
+        <tr><td>Hal</td><td>:</td><td class="tebal">{{ $teksSurat['hal'] }}</td></tr>
     </table>
 
     <p style="margin-top: 12px;">Kepada Yth,</p>
-    <p class="tebal">Bapak/Ibu Pimpinan</p>
+    <p class="tebal">{{ $teksSurat['penerima'] }}</p>
     <p class="tebal">{{ $invoice->nama_perusahaan }}</p>
     @if (filled($invoice->alamat))
         <p>{{ $invoice->alamat }}</p>
     @endif
 
     <p style="margin-top: 12px;">Dengan hormat,</p>
-    <p>
-        Bersama ini kami kirimkan 1 (satu) berkas Tagihan Jasa Tenaga Kerja {{ $invoice->nama_perusahaan }}
-        Bulan {{ $labelPeriode }}, dengan perincian tagihan sebagai berikut:
-    </p>
+    <p>{!! nl2br(e($teksSurat['paragraf_pembuka'])) !!}</p>
 
     <table class="rincian-surat">
         @foreach ($ringkasan as $baris)
@@ -135,8 +132,8 @@
         <tr><td>Nomor Rekening</td><td>:</td><td class="tebal">{{ $isi($rekening['nomor'], 'Nomor rekening') }}</td></tr>
     </table>
 
-    <p style="margin-top: 10px;">Demikian tagihan ini kami sampaikan kepada Bapak/Ibu. Atas kerja samanya kami ucapkan terima kasih.</p>
-    <p class="miring">Semoga Bapak/Ibu dalam keadaan sehat, sukses, dan bahagia selalu.</p>
+    <p style="margin-top: 10px;">{!! nl2br(e($teksSurat['paragraf_penutup'])) !!}</p>
+    <p class="miring">{{ $teksSurat['salam_penutup'] }}</p>
 
     <div class="ttd utuh">
         <p>Hormat kami,</p>
@@ -325,6 +322,15 @@
             <ol>
                 @foreach ($catatanTukarShift as $catatan)
                     <li>{{ $catatan['tanggal'] }}: {{ $catatan['teks'] }}</li>
+                @endforeach
+            </ol>
+        @endif
+
+        @if ($catatanManual !== [])
+            <p class="tebal" style="margin-top: 6px;">Catatan tambahan Keuangan:</p>
+            <ol>
+                @foreach ($catatanManual as $catatan)
+                    <li>{{ $catatan['isi'] }}</li>
                 @endforeach
             </ol>
         @endif

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\DokumenInvoiceDitolak;
 use App\Support\Terbilang;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -24,11 +25,24 @@ class InvoiceKlienService
 
     private const array ROMAWI = [1 => 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
+    /** Teks surat yang boleh diedit Admin Keuangan beserta teks bawaannya. */
+    public const array TEKS_BAWAAN = [
+        'penerima' => 'Bapak/Ibu Pimpinan',
+        'hal' => 'Tagihan Jasa Tenaga Kerja Bulan {periode}',
+        'paragraf_pembuka' => 'Bersama ini kami kirimkan 1 (satu) berkas Tagihan Jasa Tenaga Kerja {klien} Bulan {periode}, dengan perincian tagihan sebagai berikut:',
+        'paragraf_penutup' => 'Demikian tagihan ini kami sampaikan kepada Bapak/Ibu. Atas kerja samanya kami ucapkan terima kasih.',
+        'salam_penutup' => 'Semoga Bapak/Ibu dalam keadaan sehat, sukses, dan bahagia selalu.',
+    ];
+
     public function __construct(private PertukaranShiftService $pertukaranShift) {}
 
     /**
      * @return array{
      *     invoice: object,
+     *     teksSurat: array<string, string>,
+     *     catatanManual: list<array{id: int, isi: string, dibuat_oleh: string, dibuat_pada: string}>,
+     *     versiDokumen: int,
+     *     perubahanTerakhir: array{oleh: string, pada: string}|null,
      *     punyaRincian: bool,
      *     kelompok: Collection<string, Collection<int, object>>,
      *     rincian: Collection<int, object>,
@@ -85,8 +99,16 @@ class InvoiceKlienService
             $totalLampiran[$kolom] = (float) $rincian->sum($kolom);
         }
 
+        $tersimpan = $this->dokumenTersimpan($idInvoice);
+
         return [
             'invoice' => $invoice,
+            'teksSurat' => $this->teksSurat($tersimpan, $this->teksBawaan($invoice->nama_perusahaan, $labelPeriode)),
+            'catatanManual' => $this->catatanManual($idInvoice),
+            'versiDokumen' => (int) ($tersimpan->versi ?? 0),
+            'perubahanTerakhir' => $tersimpan !== null && $tersimpan->diubah_pada !== null
+                ? ['oleh' => $tersimpan->nama_pengubah ?? 'Pengguna #'.$tersimpan->diubah_oleh, 'pada' => $tersimpan->diubah_pada]
+                : null,
             'punyaRincian' => $rincian->isNotEmpty(),
             'kelompok' => $kelompok,
             'rincian' => $rincian,
@@ -151,6 +173,171 @@ class InvoiceKlienService
             'tanggal' => $this->tanggal(CarbonImmutable::parse($baris['tanggal'])),
             'teks' => $baris['teks'],
         ], $catatan);
+    }
+
+    /**
+     * Simpan mode edit (teks surat & catatan manual) untuk SATU invoice. Nominal tidak pernah disentuh.
+     * Mengembalikan false bila tidak ada perubahan. Setiap simpan menaikkan versi dan menulis riwayat audit.
+     *
+     * @param  array<string, mixed>  $isian  hasil UpdateInvoiceDokumenRequest::validated()
+     *
+     * @throws DokumenInvoiceDitolak
+     */
+    public function simpanDokumen(int $idInvoice, array $isian, int $idUser): bool
+    {
+        return DB::transaction(function () use ($idInvoice, $isian, $idUser): bool {
+            $invoice = DB::table('tbl_invoice as i')
+                ->join('tbl_klien as k', 'k.id', '=', 'i.id_klien')
+                ->where('i.id', $idInvoice)
+                ->lockForUpdate()
+                ->first(['i.id', 'i.status', 'i.periode_bulan', 'i.periode_tahun', 'k.nama_perusahaan']);
+
+            if ($invoice === null) {
+                throw new DokumenInvoiceDitolak('Invoice tidak ditemukan.');
+            }
+            if ($invoice->status === 'Lunas') {
+                throw new DokumenInvoiceDitolak('Invoice yang sudah lunas tidak dapat diedit.');
+            }
+
+            $tersimpan = DB::table('tbl_invoice_dokumen')->where('id_invoice', $idInvoice)->lockForUpdate()->first();
+            $versi = (int) ($tersimpan->versi ?? 0);
+            if ((int) $isian['versi'] !== $versi) {
+                throw new DokumenInvoiceDitolak('Dokumen invoice ini sudah diubah oleh pengguna lain. Muat ulang lalu ulangi perubahan Anda.');
+            }
+
+            $bawaan = $this->teksBawaan($invoice->nama_perusahaan, self::BULAN[(int) $invoice->periode_bulan].' '.$invoice->periode_tahun);
+            $teksBaru = [];
+            foreach (array_keys(self::TEKS_BAWAAN) as $kolom) {
+                $nilai = trim((string) ($isian[$kolom] ?? ''));
+                // Kosong atau sama dengan teks bawaan -> NULL (memakai teks bawaan).
+                $teksBaru[$kolom] = $nilai === '' || $nilai === $bawaan[$kolom] ? null : $nilai;
+            }
+
+            $catatanLama = DB::table('tbl_invoice_catatan')->where('id_invoice', $idInvoice)->orderBy('id')->lockForUpdate()->get(['id', 'isi']);
+            $catatanDikirim = collect($isian['catatan'] ?? [])
+                ->map(fn (array $baris): array => ['id' => isset($baris['id']) ? (int) $baris['id'] : null, 'isi' => trim((string) ($baris['isi'] ?? ''))])
+                ->filter(fn (array $baris): bool => $baris['isi'] !== '')
+                ->values();
+
+            $idLama = $catatanLama->pluck('id')->map(fn ($id): int => (int) $id)->all();
+            $idAsing = $catatanDikirim->pluck('id')->filter()->diff($idLama);
+            if ($idAsing->isNotEmpty()) {
+                throw new DokumenInvoiceDitolak('Catatan yang dikirim bukan milik invoice ini. Muat ulang halaman lalu coba lagi.');
+            }
+
+            $sebelum = ['teks' => $this->teksKolom($tersimpan), 'catatan' => $catatanLama->map(fn ($c): array => ['id' => (int) $c->id, 'isi' => $c->isi])->all()];
+            if ($sebelum == ['teks' => $teksBaru, 'catatan' => $catatanDikirim->all()]) {
+                return false;
+            }
+
+            $sekarang = now();
+            $idDipertahankan = $catatanDikirim->pluck('id')->filter()->all();
+            DB::table('tbl_invoice_catatan')->where('id_invoice', $idInvoice)->whereNotIn('id', $idDipertahankan ?: [0])->delete();
+
+            $isiLama = $catatanLama->pluck('isi', 'id');
+            $catatanTersimpan = [];
+            foreach ($catatanDikirim as $catatan) {
+                if ($catatan['id'] === null) {
+                    $catatan['id'] = DB::table('tbl_invoice_catatan')->insertGetId([
+                        'id_invoice' => $idInvoice, 'isi' => $catatan['isi'], 'dibuat_oleh' => $idUser, 'dibuat_pada' => $sekarang,
+                    ]);
+                } elseif ($isiLama[$catatan['id']] !== $catatan['isi']) {
+                    DB::table('tbl_invoice_catatan')->where('id', $catatan['id'])->where('id_invoice', $idInvoice)
+                        ->update(['isi' => $catatan['isi'], 'diubah_oleh' => $idUser, 'diubah_pada' => $sekarang]);
+                }
+                $catatanTersimpan[] = $catatan;
+            }
+
+            DB::table('tbl_invoice_dokumen')->updateOrInsert(
+                ['id_invoice' => $idInvoice],
+                [...$teksBaru, 'versi' => $versi + 1, 'diubah_oleh' => $idUser, 'diubah_pada' => $sekarang],
+            );
+
+            DB::table('tbl_invoice_dokumen_riwayat')->insert([
+                'id_invoice' => $idInvoice,
+                'versi' => $versi + 1,
+                'data_sebelum' => json_encode($sebelum, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'data_sesudah' => json_encode(['teks' => $teksBaru, 'catatan' => $catatanTersimpan], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'diubah_oleh' => $idUser,
+                'waktu' => $sekarang,
+            ]);
+
+            return true;
+        });
+    }
+
+    /**
+     * Teks bawaan surat untuk klien & periode invoice.
+     *
+     * @return array<string, string>
+     */
+    public function teksBawaan(string $namaKlien, string $labelPeriode): array
+    {
+        return array_map(fn (string $teks): string => strtr($teks, ['{klien}' => $namaKlien, '{periode}' => $labelPeriode]), self::TEKS_BAWAAN);
+    }
+
+    private function dokumenTersimpan(int $idInvoice): ?object
+    {
+        if (! Schema::hasTable('tbl_invoice_dokumen')) {
+            return null;
+        }
+
+        return DB::table('tbl_invoice_dokumen as d')
+            ->leftJoin('tbl_users as u', 'u.id', '=', 'd.diubah_oleh')
+            ->where('d.id_invoice', $idInvoice)
+            ->first(['d.*', 'u.nama as nama_pengubah']);
+    }
+
+    /**
+     * @param  array<string, string>  $bawaan
+     * @return array<string, string>
+     */
+    private function teksSurat(?object $tersimpan, array $bawaan): array
+    {
+        $hasil = [];
+        foreach ($bawaan as $kolom => $teks) {
+            $hasil[$kolom] = filled($tersimpan?->{$kolom} ?? null) ? (string) $tersimpan->{$kolom} : $teks;
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    private function teksKolom(?object $tersimpan): array
+    {
+        $hasil = [];
+        foreach (array_keys(self::TEKS_BAWAAN) as $kolom) {
+            $hasil[$kolom] = $tersimpan?->{$kolom} ?? null;
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Catatan tambahan manual Admin Keuangan (bukan log Operasional).
+     *
+     * @return list<array{id: int, isi: string, dibuat_oleh: string, dibuat_pada: string}>
+     */
+    private function catatanManual(int $idInvoice): array
+    {
+        if (! Schema::hasTable('tbl_invoice_catatan')) {
+            return [];
+        }
+
+        return DB::table('tbl_invoice_catatan as c')
+            ->leftJoin('tbl_users as u', 'u.id', '=', 'c.dibuat_oleh')
+            ->where('c.id_invoice', $idInvoice)
+            ->orderBy('c.id')
+            ->get(['c.id', 'c.isi', 'c.dibuat_oleh', 'c.dibuat_pada', 'u.nama as nama_pembuat'])
+            ->map(fn (object $c): array => [
+                'id' => (int) $c->id,
+                'isi' => (string) $c->isi,
+                'dibuat_oleh' => $c->nama_pembuat ?? 'Pengguna #'.$c->dibuat_oleh,
+                'dibuat_pada' => (string) $c->dibuat_pada,
+            ])
+            ->all();
     }
 
     private function tanggal(CarbonImmutable $tanggal): string
