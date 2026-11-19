@@ -9,6 +9,9 @@
         $sudahLunas = fn (object $item): bool => $item->status_bayar === 'Sudah Lunas';
     @endphp
 
+    <x-ui.page-header :title="'Selamat datang, '.auth()->user()->namaTampilan()"
+        description="Kelola payroll karyawan: generate gaji per periode, periksa rincian gaji, dan catat pencairan." />
+
     <div class="callout callout-info mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="max-w-3xl">
             <p class="font-semibold">Generate payroll</p>

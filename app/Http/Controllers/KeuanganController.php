@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InvoiceKlienService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -159,7 +162,10 @@ class KeuanganController extends Controller
                     'i.periode_bulan',
                     'i.periode_tahun',
                     'i.jumlah_tenaga',
-                    'i.biaya_bpjs',
+                    'i.sub_total',
+                    'i.persen_fee',
+                    'i.management_fee',
+                    'i.ppn',
                     'i.total_tagihan',
                     'i.status',
                     'i.tgl_pembayaran',
@@ -173,8 +179,8 @@ class KeuanganController extends Controller
             'klien' => DB::table('tbl_klien')
                 ->where('status', 'Aktif')
                 ->orderBy('nama_perusahaan')
-                // Pengaturan BPJS ditampilkan (tidak dapat diubah) saat Keuangan memilih klien.
-                ->get(['id', 'kode_klien', 'nama_perusahaan', 'bpjs_metode', 'bpjs_nilai']),
+                // Management fee ditampilkan (tidak dapat diubah; diatur Operasional) saat Keuangan memilih klien.
+                ->get(['id', 'kode_klien', 'nama_perusahaan', 'management_fee']),
             'daftarBulan' => self::DAFTAR_BULAN,
             'bulanIni' => now()->month,
             'tahunIni' => now()->year,
@@ -212,48 +218,34 @@ class KeuanganController extends Controller
     }
 
     /**
-     * Isi struk invoice digital untuk modal di halaman Invoice. Data dan
-     * status selalu dibaca langsung dari tbl_invoice sehingga mengikuti
-     * kondisi terbaru. Akses langsung (bukan fetch) diarahkan ke halaman
-     * Invoice yang akan membuka modal struk tersebut.
+     * Invoice digital untuk modal (AJAX), atau dokumen PDF tagihan klien (?format=pdf): surat permohonan,
+     * invoice, dan lampiran daftar gaji. Semua nominal dibaca dari tbl_invoice & tbl_invoice_detail (tanpa hitung ulang).
+     * Akses langsung lain diarahkan ke halaman Invoice yang membuka modal tersebut.
      */
-    public function strukInvoice(Request $request, int $id): View|RedirectResponse
+    public function strukInvoice(Request $request, int $id, InvoiceKlienService $layanan): View|RedirectResponse|Response
     {
-        if (! $request->ajax()) {
+        $unduhPdf = $request->query('format') === 'pdf';
+
+        if (! $unduhPdf && ! $request->ajax()) {
             return redirect()->route('keuangan.invoice.index', ['struk' => $id]);
         }
 
-        $invoice = DB::table('tbl_invoice as i')
-            ->join('tbl_klien as k', 'k.id', '=', 'i.id_klien')
-            ->where('i.id', $id)
-            ->first([
-                'i.id',
-                'i.nomor_invoice',
-                'i.periode_bulan',
-                'i.periode_tahun',
-                'i.jumlah_tenaga',
-                'i.bpjs_metode',
-                'i.bpjs_nilai',
-                'i.biaya_bpjs',
-                'i.total_tagihan',
-                'i.status',
-                'i.tgl_pembayaran',
-                'i.created_at',
-                'k.kode_klien',
-                'k.nama_perusahaan',
-                'k.alamat',
-                'k.pic_nama',
-                'k.pic_jabatan',
-                'k.pic_telp',
-                'k.pic_email',
-            ]);
+        $dokumen = $layanan->dokumen($id);
+        abort_if($dokumen === null, 404);
 
-        abort_if($invoice === null, 404);
+        if (! $unduhPdf) {
+            return view('keuangan.invoice._struk', $dokumen);
+        }
 
-        return view('keuangan.invoice._struk', [
-            'invoice' => $invoice,
-            'labelPeriode' => (self::DAFTAR_BULAN[(int) $invoice->periode_bulan] ?? $invoice->periode_bulan).' '.$invoice->periode_tahun,
-        ]);
+        if (! $dokumen['punyaRincian']) {
+            return redirect()->route('keuangan.invoice.index')
+                ->with('error', 'Invoice '.$dokumen['invoice']->nomor_invoice.' dibuat sebelum invoice dihitung dari payroll, sehingga belum memiliki lampiran rincian gaji.');
+        }
+
+        return Pdf::loadView('keuangan.invoice.pdf', $dokumen)
+            ->setPaper('a4')
+            ->setOption('defaultFont', 'DejaVu Sans')
+            ->stream(sprintf('tagihan-%s.pdf', $dokumen['invoice']->nomor_invoice));
     }
 
     public function tandaiInvoiceLunas(Request $request, int $id): RedirectResponse

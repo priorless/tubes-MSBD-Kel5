@@ -37,8 +37,7 @@
                         <option value="">&mdash; Pilih klien &mdash;</option>
                         @foreach ($klien as $item)
                             <option value="{{ $item->id }}" @selected((int) old('id_klien') === (int) $item->id)
-                                    data-bpjs="{{ \App\Support\LabelBpjs::aturan($item->bpjs_metode, $item->bpjs_nilai) }}"
-                                    data-bpjs-aktif="{{ $item->bpjs_metode === null ? '0' : '1' }}">
+                                    data-fee="{{ $item->management_fee === null ? '' : \App\Support\LabelBpjs::persen($item->management_fee) }}">
                                 {{ $item->kode_klien }} &mdash; {{ $item->nama_perusahaan }}
                             </option>
                         @endforeach
@@ -46,10 +45,10 @@
                     @error('id_klien') <p class="form-error">{{ $message }}</p> @enderror
                 </div>
 
-                <div id="info_bpjs_klien" class="hidden rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm" aria-live="polite">
-                    <p class="text-xs text-gray-500">BPJS default klien</p>
-                    <p class="font-semibold text-gray-800" id="info_bpjs_aturan"></p>
-                    <p class="mt-1 text-xs text-gray-500" id="info_bpjs_keterangan"></p>
+                <div id="info_fee_klien" class="hidden rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm" aria-live="polite">
+                    <p class="text-xs text-gray-500">Management fee klien (dari data klien Operasional)</p>
+                    <p class="font-semibold text-gray-800" id="info_fee_nilai"></p>
+                    <p class="mt-1 text-xs text-gray-500" id="info_fee_keterangan"></p>
                 </div>
 
                 <div class="grid grid-cols-12 gap-3">
@@ -71,8 +70,10 @@
                 </div>
 
                 <p class="text-xs text-gray-500">
-                    Jumlah tenaga dan total tagihan dihitung otomatis oleh database dari penempatan aktif klien pada periode tersebut,
-                    ditambah biaya BPJS sesuai pengaturan klien.
+                    Sub Total diambil dari payroll yang sudah di-generate untuk karyawan klien pada periode tersebut
+                    (gaji pokok + tunjangan + upah back-up + lembur &minus; potongan absensi; BPJS sudah termasuk).
+                    Management Fee = persentase klien &times; Sub Total, PPN = 11% &times; Management Fee.
+                    Generate payroll periode tersebut terlebih dahulu.
                 </p>
             </div>
 
@@ -94,7 +95,10 @@
                             <th>Klien</th>
                             <th>Periode</th>
                             <th class="text-center">Tenaga</th>
-                            <th class="text-right">Total Tagihan</th>
+                            <th class="text-right">Sub Total</th>
+                            <th class="text-right">Management Fee</th>
+                            <th class="text-right">PPN 11%</th>
+                            <th class="text-right">Grand Total</th>
                             <th>Status</th>
                             <th class="text-center">Aksi</th>
                         </tr>
@@ -106,12 +110,17 @@
                                 <td>{{ $item->nama_perusahaan }}</td>
                                 <td class="whitespace-nowrap">{{ $daftarBulan[$item->periode_bulan] ?? $item->periode_bulan }} {{ $item->periode_tahun }}</td>
                                 <td class="text-center">{{ $item->jumlah_tenaga }}</td>
-                                <td class="text-right whitespace-nowrap tabular-nums">
-                                    Rp {{ number_format((float) $item->total_tagihan, 0, ',', '.') }}
-                                    @if ((float) $item->biaya_bpjs > 0)
-                                        <p class="text-xs text-gray-400">termasuk BPJS Rp {{ number_format((float) $item->biaya_bpjs, 0, ',', '.') }}</p>
-                                    @endif
-                                </td>
+                                @if ((float) $item->sub_total > 0)
+                                    <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->sub_total, 0, ',', '.') }}</td>
+                                    <td class="text-right whitespace-nowrap tabular-nums">
+                                        Rp {{ number_format((float) $item->management_fee, 0, ',', '.') }}
+                                        <p class="text-xs text-gray-400">{{ \App\Support\LabelBpjs::persen($item->persen_fee) }}</p>
+                                    </td>
+                                    <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->ppn, 0, ',', '.') }}</td>
+                                @else
+                                    <td colspan="3" class="text-center text-xs text-gray-400">Invoice lama (sebelum rincian payroll)</td>
+                                @endif
+                                <td class="text-right font-semibold whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->total_tagihan, 0, ',', '.') }}</td>
                                 <td class="whitespace-nowrap">
                                     @if ($item->status === 'Lunas')
                                         <span class="badge badge-success">Lunas</span>
@@ -140,7 +149,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="table-empty">Belum ada invoice.</td>
+                                <td colspan="10" class="table-empty">Belum ada invoice.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -161,7 +170,7 @@
             <div class="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-5 py-3">
                 <h2 id="strukModalJudul" class="text-sm font-semibold text-gray-800">Invoice Digital</h2>
                 <div class="flex items-center gap-2">
-                    <button type="button" class="btn-primary btn-sm" data-struk-cetak disabled>Cetak / Simpan PDF</button>
+                    <a href="#" class="btn-primary btn-sm pointer-events-none opacity-50" data-struk-pdf target="_blank" rel="noopener" aria-disabled="true">Unduh PDF Tagihan</a>
                     <button type="button" class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800" data-struk-tutup aria-label="Tutup struk">
                         <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
@@ -172,37 +181,40 @@
             <div class="overflow-y-auto p-4 sm:p-6" id="strukModalIsi" aria-live="polite"></div>
         </div>
     </dialog>
-
-    <div id="areaCetakStruk"></div>
 @endsection
 
 @push('scripts')
     <script>
         (() => {
-            // BPJS default klien terisi otomatis saat klien dipilih (hanya ditampilkan, diatur di data klien).
+            // Management fee klien ditampilkan saat klien dipilih (hanya dibaca; diatur Operasional di data klien).
             const pilihKlien = document.getElementById('id_klien');
-            const infoBpjs = document.getElementById('info_bpjs_klien');
-            const tampilkanBpjs = () => {
+            const infoFee = document.getElementById('info_fee_klien');
+            const tampilkanFee = () => {
                 const opsi = pilihKlien.selectedOptions[0];
-                infoBpjs.classList.toggle('hidden', !opsi || opsi.value === '');
+                infoFee.classList.toggle('hidden', !opsi || opsi.value === '');
                 if (!opsi || opsi.value === '') return;
-                const aktif = opsi.dataset.bpjsAktif === '1';
-                document.getElementById('info_bpjs_aturan').textContent = opsi.dataset.bpjs;
-                document.getElementById('info_bpjs_keterangan').textContent = aktif
-                    ? 'Biaya BPJS invoice = total potongan BPJS karyawan klien ini pada payroll periode yang dipilih. Generate payroll periode tersebut terlebih dahulu.'
-                    : 'Klien ini tidak memakai BPJS; invoice hanya berisi tagihan tenaga.';
+                const ada = opsi.dataset.fee !== '';
+                document.getElementById('info_fee_nilai').textContent = ada ? opsi.dataset.fee : 'Belum diatur';
+                document.getElementById('info_fee_keterangan').textContent = ada
+                    ? 'Management Fee = ' + opsi.dataset.fee + ' x Sub Total; PPN 11% dihitung dari Management Fee.'
+                    : 'Invoice tidak dapat dibuat sebelum Operasional mengisi Management Fee klien ini (0% pun boleh).';
             };
-            pilihKlien.addEventListener('change', tampilkanBpjs);
-            tampilkanBpjs();
+            pilihKlien.addEventListener('change', tampilkanFee);
+            tampilkanFee();
         })();
 
         (() => {
             const modal = document.getElementById('strukModal');
             const isi = document.getElementById('strukModalIsi');
             const judul = document.getElementById('strukModalJudul');
-            const tombolCetak = modal.querySelector('[data-struk-cetak]');
-            const areaCetak = document.getElementById('areaCetakStruk');
-            document.body.appendChild(areaCetak);
+            const tautanPdf = modal.querySelector('[data-struk-pdf]');
+            const aturPdf = (url) => {
+                const aktif = url !== null;
+                tautanPdf.href = aktif ? url + '?format=pdf' : '#';
+                tautanPdf.classList.toggle('pointer-events-none', !aktif);
+                tautanPdf.classList.toggle('opacity-50', !aktif);
+                tautanPdf.setAttribute('aria-disabled', aktif ? 'false' : 'true');
+            };
 
             const tampilkanPesan = (pesan, kelas) => {
                 isi.innerHTML = '';
@@ -214,8 +226,8 @@
 
             const bukaStruk = async (url) => {
                 judul.textContent = 'Invoice Digital';
-                tombolCetak.disabled = true;
-                tampilkanPesan('Memuat struk invoice...', 'text-gray-500');
+                aturPdf(null);
+                tampilkanPesan('Memuat invoice...', 'text-gray-500');
                 if (!modal.open) modal.showModal();
 
                 try {
@@ -226,7 +238,7 @@
                     if (!respons.ok) throw new Error(String(respons.status));
                     isi.innerHTML = await respons.text();
                     judul.textContent = isi.querySelector('[data-judul]')?.dataset.judul ?? 'Invoice Digital';
-                    tombolCetak.disabled = false;
+                    aturPdf(isi.querySelector('[data-punya-rincian="1"]') ? url : null);
                 } catch (galat) {
                     tampilkanPesan(galat.message === '404'
                         ? 'Invoice tidak ditemukan.'
@@ -241,15 +253,6 @@
             modal.querySelector('[data-struk-tutup]').addEventListener('click', () => modal.close());
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
 
-            tombolCetak.addEventListener('click', () => {
-                areaCetak.innerHTML = isi.innerHTML;
-                document.body.classList.add('cetak-struk');
-                window.print();
-            });
-            window.addEventListener('afterprint', () => {
-                document.body.classList.remove('cetak-struk');
-                areaCetak.innerHTML = '';
-            });
 
             const idStrukDiminta = new URLSearchParams(window.location.search).get('struk');
             if (idStrukDiminta && /^\d+$/.test(idStrukDiminta)) {

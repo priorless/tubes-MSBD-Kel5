@@ -87,6 +87,7 @@ class KeuanganPayrollTest extends TestCase
         $this->actingAs($user)
             ->get(route('keuangan.payroll.index', ['bulan' => 10, 'tahun' => 2026]))
             ->assertOk()
+            ->assertSeeText('Selamat datang, '.$user->namaTampilan())
             ->assertSee('Gaji Pokok')
             ->assertSeeInOrder(['NIP', 'Nama Karyawan', 'Jenis Pekerjaan', 'Hari (Wajib / Hadir / Absen)', 'Gaji Pokok', 'Tunjangan', 'Upah Back-up', 'Upah Lembur', 'Potongan Absensi', 'Potongan BPJS', 'Potongan Pinjaman', 'PPh 21', 'Total Gaji', 'Status', 'Aksi'])
             ->assertSee('Rp 12.345')

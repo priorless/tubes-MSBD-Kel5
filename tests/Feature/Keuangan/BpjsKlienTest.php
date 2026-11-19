@@ -84,38 +84,41 @@ class BpjsKlienTest extends TestCase
         $this->assertNull($payrollInternal->id_klien_bpjs);
     }
 
-    public function test_invoice_menambahkan_biaya_bpjs_sebesar_total_potongan_bpjs_karyawan_klien(): void
+    public function test_invoice_tidak_menagih_bpjs_lagi_karena_sudah_termasuk_sub_total_payroll(): void
     {
-        $tarif = (float) DB::table('tbl_jenis_layanan')->where('nama_layanan', 'Driver')->value('tarif_tagihan_klien');
-        $klien = $this->buatKlien(['bpjs_metode' => 'Persentase', 'bpjs_nilai' => 5]);
+        $klien = $this->buatKlien(['bpjs_metode' => 'Persentase', 'bpjs_nilai' => 5, 'management_fee' => 10]);
         $this->karyawanSebulanPenuh($klien, 23);
         $this->karyawanSebulanPenuh($klien, 25);
         $this->generatePayroll();
 
         DatabaseService::callGenerateInvoiceKlien($klien, self::BULAN, self::TAHUN);
 
+        // Sub Total = gaji kotor payroll (2.500.000 - 200.000) + 2.500.000; potongan BPJS ada di dalamnya.
         $invoice = DB::table('tbl_invoice')->where('id_klien', $klien)->sole();
-        $this->assertEquals(250000, (float) $invoice->biaya_bpjs, '125.000 + 125.000, sama dengan potongan payroll');
-        $this->assertEquals(round(2 * $tarif + 250000, 2), (float) $invoice->total_tagihan);
+        $this->assertEquals(4800000, (float) $invoice->sub_total);
+        $this->assertEquals(0, (float) $invoice->biaya_bpjs, 'BPJS tidak ditagihkan ulang');
+        $this->assertEquals(250000, (float) DB::table('tbl_invoice_detail')->where('id_invoice', $invoice->id)->sum('potongan_bpjs'));
+        $this->assertEquals(4800000 + 480000 + 52800, (float) $invoice->total_tagihan);
         $this->assertSame(['Persentase', 5.0], [$invoice->bpjs_metode, (float) $invoice->bpjs_nilai]);
 
         $this->loginSebagai(Role::Keuangan);
         $this->withHeader('X-Requested-With', 'XMLHttpRequest')
             ->get(route('keuangan.invoice.struk', $invoice->id))
             ->assertOk()
-            ->assertSeeInOrder(['Jasa Penyediaan Tenaga Kerja Outsourcing', 'Rp '.number_format(2 * $tarif, 0, ',', '.'), 'Biaya BPJS', '5% dari gaji', 'Rp 250.000'], false);
+            ->assertSeeInOrder(['Sub Total', 'Rp 4.800.000', 'Management Fee (10%)', 'Rp 480.000', 'PPN 11%', 'Rp 52.800', 'Grand Total', 'Rp 5.332.800'], false)
+            ->assertDontSee('Biaya BPJS');
     }
 
-    public function test_invoice_klien_ber_bpjs_ditolak_sebelum_payroll_periode_digenerate(): void
+    public function test_invoice_ditolak_sebelum_payroll_periode_digenerate(): void
     {
-        $klien = $this->buatKlien(['bpjs_metode' => 'Nominal', 'bpjs_nilai' => 100000]);
+        $klien = $this->buatKlien(['bpjs_metode' => 'Persentase', 'bpjs_nilai' => 5, 'management_fee' => 10]);
         $this->karyawanSebulanPenuh($klien, 23);
 
         try {
             DatabaseService::callGenerateInvoiceKlien($klien, self::BULAN, self::TAHUN);
-            $this->fail('Invoice klien ber-BPJS tanpa payroll seharusnya ditolak.');
+            $this->fail('Invoice tanpa payroll seharusnya ditolak.');
         } catch (QueryException $exception) {
-            $this->assertSame('Generate payroll periode ini terlebih dahulu agar biaya BPJS klien dapat dihitung', $exception->errorInfo[2]);
+            $this->assertSame('Generate payroll periode ini terlebih dahulu: invoice dihitung dari data payroll karyawan klien', $exception->errorInfo[2]);
         }
 
         $this->assertFalse(DB::table('tbl_invoice')->where('id_klien', $klien)->exists());
@@ -123,16 +126,19 @@ class BpjsKlienTest extends TestCase
 
     public function test_perubahan_pengaturan_klien_tidak_mengubah_payroll_dan_invoice_yang_sudah_dibuat(): void
     {
-        $klien = $this->buatKlien(['bpjs_metode' => 'Persentase', 'bpjs_nilai' => 5]);
+        $klien = $this->buatKlien(['bpjs_metode' => 'Persentase', 'bpjs_nilai' => 5, 'management_fee' => 10]);
         $karyawan = $this->karyawanSebulanPenuh($klien, 23);
         $this->generatePayroll();
         DatabaseService::callGenerateInvoiceKlien($klien, self::BULAN, self::TAHUN);
         $idPayroll = $this->payroll($karyawan)->id;
 
-        DB::table('tbl_klien')->where('id', $klien)->update(['bpjs_metode' => 'Nominal', 'bpjs_nilai' => 300000]);
+        DB::table('tbl_klien')->where('id', $klien)->update(['bpjs_metode' => 'Nominal', 'bpjs_nilai' => 300000, 'management_fee' => 25]);
 
         $this->assertDatabaseHas('tbl_payroll', ['id' => $idPayroll, 'bpjs_metode' => 'Persentase', 'potongan_bpjs' => 125000, 'total_gaji' => 2175000]);
-        $this->assertDatabaseHas('tbl_invoice', ['id_klien' => $klien, 'bpjs_metode' => 'Persentase', 'biaya_bpjs' => 125000]);
+        $this->assertDatabaseHas('tbl_invoice', [
+            'id_klien' => $klien, 'bpjs_metode' => 'Persentase', 'sub_total' => 2300000, 'persen_fee' => 10,
+            'management_fee' => 230000, 'ppn' => 25300, 'total_tagihan' => 2555300,
+        ]);
 
         $this->loginSebagai(Role::Keuangan);
         $this->withHeader('X-Requested-With', 'XMLHttpRequest')
@@ -159,17 +165,19 @@ class BpjsKlienTest extends TestCase
             ->assertDontSeeText('Rp 5');
     }
 
-    public function test_halaman_invoice_menampilkan_bpjs_default_klien_saat_dipilih(): void
+    public function test_halaman_invoice_menampilkan_management_fee_klien_saat_dipilih(): void
     {
-        $this->buatKlien(['nama_perusahaan' => 'Klien BPJS Persen', 'bpjs_metode' => 'Persentase', 'bpjs_nilai' => 4.5]);
-        $this->buatKlien(['nama_perusahaan' => 'Klien BPJS Nominal', 'bpjs_metode' => 'Nominal', 'bpjs_nilai' => 100000]);
+        $this->buatKlien(['nama_perusahaan' => 'Klien Fee', 'management_fee' => 4.5]);
+        $this->buatKlien(['nama_perusahaan' => 'Klien Fee Nol', 'management_fee' => 0]);
+        $this->buatKlien(['nama_perusahaan' => 'Klien Tanpa Fee']);
         $this->loginSebagai(Role::Keuangan);
 
         $this->get(route('keuangan.invoice.index'))
             ->assertOk()
-            ->assertSee('data-bpjs="4,5% dari gaji"', false)
-            ->assertSee('data-bpjs="Rp 100.000 per tenaga"', false)
-            ->assertSee('id="info_bpjs_klien"', false);
+            ->assertSee('data-fee="4,5%"', false)
+            ->assertSee('data-fee="0%"', false)
+            ->assertSee('data-fee=""', false)
+            ->assertSee('id="info_fee_klien"', false);
     }
 
     public function test_database_menolak_pengaturan_bpjs_klien_yang_tidak_konsisten(): void
