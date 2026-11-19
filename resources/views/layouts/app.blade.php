@@ -67,6 +67,7 @@
         if ($penggunaAktif->hasRole(Role::KaryawanLapangan)) {
             $menu['Portal Karyawan'] = [
                 ['Absensi', 'tenaga-kerja.absensi', 'tenaga-kerja.absensi*'],
+                ['Tukar Shift', 'tenaga-kerja.tukar-shift.index', 'tenaga-kerja.tukar-shift.*'],
                 ['Riwayat Absensi', 'tenaga-kerja.riwayat', 'tenaga-kerja.riwayat*'],
                 ['Slip Gaji', 'tenaga-kerja.slip-gaji', 'tenaga-kerja.slip-gaji'],
                 ['Profil Saya', 'tenaga-kerja.profil', 'tenaga-kerja.profil'],
