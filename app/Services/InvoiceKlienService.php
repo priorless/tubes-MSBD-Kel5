@@ -267,6 +267,51 @@ class InvoiceKlienService
     }
 
     /**
+     * Subjek & isi email penagihan bawaan untuk satu invoice (dapat diedit Admin Keuangan sebelum dikirim).
+     * Nominal dibaca dari tbl_invoice, bukan dari form.
+     *
+     * @param  object  $invoice  baris tbl_invoice + nama_perusahaan, pic_nama
+     * @return array{subjek: string, pesan: string}
+     */
+    public function templateEmail(object $invoice): array
+    {
+        $periode = self::BULAN[(int) $invoice->periode_bulan].' '.$invoice->periode_tahun;
+        $rekening = config('perusahaan.rekening');
+        $nilai = fn (?string $isi, string $label): string => filled($isi) ? $isi : '['.$label.' belum tersedia]';
+        $sapaan = filled($invoice->pic_nama ?? null) ? 'Bapak/Ibu '.$invoice->pic_nama : 'Bapak/Ibu Pimpinan';
+
+        $pesan = implode("\n", [
+            'Yth. '.$sapaan,
+            $invoice->nama_perusahaan,
+            '',
+            'Dengan hormat,',
+            '',
+            'Bersama email ini kami sampaikan tagihan jasa tenaga kerja PT Satu Jaya Indonesia untuk periode '.$periode
+                .' dengan nomor invoice '.$invoice->nomor_invoice.' sebesar Rp '.number_format((float) $invoice->total_tagihan, 0, ',', '.')
+                .' ('.Terbilang::rupiah($invoice->total_tagihan).').',
+            'Surat permohonan, invoice, dan lampiran rincian tagihan kami lampirkan dalam satu berkas PDF.',
+            '',
+            'Pembayaran dapat ditransfer ke rekening berikut:',
+            'Bank: '.$nilai($rekening['bank'] ?? null, 'Nama bank'),
+            'Nama Rekening: '.$nilai($rekening['nama'] ?? null, 'Nama rekening'),
+            'Nomor Rekening: '.$nilai($rekening['nomor'] ?? null, 'Nomor rekening'),
+            '',
+            'Mohon mencantumkan nomor invoice '.$invoice->nomor_invoice.' pada berita transfer. Apabila terdapat pertanyaan mengenai tagihan ini, silakan membalas email ini.',
+            '',
+            'Atas perhatian dan kerja samanya kami ucapkan terima kasih.',
+            '',
+            'Hormat kami,',
+            'Bagian Keuangan',
+            'PT Satu Jaya Indonesia',
+        ]);
+
+        return [
+            'subjek' => 'Tagihan Invoice Jasa PT Satu Jaya Indonesia - '.$invoice->nama_perusahaan.' - Periode '.$periode,
+            'pesan' => $pesan,
+        ];
+    }
+
+    /**
      * Teks bawaan surat untuk klien & periode invoice.
      *
      * @return array<string, string>

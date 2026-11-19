@@ -178,6 +178,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::patch('invoice/{id}/lunas', 'tandaiInvoiceLunas')->whereNumber('id')->name('invoice.lunas');
         Route::get('invoice/{id}/struk', 'strukInvoice')->whereNumber('id')->name('invoice.struk');
         Route::put('invoice/{id}/dokumen', 'simpanDokumenInvoice')->whereNumber('id')->name('invoice.dokumen');
+        Route::post('invoice/{id}/email', 'kirimInvoiceEmail')->whereNumber('id')->middleware('throttle:10,1')->name('invoice.email');
     });
 
     /* =====================================================================

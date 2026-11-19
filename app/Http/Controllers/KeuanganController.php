@@ -2,16 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Keuangan\KirimInvoiceEmailRequest;
 use App\Http\Requests\Keuangan\UpdateInvoiceDokumenRequest;
+use App\Mail\InvoiceKlienMail;
 use App\Services\InvoiceKlienService;
 use App\Support\DokumenInvoiceDitolak;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as DokumenPdf;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
+use Throwable;
 
 /**
  * Modul Keuangan: seluruh logika bisnis (perhitungan payroll dan invoice)
@@ -150,7 +156,7 @@ class KeuanganController extends Controller
         return DB::table('tbl_payroll')->where('periode_bulan', $bulan)->where('periode_tahun', $tahun)->count();
     }
 
-    public function invoice(): View
+    public function invoice(InvoiceKlienService $layanan): View
     {
         return view('keuangan.invoice.index', [
             'invoice' => DB::table('tbl_invoice as i')
@@ -173,8 +179,12 @@ class KeuanganController extends Controller
                     'i.tgl_pembayaran',
                     'k.kode_klien',
                     'k.nama_perusahaan',
+                    'k.pic_nama',
+                    'k.pic_email',
                 ])
-                ->paginate(15),
+                ->paginate(15)
+                // Isian awal form "Kirim via Email" (subjek & pesan bawaan, dapat diedit sebelum dikirim).
+                ->through(fn (object $item): object => (object) [...(array) $item, 'email' => $layanan->templateEmail($item)]),
             'invoiceBaru' => session()->has('invoice_baru')
                 ? DB::table('tbl_invoice')->where('id', session('invoice_baru'))->first(['id', 'nomor_invoice'])
                 : null,
@@ -244,10 +254,75 @@ class KeuanganController extends Controller
                 ->with('error', 'Invoice '.$dokumen['invoice']->nomor_invoice.' dibuat sebelum invoice dihitung dari payroll, sehingga belum memiliki lampiran rincian gaji.');
         }
 
+        return $this->pdfTagihan($dokumen)->stream($this->namaFilePdfTagihan($dokumen['invoice']));
+    }
+
+    /**
+     * Kirim dokumen tagihan (PDF yang sama dengan "Unduh PDF Tagihan") ke email klien.
+     * Data invoice, nominal, dan PDF dibaca dari database berdasarkan {id}; form hanya berisi alamat, subjek, dan pesan.
+     */
+    public function kirimInvoiceEmail(KirimInvoiceEmailRequest $request, int $id, InvoiceKlienService $layanan): RedirectResponse
+    {
+        $dokumen = $layanan->dokumen($id);
+        abort_if($dokumen === null, 404);
+        $invoice = $dokumen['invoice'];
+
+        if (! $dokumen['punyaRincian']) {
+            return redirect()->route('keuangan.invoice.index')
+                ->with('error', 'Invoice '.$invoice->nomor_invoice.' belum memiliki lampiran rincian gaji sehingga tidak dapat dikirim via email.');
+        }
+
+        $data = $request->validated();
+        $email = new InvoiceKlienMail(
+            subjek: $data['subjek'],
+            pesan: $data['pesan'],
+            nomorInvoice: $invoice->nomor_invoice,
+            namaFilePdf: $this->namaFilePdfTagihan($invoice),
+            isiPdf: $this->pdfTagihan($dokumen)->output(),
+        );
+
+        try {
+            Mail::to($data['email_tujuan'])->cc($data['daftar_cc'] ?? [])->send($email);
+        } catch (Throwable $exception) {
+            // Detail SMTP hanya dicatat di log server, tidak ditampilkan ke pengguna.
+            Log::error('Gagal mengirim invoice via email.', [
+                'id_invoice' => $invoice->id,
+                'nomor_invoice' => $invoice->nomor_invoice,
+                'id_user' => $request->user()->getAuthIdentifier(),
+                'galat' => $exception::class.': '.$exception->getMessage(),
+            ]);
+
+            return redirect()->route('keuangan.invoice.index')->withInput()
+                ->with('error', 'Invoice '.$invoice->nomor_invoice.' gagal dikirim via email. Silakan coba lagi atau hubungi admin sistem untuk memeriksa pengaturan email.');
+        }
+
+        Log::info('Invoice dikirim via email.', [
+            'id_invoice' => $invoice->id,
+            'nomor_invoice' => $invoice->nomor_invoice,
+            'id_user' => $request->user()->getAuthIdentifier(),
+            'jumlah_penerima' => 1 + count($data['daftar_cc'] ?? []),
+        ]);
+
+        return redirect()->route('keuangan.invoice.index')
+            ->with('success', 'Invoice '.$invoice->nomor_invoice.' berhasil dikirim ke '.$data['email_tujuan']
+                .(($data['daftar_cc'] ?? []) !== [] ? ' (CC '.count($data['daftar_cc']).' alamat)' : '').'.');
+    }
+
+    /**
+     * PDF tagihan klien (surat permohonan, invoice, lampiran) dari data InvoiceKlienService::dokumen().
+     *
+     * @param  array<string, mixed>  $dokumen
+     */
+    private function pdfTagihan(array $dokumen): DokumenPdf
+    {
         return Pdf::loadView('keuangan.invoice.pdf', $dokumen)
             ->setPaper('a4')
-            ->setOption('defaultFont', 'DejaVu Sans')
-            ->stream(sprintf('tagihan-%s.pdf', $dokumen['invoice']->nomor_invoice));
+            ->setOption('defaultFont', 'DejaVu Sans');
+    }
+
+    private function namaFilePdfTagihan(object $invoice): string
+    {
+        return sprintf('tagihan-%s.pdf', $invoice->nomor_invoice);
     }
 
     /**
