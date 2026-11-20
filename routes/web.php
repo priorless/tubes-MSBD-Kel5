@@ -34,6 +34,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
 
+// PDF tagihan invoice untuk klien penerima tautan WhatsApp: tanpa login, hanya lewat signed URL per invoice.
+Route::get('/tagihan/{id}/pdf', [KeuanganController::class, 'pdfInvoicePublik'])
+    ->whereNumber('id')->middleware(['signed', 'throttle:30,1'])->name('invoice.publik.pdf');
+
 /*
 |--------------------------------------------------------------------------
 | Area setelah login
@@ -177,6 +181,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::post('invoice', 'generateInvoice')->name('invoice.generate');
         Route::patch('invoice/{id}/lunas', 'tandaiInvoiceLunas')->whereNumber('id')->name('invoice.lunas');
         Route::get('invoice/{id}/struk', 'strukInvoice')->whereNumber('id')->name('invoice.struk');
+        Route::put('invoice/{id}/dokumen', 'simpanDokumenInvoice')->whereNumber('id')->name('invoice.dokumen');
+        Route::post('invoice/{id}/email', 'kirimInvoiceEmail')->whereNumber('id')->middleware('throttle:10,1')->name('invoice.email');
     });
 
     /* =====================================================================

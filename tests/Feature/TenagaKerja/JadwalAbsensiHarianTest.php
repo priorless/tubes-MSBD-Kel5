@@ -99,11 +99,11 @@ class JadwalAbsensiHarianTest extends TestCase
         [$idPengaju, $idPenempatanPengaju] = $this->karyawanDitempatkan();
         [$idRekan, $idPenempatanRekan] = $this->karyawanDitempatkan();
         $tanggal = $this->hariIniDb(2);
-        $this->buatJadwal($idPenempatanPengaju, $tanggal, 'Kerja', '07:00', '15:00');
-        $this->buatJadwal($idPenempatanRekan, $tanggal, 'Kerja', '15:00', '23:00');
+        $idJadwalPengaju = $this->buatJadwal($idPenempatanPengaju, $tanggal, 'Kerja', '07:00', '15:00');
+        $idJadwalRekan = $this->buatJadwal($idPenempatanRekan, $tanggal, 'Kerja', '15:00', '23:00');
 
         $layanan = app(PertukaranShiftService::class);
-        $idPengajuan = $layanan->ajukan($idPengaju, $idRekan, $tanggal, 'Ada keperluan keluarga pada pagi hari.');
+        $idPengajuan = $layanan->ajukan($idPengaju, $idJadwalPengaju, $idJadwalRekan, 'Ada keperluan keluarga pada pagi hari.');
         $layanan->tanggapiRekan($idPengajuan, $idRekan, true, null, $this->loginSebagai(Role::KaryawanLapangan)->id);
         $layanan->setujui($idPengajuan, $this->loginSebagai(Role::Operasional)->id);
 
@@ -154,9 +154,9 @@ class JadwalAbsensiHarianTest extends TestCase
         return [$idKaryawan, $this->buatPenempatan($idKaryawan, $this->idKlien, $this->hariIniDb(-30))];
     }
 
-    private function buatJadwal(int $idPenempatan, string $tanggal, string $status, ?string $masuk = null, ?string $pulang = null): void
+    private function buatJadwal(int $idPenempatan, string $tanggal, string $status, ?string $masuk = null, ?string $pulang = null): int
     {
-        DB::table('tbl_jadwal_kerja')->insert([
+        return (int) DB::table('tbl_jadwal_kerja')->insertGetId([
             'id_penempatan' => $idPenempatan,
             'tanggal_kerja' => $tanggal,
             'status' => $status,

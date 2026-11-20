@@ -88,6 +88,13 @@ GRANT SELECT, UPDATE ON tbl_pertukaran_shift TO 'sji_role_operasional';
 GRANT SELECT ON tbl_payroll TO 'sji_role_keuangan';
 GRANT SELECT, INSERT, UPDATE ON tbl_komponen_gaji TO 'sji_role_keuangan';
 GRANT SELECT ON tbl_invoice TO 'sji_role_keuangan';
+-- Lampiran invoice (snapshot dari payroll) dan catatan tukar shift pada lampiran: hanya dibaca.
+GRANT SELECT ON tbl_invoice_detail TO 'sji_role_keuangan';
+GRANT SELECT ON tbl_pertukaran_shift TO 'sji_role_keuangan';
+-- Mode edit dokumen tagihan: teks surat & catatan manual per invoice, riwayat audit hanya ditambah.
+GRANT SELECT, INSERT, UPDATE ON tbl_invoice_dokumen TO 'sji_role_keuangan';
+GRANT SELECT, INSERT, UPDATE, DELETE ON tbl_invoice_catatan TO 'sji_role_keuangan';
+GRANT SELECT, INSERT ON tbl_invoice_dokumen_riwayat TO 'sji_role_keuangan';
 GRANT SELECT ON tbl_mutasi_keuangan TO 'sji_role_keuangan';
 GRANT SELECT ON tbl_klien TO 'sji_role_keuangan';
 GRANT SELECT ON tbl_kontrak TO 'sji_role_keuangan';

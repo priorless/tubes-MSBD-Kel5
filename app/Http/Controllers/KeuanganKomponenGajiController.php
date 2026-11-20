@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\LabelBpjs;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -16,6 +17,9 @@ class KeuanganKomponenGajiController extends Controller
         5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
         9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
     ];
+
+    /** Pembagi upah per jam lembur: gaji pokok sebulan / 173. */
+    private const int PEMBAGI_UPAH_PER_JAM = 173;
 
     public function index(Request $request): View
     {
@@ -51,7 +55,6 @@ class KeuanganKomponenGajiController extends Controller
 
             return (object) [...(array) $item, ...$otomatis,
                 'tunjangan' => (float) ($tersimpan->tunjangan ?? 0),
-                'potongan_bpjs' => (float) ($tersimpan->potongan_bpjs ?? 0),
                 'potongan_pinjaman' => (float) ($tersimpan->potongan_pinjaman ?? 0),
             ];
         });
@@ -79,7 +82,6 @@ class KeuanganKomponenGajiController extends Controller
             'jenis_pekerjaan' => ['nullable', 'integer', Rule::in($jenisPekerjaan->pluck('id')->all())],
             'komponen' => ['required', 'array', 'min:1'],
             'komponen.*.tunjangan' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
-            'komponen.*.potongan_bpjs' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'komponen.*.potongan_pinjaman' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
         ], [
             'komponen.required' => 'Komponen gaji tidak ditemukan untuk disimpan.',
@@ -93,6 +95,9 @@ class KeuanganKomponenGajiController extends Controller
         $idsDikirim = array_map('strval', array_keys($validated['komponen']));
         abort_if(array_diff($idsDikirim, $karyawanIds) !== [], 422, 'Daftar karyawan tidak sesuai dengan filter periode dan penempatan.');
 
+        // Hanya Tunjangan & Potongan Pinjaman yang diambil dari request (field lain di request diabaikan oleh validate()).
+        // Komponen otomatis (gaji pokok, lembur, back-up, potongan absensi, BPJS) tidak disimpan di sini:
+        // Generate Payroll menghitungnya sendiri dari data sumber di database.
         $sekarang = now();
         $baris = [];
         foreach ($validated['komponen'] as $idKaryawan => $nilai) {
@@ -101,7 +106,6 @@ class KeuanganKomponenGajiController extends Controller
                 'periode_bulan' => (int) $validated['bulan'],
                 'periode_tahun' => (int) $validated['tahun'],
                 'tunjangan' => $nilai['tunjangan'],
-                'potongan_bpjs' => $nilai['potongan_bpjs'],
                 'potongan_pinjaman' => $nilai['potongan_pinjaman'],
                 'created_at' => $sekarang,
                 'updated_at' => $sekarang,
@@ -111,7 +115,7 @@ class KeuanganKomponenGajiController extends Controller
         DB::transaction(fn () => DB::table('tbl_komponen_gaji')->upsert(
             $baris,
             ['id_karyawan', 'periode_bulan', 'periode_tahun'],
-            ['tunjangan', 'potongan_bpjs', 'potongan_pinjaman', 'updated_at'],
+            ['tunjangan', 'potongan_pinjaman', 'updated_at'],
         ));
 
         return redirect()->route('keuangan.komponen-gaji.index', [
@@ -151,9 +155,14 @@ class KeuanganKomponenGajiController extends Controller
             ->values();
     }
 
-    /** Angka otomatis mengikuti rumus yang dipakai sp_generate_payroll_bulanan. */
+    /**
+     * Komponen otomatis (read-only). Gaji pokok & potongan absensi mengikuti sp_generate_payroll_bulanan;
+     * lembur, BPJS, dan back-up mengikuti aturan Komponen Gaji (lihat upahLembur(), potonganBpjs()).
+     * Nilai ini selalu dihitung ulang di server dan tidak pernah diambil dari request.
+     */
     private function komponenOtomatis(object $karyawan, int $bulan, int $tahun): array
     {
+        $idKlien = null;
         $awal = Carbon::create($tahun, $bulan, 1)->toDateString();
         $akhir = Carbon::create($tahun, $bulan, 1)->endOfMonth()->toDateString();
         $hariBulan = Carbon::create($tahun, $bulan, 1)->daysInMonth;
@@ -177,10 +186,12 @@ class KeuanganKomponenGajiController extends Controller
                 ->where('p.id_karyawan', $karyawan->id)->where('p.tgl_mulai', '<=', $akhir)
                 ->where(fn ($query) => $query->whereNull('p.tgl_selesai')->orWhere('p.tgl_selesai', '>=', $awal))
                 ->orderByDesc('p.tgl_mulai')->orderByDesc('p.id')->orderByDesc('c.id')
-                ->first(['c.gaji_pokok', 'c.hari_kerja_per_bulan']);
+                ->first(['c.gaji_pokok', 'c.hari_kerja_per_bulan', 'p.id_klien']);
 
             if ($kontrak !== null && (int) $kontrak->hari_kerja_per_bulan > 0) {
                 $gajiTersedia = true;
+                // Klien BPJS = klien penempatan yang kontraknya dipakai sebagai sumber gaji (sama dengan Generate Payroll).
+                $idKlien = (int) $kontrak->id_klien;
                 $hariPenempatan = (int) DB::selectOne('SELECT fn_hari_penempatan(?, NULL, ?, ?) AS jumlah', [$karyawan->id, $awal, $akhir])->jumlah;
                 $hariWajib = (int) round((int) $kontrak->hari_kerja_per_bulan * $hariPenempatan / $hariBulan);
                 $hariMasuk = DB::table('tbl_absensi')->where('id_karyawan', $karyawan->id)
@@ -192,18 +203,90 @@ class KeuanganKomponenGajiController extends Controller
             }
         }
 
-        $jamLembur = (int) DB::table('tbl_absensi')->where('id_karyawan', $karyawan->id)
-            ->whereBetween('tgl', [$awal, $akhir])->where('status_lembur', 'Disetujui')->sum('jam_lembur');
-        $lembur = (float) DB::selectOne('SELECT fn_hitung_lembur(?) AS nominal', [$jamLembur])->nominal;
+        $lembur = $this->upahLembur((int) $karyawan->id, $awal, $akhir, $gajiTersedia ? $gaji : null);
+        $bpjs = $this->potonganBpjs($idKlien, $gajiTersedia ? $gaji : null);
 
         return [
             'gaji_pokok' => $gaji,
-            'upah_lembur' => $lembur,
+            'upah_lembur' => $lembur['nominal'],
+            'jam_lembur' => $lembur['jam'],
             'potongan_absen' => $potongan,
+            'potongan_bpjs' => $bpjs['nominal'],
+            'keterangan_bpjs' => $bpjs['keterangan'],
             'hari_wajib' => $hariWajib,
             'hari_absen' => $hariAbsen,
             'status_gaji' => $gajiTersedia ? null : 'Sumber gaji belum tersedia',
+            // Belum ada sumber data penugasan Back-up (Pengganti Kosong) + persetujuan Operasional + tarifnya.
+            // Pertukaran Shift (barter) bukan Back-up, sehingga tidak pernah menghasilkan upah back-up.
             'upah_backup' => 0.0,
+        ];
+    }
+
+    /**
+     * Upah lembur dari absensi yang valid: sudah check-in dan check-out serta berstatus Hadir/Terlambat.
+     * Jam lembur per absensi diambil dari tbl_absensi.jam_lembur yang diisi
+     * trigger trg_auto_hitung_lembur saat check-out: FLOOR(menit melewati jam pulang jadwal / 60), dengan
+     * jam pulang dari fn_jadwal_absensi (jadwal roster, termasuk shift lintas tengah malam). Akibatnya
+     * kelebihan 0–59 menit = 0 jam; lembur baru dihitung setelah 1 jam penuh.
+     *
+     * Per absensi: jam pertama 1,5 × upah per jam, jam kedua dst. 2 × upah per jam; upah per jam = gaji pokok / 173.
+     *
+     * @return array{nominal: float, jam: int}
+     */
+    private function upahLembur(int $idKaryawan, string $awal, string $akhir, ?float $gajiPokok): array
+    {
+        $jamPerAbsensi = DB::table('tbl_absensi')
+            ->where('id_karyawan', $idKaryawan)
+            ->whereBetween('tgl', [$awal, $akhir])
+            ->whereNotNull('jam_masuk')
+            ->whereNotNull('jam_keluar')
+            ->whereIn('status_kehadiran', ['Hadir', 'Terlambat'])
+            ->where('jam_lembur', '>=', 1)
+            ->pluck('jam_lembur')
+            ->map(fn ($jam): int => (int) $jam);
+
+        if ($gajiPokok === null || $gajiPokok <= 0) {
+            return ['nominal' => 0.0, 'jam' => (int) $jamPerAbsensi->sum()];
+        }
+
+        // Urutan hitung sama dengan sp_generate_payroll_bulanan (sql/Komponen/15): gaji × kelipatan / 173.
+        $kelipatan = $jamPerAbsensi->sum(fn (int $jam): float => 1.5 + 2 * ($jam - 1));
+
+        return ['nominal' => round($gajiPokok * $kelipatan / self::PEMBAGI_UPAH_PER_JAM, 2), 'jam' => (int) $jamPerAbsensi->sum()];
+    }
+
+    /**
+     * Potongan BPJS = persentase BPJS klien tempat karyawan bertugas × gaji pokok (dibulatkan 2 desimal
+     * seperti routine database). Hanya persentase dari master klien yang dipakai: klien tanpa klien /
+     * belum diatur / bukan persentase, atau gaji tidak tersedia -> tidak dihitung (tanpa nominal karangan).
+     *
+     * @return array{nominal: float|null, keterangan: string}
+     */
+    private function potonganBpjs(?int $idKlien, ?float $gajiPokok): array
+    {
+        if ($idKlien === null) {
+            return ['nominal' => null, 'keterangan' => 'Tanpa klien penempatan'];
+        }
+
+        $klien = DB::table('tbl_klien')->where('id', $idKlien)->first(['nama_perusahaan', 'bpjs_metode', 'bpjs_nilai']);
+
+        if ($klien === null || $klien->bpjs_metode === null || $klien->bpjs_nilai === null) {
+            return ['nominal' => null, 'keterangan' => 'BPJS belum diatur pada data klien'];
+        }
+
+        if ($klien->bpjs_metode !== LabelBpjs::PERSENTASE) {
+            return ['nominal' => null, 'keterangan' => 'Persentase BPJS belum diatur pada data klien'];
+        }
+
+        if ($gajiPokok === null) {
+            return ['nominal' => null, 'keterangan' => 'Gaji pokok belum tersedia'];
+        }
+
+        $persen = (float) $klien->bpjs_nilai;
+
+        return [
+            'nominal' => round($gajiPokok * $persen / 100, 2),
+            'keterangan' => LabelBpjs::aturan(LabelBpjs::PERSENTASE, $persen).' · '.$klien->nama_perusahaan,
         ];
     }
 }

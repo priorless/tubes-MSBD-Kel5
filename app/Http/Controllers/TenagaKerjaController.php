@@ -13,6 +13,7 @@ use App\Support\FotoAbsensiTidakValid;
 use App\Support\JamServer;
 use App\Support\KaryawanAktif;
 use App\Support\KolomTidakDitemukan;
+use App\Support\LabelBpjs;
 use App\Support\ShiftAbsensi;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -652,7 +653,9 @@ class TenagaKerjaController extends Controller
         $abaikan = array_merge(
             config('tenaga_kerja.kolom_tersembunyi'),
             array_filter([$kolom['bulan'], $kolom['tahun'], $kolom['periode'], $kolom['total']]),
-            (array) config('tenaga_kerja.kolom.id_karyawan')
+            (array) config('tenaga_kerja.kolom.id_karyawan'),
+            // bpjs_nilai bisa berupa persen; ditampilkan sebagai satu baris "Aturan BPJS" di bawah, bukan sebagai rupiah.
+            ['bpjs_metode', 'bpjs_nilai']
         );
 
         $hasil = ['penghasilan' => [], 'potongan' => [], 'info' => [], 'total' => null];
@@ -668,6 +671,11 @@ class TenagaKerjaController extends Controller
             } else {
                 $hasil['info'][] = $item;
             }
+        }
+
+        if (($slip->bpjs_metode ?? null) !== null) {
+            $aturan = LabelBpjs::aturan($slip->bpjs_metode, $slip->bpjs_nilai ?? null);
+            $hasil['info'][] = ['label' => 'Aturan BPJS', 'nilai' => $aturan, 'kolom' => 'bpjs_metode', 'mentah' => $aturan];
         }
 
         if ($kolom['total']) {

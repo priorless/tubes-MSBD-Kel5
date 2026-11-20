@@ -36,12 +36,19 @@
                     <select name="id_klien" id="id_klien" @class(['form-input', 'form-input-error' => $errors->has('id_klien')]) required>
                         <option value="">&mdash; Pilih klien &mdash;</option>
                         @foreach ($klien as $item)
-                            <option value="{{ $item->id }}" @selected((int) old('id_klien') === (int) $item->id)>
+                            <option value="{{ $item->id }}" @selected((int) old('id_klien') === (int) $item->id)
+                                    data-fee="{{ $item->management_fee === null ? '' : \App\Support\LabelBpjs::persen($item->management_fee) }}">
                                 {{ $item->kode_klien }} &mdash; {{ $item->nama_perusahaan }}
                             </option>
                         @endforeach
                     </select>
                     @error('id_klien') <p class="form-error">{{ $message }}</p> @enderror
+                </div>
+
+                <div id="info_fee_klien" class="hidden rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm" aria-live="polite">
+                    <p class="text-xs text-gray-500">Management fee klien (dari data klien Operasional)</p>
+                    <p class="font-semibold text-gray-800" id="info_fee_nilai"></p>
+                    <p class="mt-1 text-xs text-gray-500" id="info_fee_keterangan"></p>
                 </div>
 
                 <div class="grid grid-cols-12 gap-3">
@@ -63,7 +70,10 @@
                 </div>
 
                 <p class="text-xs text-gray-500">
-                    Jumlah tenaga dan total tagihan dihitung otomatis oleh database dari penempatan aktif klien pada periode tersebut.
+                    Sub Total diambil dari payroll yang sudah di-generate untuk karyawan klien pada periode tersebut
+                    (gaji pokok + tunjangan + upah back-up + lembur &minus; potongan absensi; BPJS sudah termasuk).
+                    Management Fee = persentase klien &times; Sub Total, PPN = 11% &times; Management Fee.
+                    Generate payroll periode tersebut terlebih dahulu.
                 </p>
             </div>
 
@@ -85,7 +95,10 @@
                             <th>Klien</th>
                             <th>Periode</th>
                             <th class="text-center">Tenaga</th>
-                            <th class="text-right">Total Tagihan</th>
+                            <th class="text-right">Sub Total</th>
+                            <th class="text-right">Management Fee</th>
+                            <th class="text-right">PPN 11%</th>
+                            <th class="text-right">Grand Total</th>
                             <th>Status</th>
                             <th class="text-center">Aksi</th>
                         </tr>
@@ -97,7 +110,17 @@
                                 <td>{{ $item->nama_perusahaan }}</td>
                                 <td class="whitespace-nowrap">{{ $daftarBulan[$item->periode_bulan] ?? $item->periode_bulan }} {{ $item->periode_tahun }}</td>
                                 <td class="text-center">{{ $item->jumlah_tenaga }}</td>
-                                <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->total_tagihan, 0, ',', '.') }}</td>
+                                @if ((float) $item->sub_total > 0)
+                                    <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->sub_total, 0, ',', '.') }}</td>
+                                    <td class="text-right whitespace-nowrap tabular-nums">
+                                        Rp {{ number_format((float) $item->management_fee, 0, ',', '.') }}
+                                        <p class="text-xs text-gray-400">{{ \App\Support\LabelBpjs::persen($item->persen_fee) }}</p>
+                                    </td>
+                                    <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->ppn, 0, ',', '.') }}</td>
+                                @else
+                                    <td colspan="3" class="text-center text-xs text-gray-400">Invoice lama (sebelum rincian payroll)</td>
+                                @endif
+                                <td class="text-right font-semibold whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->total_tagihan, 0, ',', '.') }}</td>
                                 <td class="whitespace-nowrap">
                                     @if ($item->status === 'Lunas')
                                         <span class="badge badge-success">Lunas</span>
@@ -110,6 +133,26 @@
                                     <div class="flex items-center justify-center gap-2">
                                         <button type="button" class="btn-secondary btn-sm whitespace-nowrap"
                                                 data-struk-url="{{ route('keuangan.invoice.struk', $item->id) }}">Lihat Struk</button>
+                                        @if ((float) $item->sub_total > 0)
+                                            <button type="button" class="btn-primary btn-sm whitespace-nowrap"
+                                                    data-email-url="{{ route('keuangan.invoice.email', $item->id) }}"
+                                                    data-email-id="{{ $item->id }}"
+                                                    data-email-nomor="{{ $item->nomor_invoice }}"
+                                                    data-email-klien="{{ $item->nama_perusahaan }}"
+                                                    data-email-tujuan="{{ $item->pic_email }}"
+                                                    data-email-subjek="{{ $item->email['subjek'] }}"
+                                                    data-email-pesan="{{ $item->email['pesan'] }}">Kirim via Email</button>
+                                        @endif
+                                        @if ($item->whatsapp !== null)
+                                            @if ($item->whatsapp['url'] !== null)
+                                                <a href="{{ $item->whatsapp['url'] }}" target="_blank" rel="noopener noreferrer"
+                                                   class="btn-success btn-sm whitespace-nowrap" style="background-color: #25D366; border-color: #25D366;"
+                                                   data-whatsapp-kirim>Kirim via WhatsApp</a>
+                                            @else
+                                                <button type="button" class="btn-success btn-sm whitespace-nowrap" style="background-color: #25D366; border-color: #25D366;"
+                                                        data-whatsapp-galat="{{ $item->whatsapp['galat'] }}">Kirim via WhatsApp</button>
+                                            @endif
+                                        @endif
                                         @if ($item->status !== 'Lunas')
                                             <form method="POST" action="{{ route('keuangan.invoice.lunas', $item->id) }}" class="flex items-center gap-2"
                                                   onsubmit="return confirm(@js('Tandai invoice '.$item->nomor_invoice.' sebagai lunas?'));">
@@ -126,7 +169,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="table-empty">Belum ada invoice.</td>
+                                <td colspan="10" class="table-empty">Belum ada invoice.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -147,7 +190,7 @@
             <div class="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-5 py-3">
                 <h2 id="strukModalJudul" class="text-sm font-semibold text-gray-800">Invoice Digital</h2>
                 <div class="flex items-center gap-2">
-                    <button type="button" class="btn-primary btn-sm" data-struk-cetak disabled>Cetak / Simpan PDF</button>
+                    <a href="#" class="btn-primary btn-sm pointer-events-none opacity-50" data-struk-pdf target="_blank" rel="noopener" aria-disabled="true">Unduh PDF Tagihan</a>
                     <button type="button" class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800" data-struk-tutup aria-label="Tutup struk">
                         <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
@@ -159,18 +202,102 @@
         </div>
     </dialog>
 
-    <div id="areaCetakStruk"></div>
+    {{-- ===================== Modal kirim invoice via email ===================== --}}
+    <dialog id="emailModal" aria-labelledby="emailModalJudul"
+            class="m-auto max-h-[92vh] w-[calc(100%-2rem)] max-w-2xl overflow-hidden rounded-xl bg-white p-0 shadow-2xl backdrop:bg-gray-900/60">
+        <form method="POST" action="#" class="flex max-h-[92vh] flex-col" data-email-form
+              onsubmit="return confirm('Kirim invoice ini via email sekarang?');">
+            @csrf
+            <input type="hidden" name="id_invoice" value="">
+            <input type="hidden" name="form_email" value="1">
+            <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
+                <div>
+                    <h2 id="emailModalJudul" class="text-sm font-semibold text-gray-800">Kirim Invoice via Email</h2>
+                    <p class="text-xs text-gray-500" data-email-info></p>
+                </div>
+                <button type="button" class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800" data-email-tutup aria-label="Tutup form email">
+                    <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="space-y-4 overflow-y-auto px-5 py-4">
+                <div>
+                    <label for="email_tujuan" class="form-label">Email tujuan</label>
+                    <input type="email" name="email_tujuan" id="email_tujuan" maxlength="100" required
+                           @class(['form-input', 'form-input-error' => $errors->has('email_tujuan')])>
+                    <p class="form-hint">Terisi otomatis dari email PIC klien; dapat diubah.</p>
+                    @error('email_tujuan') <p class="form-error">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label for="email_cc" class="form-label">CC <span class="font-normal text-gray-400">(opsional)</span></label>
+                    <input type="text" name="cc" id="email_cc" maxlength="1000" placeholder="contoh: keuangan@klien.co.id, direktur@klien.co.id"
+                           @class(['form-input', 'form-input-error' => $errors->has('cc') || $errors->has('daftar_cc') || $errors->has('daftar_cc.*')])>
+                    <p class="form-hint">Pisahkan beberapa alamat dengan koma. Maksimal {{ \App\Http\Requests\Keuangan\KirimInvoiceEmailRequest::MAKS_CC }} alamat.</p>
+                    @foreach (array_merge($errors->get('cc'), $errors->get('daftar_cc'), ...array_values($errors->get('daftar_cc.*'))) as $pesanCc)
+                        <p class="form-error">{{ $pesanCc }}</p>
+                    @endforeach
+                </div>
+                <div>
+                    <label for="email_subjek" class="form-label">Subjek</label>
+                    <input type="text" name="subjek" id="email_subjek" maxlength="200" required
+                           @class(['form-input', 'form-input-error' => $errors->has('subjek')])>
+                    @error('subjek') <p class="form-error">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label for="email_pesan" class="form-label">Isi pesan</label>
+                    <textarea name="pesan" id="email_pesan" rows="12" maxlength="5000" required
+                              @class(['form-input', 'form-input-error' => $errors->has('pesan')])></textarea>
+                    @error('pesan') <p class="form-error">{{ $message }}</p> @enderror
+                </div>
+                @error('id_invoice') <p class="form-error">{{ $message }}</p> @enderror
+                <p class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                    Lampiran: PDF tagihan (surat permohonan, invoice, dan lampiran rincian) versi terakhir yang tersimpan,
+                    sama dengan tombol Unduh PDF Tagihan. Nominal diambil dari sistem.
+                </p>
+            </div>
+
+            <div class="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
+                <button type="button" class="btn-secondary" data-email-tutup>Batal</button>
+                <button type="submit" class="btn-primary">Kirim Email</button>
+            </div>
+        </form>
+    </dialog>
 @endsection
 
 @push('scripts')
     <script>
         (() => {
+            // Management fee klien ditampilkan saat klien dipilih (hanya dibaca; diatur Operasional di data klien).
+            const pilihKlien = document.getElementById('id_klien');
+            const infoFee = document.getElementById('info_fee_klien');
+            const tampilkanFee = () => {
+                const opsi = pilihKlien.selectedOptions[0];
+                infoFee.classList.toggle('hidden', !opsi || opsi.value === '');
+                if (!opsi || opsi.value === '') return;
+                const ada = opsi.dataset.fee !== '';
+                document.getElementById('info_fee_nilai').textContent = ada ? opsi.dataset.fee : 'Belum diatur';
+                document.getElementById('info_fee_keterangan').textContent = ada
+                    ? 'Management Fee = ' + opsi.dataset.fee + ' x Sub Total; PPN 11% dihitung dari Management Fee.'
+                    : 'Invoice tidak dapat dibuat sebelum Operasional mengisi Management Fee klien ini (0% pun boleh).';
+            };
+            pilihKlien.addEventListener('change', tampilkanFee);
+            tampilkanFee();
+        })();
+
+        (() => {
             const modal = document.getElementById('strukModal');
             const isi = document.getElementById('strukModalIsi');
             const judul = document.getElementById('strukModalJudul');
-            const tombolCetak = modal.querySelector('[data-struk-cetak]');
-            const areaCetak = document.getElementById('areaCetakStruk');
-            document.body.appendChild(areaCetak);
+            const tautanPdf = modal.querySelector('[data-struk-pdf]');
+            const aturPdf = (url) => {
+                const aktif = url !== null;
+                tautanPdf.href = aktif ? url + '?format=pdf' : '#';
+                tautanPdf.classList.toggle('pointer-events-none', !aktif);
+                tautanPdf.classList.toggle('opacity-50', !aktif);
+                tautanPdf.setAttribute('aria-disabled', aktif ? 'false' : 'true');
+            };
 
             const tampilkanPesan = (pesan, kelas) => {
                 isi.innerHTML = '';
@@ -180,10 +307,13 @@
                 isi.appendChild(p);
             };
 
+            let urlStrukAktif = null;
+
             const bukaStruk = async (url) => {
+                urlStrukAktif = url;
                 judul.textContent = 'Invoice Digital';
-                tombolCetak.disabled = true;
-                tampilkanPesan('Memuat struk invoice...', 'text-gray-500');
+                aturPdf(null);
+                tampilkanPesan('Memuat invoice...', 'text-gray-500');
                 if (!modal.open) modal.showModal();
 
                 try {
@@ -194,7 +324,7 @@
                     if (!respons.ok) throw new Error(String(respons.status));
                     isi.innerHTML = await respons.text();
                     judul.textContent = isi.querySelector('[data-judul]')?.dataset.judul ?? 'Invoice Digital';
-                    tombolCetak.disabled = false;
+                    aturPdf(isi.querySelector('[data-punya-rincian="1"]') ? url : null);
                 } catch (galat) {
                     tampilkanPesan(galat.message === '404'
                         ? 'Invoice tidak ditemukan.'
@@ -209,15 +339,74 @@
             modal.querySelector('[data-struk-tutup]').addEventListener('click', () => modal.close());
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
 
-            tombolCetak.addEventListener('click', () => {
-                areaCetak.innerHTML = isi.innerHTML;
-                document.body.classList.add('cetak-struk');
-                window.print();
+            // Mode edit dokumen (teks surat & catatan manual). Isi modal dimuat lewat fetch, jadi event didelegasikan.
+            isi.addEventListener('click', (e) => {
+                const dokumen = e.target.closest('[data-dokumen]');
+                if (!dokumen) return;
+                const form = dokumen.querySelector('[data-mode-edit]');
+
+                if (e.target.closest('[data-edit-mulai]')) {
+                    dokumen.querySelector('[data-mode-lihat]').classList.add('hidden');
+                    form.classList.remove('hidden');
+                    aturPdf(null);
+                    form.querySelector('input:not([type="hidden"]), textarea')?.focus();
+                } else if (e.target.closest('[data-edit-batal]')) {
+                    // Batal: buang semua perubahan dengan memuat ulang versi terakhir yang tersimpan.
+                    if (urlStrukAktif) bukaStruk(urlStrukAktif);
+                } else if (e.target.closest('[data-catatan-tambah]')) {
+                    const daftar = form.querySelector('[data-catatan-daftar]');
+                    const indeks = Number(daftar.dataset.catatanBerikut);
+                    const baris = form.querySelector('[data-catatan-template]').content.firstElementChild.cloneNode(true);
+                    baris.querySelector('[data-nama="isi"]').name = `catatan[${indeks}][isi]`;
+                    daftar.dataset.catatanBerikut = String(indeks + 1);
+                    daftar.appendChild(baris);
+                    baris.querySelector('textarea').focus();
+                } else if (e.target.closest('[data-catatan-hapus]')) {
+                    e.target.closest('[data-catatan-baris]').remove();
+                }
             });
-            window.addEventListener('afterprint', () => {
-                document.body.classList.remove('cetak-struk');
-                areaCetak.innerHTML = '';
+            isi.addEventListener('submit', (e) => {
+                if (e.target.matches('[data-mode-edit]') && !confirm('Simpan perubahan dokumen invoice ini?')) e.preventDefault();
             });
+
+
+            // ===== Kirim invoice via WhatsApp: nomor/rekening tidak valid -> beri tahu, jangan buka WhatsApp =====
+            document.querySelectorAll('[data-whatsapp-galat]').forEach((tombol) => {
+                tombol.addEventListener('click', () => alert(tombol.dataset.whatsappGalat));
+            });
+
+            // ===== Kirim invoice via email =====
+            const modalEmail = document.getElementById('emailModal');
+            const formEmail = modalEmail.querySelector('[data-email-form]');
+            const bukaEmail = (tombol, isian = null) => {
+                const d = tombol.dataset;
+                formEmail.action = d.emailUrl;
+                formEmail.elements.id_invoice.value = d.emailId;
+                formEmail.elements.email_tujuan.value = isian?.email_tujuan ?? d.emailTujuan ?? '';
+                formEmail.elements.cc.value = isian?.cc ?? '';
+                formEmail.elements.subjek.value = isian?.subjek ?? d.emailSubjek;
+                formEmail.elements.pesan.value = isian?.pesan ?? d.emailPesan;
+                modalEmail.querySelector('[data-email-info]').textContent = d.emailNomor + ' · ' + d.emailKlien;
+                if (!modalEmail.open) modalEmail.showModal();
+            };
+            document.querySelectorAll('[data-email-url]').forEach((tombol) => {
+                tombol.addEventListener('click', () => {
+                    // Isian lama/pesan error hanya berlaku untuk percobaan sebelumnya.
+                    modalEmail.querySelectorAll('.form-error').forEach((el) => el.remove());
+                    modalEmail.querySelectorAll('.form-input-error').forEach((el) => el.classList.remove('form-input-error'));
+                    bukaEmail(tombol);
+                });
+            });
+            modalEmail.querySelectorAll('[data-email-tutup]').forEach((el) => el.addEventListener('click', () => modalEmail.close()));
+
+            @if (old('form_email') && old('id_invoice'))
+                {
+                    const tombolLama = document.querySelector('[data-email-id="' + @js((string) old('id_invoice')) + '"]');
+                    if (tombolLama) {
+                        bukaEmail(tombolLama, @js(['email_tujuan' => old('email_tujuan'), 'cc' => old('cc'), 'subjek' => old('subjek'), 'pesan' => old('pesan')]));
+                    }
+                }
+            @endif
 
             const idStrukDiminta = new URLSearchParams(window.location.search).get('struk');
             if (idStrukDiminta && /^\d+$/.test(idStrukDiminta)) {

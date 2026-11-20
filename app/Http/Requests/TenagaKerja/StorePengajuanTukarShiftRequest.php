@@ -23,8 +23,8 @@ class StorePengajuanTukarShiftRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tanggal_kerja' => ['bail', 'required', 'date_format:Y-m-d'],
-            'id_karyawan_rekan' => ['bail', 'required', 'integer', 'min:1'],
+            'id_jadwal_pengaju' => ['bail', 'required', 'integer', 'min:1'],
+            'id_jadwal_rekan' => ['bail', 'required', 'integer', 'min:1', 'different:id_jadwal_pengaju'],
             'alasan' => ['required', 'string', 'min:10', 'max:500'],
             'konfirmasi_rekan' => ['accepted'],
         ];
@@ -39,8 +39,9 @@ class StorePengajuanTukarShiftRequest extends FormRequest
             'required' => ':Attribute wajib diisi.',
             'integer' => ':Attribute tidak valid.',
             'min' => ':Attribute minimal :min karakter.',
-            'id_karyawan_rekan.min' => 'Rekan yang dipilih tidak valid.',
-            'date_format' => ':Attribute bukan tanggal yang valid.',
+            'id_jadwal_pengaju.min' => 'Jadwal Anda yang dipilih tidak valid.',
+            'id_jadwal_rekan.min' => 'Jadwal rekan yang dipilih tidak valid.',
+            'different' => 'Pilih dua jadwal yang berbeda.',
             'string' => ':Attribute harus berupa teks.',
             'max' => ':Attribute maksimal :max karakter.',
             'konfirmasi_rekan.accepted' => 'Pastikan rekan sudah menyetujui pertukaran, lalu centang pernyataan persetujuan rekan.',
@@ -53,8 +54,8 @@ class StorePengajuanTukarShiftRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'tanggal_kerja' => 'tanggal shift',
-            'id_karyawan_rekan' => 'rekan',
+            'id_jadwal_pengaju' => 'jadwal Anda',
+            'id_jadwal_rekan' => 'jadwal rekan',
             'alasan' => 'alasan',
         ];
     }

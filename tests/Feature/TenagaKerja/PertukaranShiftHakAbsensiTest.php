@@ -78,7 +78,7 @@ class PertukaranShiftHakAbsensiTest extends TestCase
 
         $this->actingAs($this->operasional())
             ->patch(route('operasional.jadwal-kerja.pertukaran-shift.approve', $idPengajuan))
-            ->assertSessionHas('success', 'Pengajuan disetujui. Jadwal kedua karyawan sudah ditukar.');
+            ->assertSessionHas('success', 'Pengajuan disetujui. Tanggal dan shift kedua jadwal sudah ditukar.');
 
         $this->assertDatabaseHas('tbl_jadwal_kerja', ['id' => $this->idJadwalAndi, 'jam_masuk' => '15:00:00', 'nama_shift_snapshot' => 'Siang']);
         $this->assertDatabaseHas('tbl_jadwal_kerja', ['id' => $this->idJadwalBudi, 'jam_masuk' => '07:00:00', 'nama_shift_snapshot' => 'Pagi']);
@@ -116,8 +116,8 @@ class PertukaranShiftHakAbsensiTest extends TestCase
     {
         $this->actingAs($this->akunKaryawan($this->idAndi))
             ->post(route('tenaga-kerja.tukar-shift.store'), [
-                'tanggal_kerja' => $this->hariIniDb(self::SELISIH_HARI),
-                'id_karyawan_rekan' => $this->idBudi,
+                'id_jadwal_pengaju' => $this->idJadwalAndi,
+                'id_jadwal_rekan' => $this->idJadwalBudi,
                 'alasan' => 'Ada keperluan keluarga pada pagi hari.',
                 'konfirmasi_rekan' => '1',
             ])
