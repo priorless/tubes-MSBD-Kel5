@@ -46,7 +46,7 @@ class StoreKaryawanRequest extends FormRequest
             'jenis_kelamin' => ['required', Rule::in(['L', 'P'])],
             'status_pernikahan' => ['nullable', Rule::in(['Belum Menikah', 'Menikah'])],
             'nama_ibu_kandung' => ['nullable', 'string', 'max:100'],
-            'jenis_jaminan_kesehatan' => ['nullable', Rule::in(self::PILIHAN_JAMINAN_KESEHATAN)],
+            'jenis_jaminan_kesehatan' => ['exclude_if:kategori,Internal', 'nullable', Rule::in(self::PILIHAN_JAMINAN_KESEHATAN)],
             'alamat' => ['nullable', 'string'],
             'no_telp' => ['bail', 'required', 'string', 'max:15', 'regex:/^\+?[0-9]{8,14}$/'],
             'email' => ['nullable', 'email', 'max:100', Rule::unique('tbl_karyawan', 'email')],
