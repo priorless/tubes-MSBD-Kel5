@@ -99,12 +99,11 @@ class JadwalAbsensiHarianTest extends TestCase
         [$idPengaju, $idPenempatanPengaju] = $this->karyawanDitempatkan();
         [$idRekan, $idPenempatanRekan] = $this->karyawanDitempatkan();
         $tanggal = $this->hariIniDb(2);
-        $idJadwalPengaju = $this->buatJadwal($idPenempatanPengaju, $tanggal, 'Kerja', '07:00', '15:00');
-        $idJadwalRekan = $this->buatJadwal($idPenempatanRekan, $tanggal, 'Kerja', '15:00', '23:00');
+        $this->buatJadwal($idPenempatanPengaju, $tanggal, 'Kerja', '07:00', '15:00');
+        $this->buatJadwal($idPenempatanRekan, $tanggal, 'Kerja', '15:00', '23:00');
 
         $layanan = app(PertukaranShiftService::class);
-        $idPengajuan = $layanan->ajukan($idPengaju, $idJadwalPengaju, $idJadwalRekan, 'Ada keperluan keluarga pada pagi hari.');
-        $layanan->tanggapiRekan($idPengajuan, $idRekan, true, null, $this->loginSebagai(Role::KaryawanLapangan)->id);
+        $idPengajuan = $layanan->ajukan($idPengaju, $idRekan, $tanggal, 'Ada keperluan keluarga pada pagi hari.');
         $layanan->setujui($idPengajuan, $this->loginSebagai(Role::Operasional)->id);
 
         $pengaju = $this->checkIn($idPengaju, $tanggal, '15:05:00');
