@@ -55,7 +55,7 @@ class TenagaKerjaController extends Controller
         }
 
         $data['foto'] = $this->urlFoto($data['hariIni']);
-        $data['tukarShift'] = $this->dataTukarShift($pertukaranShiftService, $id);
+        $data['tukarShiftMenungguTanggapan'] = $this->jumlahTukarShiftMenungguTanggapan($pertukaranShiftService, $id);
         $data['monitoring'] = $this->dataMonitoring($jadwal, $laporan, $jam, $id, $data['hariIni']);
 
         return view('tenaga-kerja.absensi', $data + $this->dataUmum() + $this->kolomAbsensi());
@@ -226,25 +226,38 @@ class TenagaKerjaController extends Controller
     }
 
     /**
-     * Data bagian Tukar Shift di halaman Absensi. Kegagalan di sini tidak boleh mengganggu absensi.
-     *
-     * @return array{tersedia: bool, opsi: list<array<string, mixed>>, riwayat: Collection<int, object>, layanan: PertukaranShiftService}
+     * Penanda pada tautan Tukar Shift di halaman Absensi. Kegagalan di sini tidak boleh mengganggu absensi.
      */
-    private function dataTukarShift(PertukaranShiftService $pertukaranShiftService, int $idKaryawan): array
+    private function jumlahTukarShiftMenungguTanggapan(PertukaranShiftService $pertukaranShiftService, int $idKaryawan): int
     {
-        $hasil = ['tersedia' => false, 'opsi' => [], 'riwayat' => collect(), 'layanan' => $pertukaranShiftService];
+        try {
+            return $pertukaranShiftService->jumlahMenungguTanggapan($idKaryawan);
+        } catch (QueryException) {
+            return 0;
+        }
+    }
+
+    /* =====================================================================
+     * Tukar Shift (Roker)
+     * ===================================================================== */
+
+    public function tukarShift(PertukaranShiftService $pertukaranShiftService)
+    {
+        $idKaryawan = KaryawanAktif::id();
+        $data = ['tersedia' => false, 'opsi' => [], 'riwayat' => null, 'layananTukar' => $pertukaranShiftService];
 
         try {
             if ($pertukaranShiftService->tersedia()) {
-                $hasil['tersedia'] = true;
-                $hasil['opsi'] = $pertukaranShiftService->opsiPengajuan($idKaryawan);
-                $hasil['riwayat'] = $pertukaranShiftService->riwayatKaryawan($idKaryawan);
+                $data['tersedia'] = true;
+                $data['opsi'] = $pertukaranShiftService->opsiPengajuan($idKaryawan);
+                $data['riwayat'] = $pertukaranShiftService->riwayatKaryawan($idKaryawan);
             }
-        } catch (QueryException) {
-            $hasil['tersedia'] = false;
+        } catch (QueryException $e) {
+            $data['tersedia'] = false;
+            session()->now('gagal', TenagaKerjaService::pesanError($e));
         }
 
-        return $hasil;
+        return view('tenaga-kerja.tukar-shift', $data + $this->dataUmum());
     }
 
     /** Primary key baris absensi (kolom sesuai config), atau null. */
