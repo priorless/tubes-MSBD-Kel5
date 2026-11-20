@@ -27,14 +27,15 @@ class PengajuanTukarShiftController extends Controller
         try {
             $pertukaranShiftService->ajukan(
                 (int) KaryawanAktif::id(),
-                (int) $validated['id_jadwal_pengaju'],
-                (int) $validated['id_jadwal_rekan'],
+                (int) $validated['id_karyawan_rekan'],
+                $validated['tanggal_kerja'],
                 trim($validated['alasan']),
+                $validated['tanggal_kerja_rekan'] ?? null,
             );
         } catch (ValidationException $exception) {
             return $kembali->withInput()->with('gagal', $exception->validator->errors()->first());
         }
 
-        return $kembali->with('sukses', 'Pengajuan tukar shift terkirim. Menunggu persetujuan rekan, lalu persetujuan akhir Operasional.');
+        return $kembali->with('sukses', 'Pengajuan tukar shift terkirim dan menunggu persetujuan Operasional.');
     }
 }

@@ -53,9 +53,9 @@ class PertukaranShiftController extends Controller
 
         $query = $pertukaranShiftService->queryDaftar()
             ->when($status !== 'Semua', fn (Builder $query) => $query->where('ps.status', $status))
-            // Pengajuan cocok bila tanggal jadwal pengaju ATAU tanggal jadwal rekan berada dalam rentang.
             ->when($tanggalDari !== null || $tanggalSampai !== null, fn (Builder $query) => $query->where(function (Builder $query) use ($tanggalDari, $tanggalSampai): void {
-                foreach (['ps.tanggal_kerja', 'ps.tanggal_kerja_rekan'] as $kolom) {
+                // Cocok bila tanggal jadwal pengaju (ps) ATAU tanggal jadwal rekan (jr) berada dalam rentang.
+                foreach (['ps.tanggal_kerja', 'jr.tanggal_kerja'] as $kolom) {
                     $query->orWhere(fn (Builder $query) => $query
                         ->when($tanggalDari, fn (Builder $query, string $tanggal) => $query->where($kolom, '>=', $tanggal))
                         ->when($tanggalSampai, fn (Builder $query, string $tanggal) => $query->where($kolom, '<=', $tanggal)));
@@ -127,7 +127,7 @@ class PertukaranShiftController extends Controller
 
         return redirect()
             ->route('operasional.jadwal-kerja.pertukaran-shift.show', $pertukaranShift)
-            ->with('success', 'Pengajuan disetujui. Tanggal dan shift kedua jadwal sudah ditukar.');
+            ->with('success', 'Pengajuan disetujui. Jadwal kedua karyawan sudah ditukar.');
     }
 
     public function reject(Request $request, int $pertukaranShift, PertukaranShiftService $pertukaranShiftService): RedirectResponse
