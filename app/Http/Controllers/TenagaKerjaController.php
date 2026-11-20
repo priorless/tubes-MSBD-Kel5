@@ -37,7 +37,7 @@ class TenagaKerjaController extends Controller
      * Absensi
      * ===================================================================== */
 
-    public function absensi(PertukaranShiftService $pertukaranShiftService, JadwalAbsensiService $jadwal, LaporanAktivitasService $laporan, JamServer $jam)
+    public function absensi(JadwalAbsensiService $jadwal, LaporanAktivitasService $laporan, JamServer $jam)
     {
         $id = KaryawanAktif::id();
         $data = ['hariIni' => null, 'waktuServer' => now()->toDateTimeString(), 'status' => 'belum', 'masukIso' => null, 'penugasan' => null];
@@ -55,7 +55,6 @@ class TenagaKerjaController extends Controller
         }
 
         $data['foto'] = $this->urlFoto($data['hariIni']);
-        $data['tukarShiftMenungguTanggapan'] = $this->jumlahTukarShiftMenungguTanggapan($pertukaranShiftService, $id);
         $data['monitoring'] = $this->dataMonitoring($jadwal, $laporan, $jam, $id, $data['hariIni']);
 
         return view('tenaga-kerja.absensi', $data + $this->dataUmum() + $this->kolomAbsensi());
@@ -223,18 +222,6 @@ class TenagaKerjaController extends Controller
         }
 
         return $this->balasAbsensi($request, true, $this->pesanSukses('keluar', $selesai), baris: $selesai);
-    }
-
-    /**
-     * Penanda pada tautan Tukar Shift di halaman Absensi. Kegagalan di sini tidak boleh mengganggu absensi.
-     */
-    private function jumlahTukarShiftMenungguTanggapan(PertukaranShiftService $pertukaranShiftService, int $idKaryawan): int
-    {
-        try {
-            return $pertukaranShiftService->jumlahMenungguTanggapan($idKaryawan);
-        } catch (QueryException) {
-            return 0;
-        }
     }
 
     /* =====================================================================

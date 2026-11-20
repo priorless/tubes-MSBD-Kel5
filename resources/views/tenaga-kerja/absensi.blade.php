@@ -366,11 +366,8 @@
         <div>
             <p class="tk-heading flex items-center gap-2 font-bold text-gray-800">
                 Tukar Shift dengan Rekan
-                @if ($tukarShiftMenungguTanggapan > 0)
-                    <span class="badge badge-warning">{{ $tukarShiftMenungguTanggapan }} menunggu tanggapan Anda</span>
-                @endif
             </p>
-            <p class="text-sm text-gray-500">Ajukan, tanggapi, atau batalkan pertukaran shift dengan rekan satu layanan di lokasi yang sama</p>
+            <p class="text-sm text-gray-500">Ajukan atau batalkan pertukaran shift dengan rekan satu layanan di lokasi yang sama</p>
         </div>
         <span class="text-gray-400 transition group-hover:translate-x-1 group-hover:text-sji-biru">&rarr;</span>
     </a>

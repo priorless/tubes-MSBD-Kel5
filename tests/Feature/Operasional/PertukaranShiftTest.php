@@ -12,7 +12,7 @@ use Tests\Concerns\CreatesSjiAuthTables;
 use Tests\TestCase;
 
 /**
- * Pengajuan tukar shift oleh karyawan (menu Tukar Shift) dan persetujuan Operasional (menu Jadwal Kerja).
+ * Pengajuan tukar shift oleh karyawan (menu Tukar Shift) yang langsung diputuskan Operasional (menu Jadwal Kerja).
  * Skema SQLite ringkas; tbl_pertukaran_shift dibuat oleh migration aslinya.
  */
 class PertukaranShiftTest extends TestCase
@@ -20,6 +20,8 @@ class PertukaranShiftTest extends TestCase
     use CreatesSjiAuthTables;
 
     private const string TANGGAL_SHIFT = '2026-11-20';
+
+    private const string TANGGAL_SHIFT_REKAN = '2026-11-22';
 
     private const int LAYANAN_SATPAM = 1;
 
@@ -56,7 +58,7 @@ class PertukaranShiftTest extends TestCase
         $this->actingAs($this->employeeUser($this->requesterId))
             ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload())
             ->assertRedirect(route('tenaga-kerja.tukar-shift.index'))
-            ->assertSessionHas('sukses', 'Pengajuan tukar shift terkirim. Menunggu persetujuan rekan, lalu persetujuan akhir Operasional.');
+            ->assertSessionHas('sukses', 'Pengajuan tukar shift terkirim dan menunggu persetujuan Operasional.');
 
         $this->assertDatabaseHas('tbl_pertukaran_shift', [
             'id_karyawan_pengaju' => $this->requesterId,
@@ -87,10 +89,10 @@ class PertukaranShiftTest extends TestCase
     {
         $driverId = $this->createEmployee('SJI003', 'Citra Driver', self::LAYANAN_DRIVER);
         $this->createPlacement(103, $driverId, $this->clientId);
-        $driverScheduleId = $this->createSchedule(103, self::TANGGAL_SHIFT, '15:00', '23:00', 'Siang');
+        $this->createSchedule(103, self::TANGGAL_SHIFT, '15:00', '23:00', 'Siang');
 
         $this->actingAs($this->employeeUser($this->requesterId))
-            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['id_jadwal_rekan' => $driverScheduleId]))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['id_karyawan_rekan' => $driverId]))
             ->assertSessionHas('gagal', 'Pertukaran hanya dapat dilakukan dengan rekan yang memiliki jenis layanan yang sama.');
 
         $this->assertDatabaseCount('tbl_pertukaran_shift', 0);
@@ -109,17 +111,34 @@ class PertukaranShiftTest extends TestCase
         $this->assertDatabaseHas('tbl_pertukaran_shift', ['id' => $requestId, 'status' => 'Menunggu']);
     }
 
-    public function test_coworker_cannot_accept_when_a_schedule_changed_after_the_request(): void
+    public function test_request_goes_straight_to_operasional_without_coworker_approval(): void
+    {
+        $requestId = $this->submitRequest();
+
+        $this->actingAs($this->employeeUser($this->partnerId))
+            ->get(route('tenaga-kerja.tukar-shift.index'))
+            ->assertOk()
+            ->assertSee('Menunggu Persetujuan Operasional')
+            ->assertDontSee('Terima</button>', false)
+            ->assertDontSee('Menunggu Persetujuan Rekan');
+        $this->actingAs($this->operasionalUser())
+            ->get(route('operasional.jadwal-kerja.pertukaran-shift.show', $requestId))
+            ->assertOk()
+            ->assertSee('Siap disetujui')
+            ->assertDontSee('rekan sudah setuju');
+        $this->assertScheduleHours($this->requesterScheduleId, '07:00:00', 'Pagi');
+    }
+
+    public function test_detail_page_warns_when_a_schedule_changed_after_the_request(): void
     {
         $requestId = $this->submitRequest();
         DB::table('tbl_jadwal_kerja')->where('id', $this->partnerScheduleId)->update(['jam_masuk' => '16:00:00', 'jam_pulang' => '23:59:00']);
 
-        $this->actingAs($this->employeeUser($this->partnerId))
-            ->patch(route('tenaga-kerja.tukar-shift.tanggapi', $requestId), ['tanggapan' => 'terima'])
-            ->assertRedirect(route('tenaga-kerja.tukar-shift.index'))
-            ->assertSessionHas('gagal', 'Jadwal salah satu karyawan sudah diubah setelah pengajuan dibuat. Tolak pengajuan ini dan minta karyawan mengajukan ulang.');
-
-        $this->assertDatabaseHas('tbl_pertukaran_shift', ['id' => $requestId, 'status' => 'Menunggu', 'status_rekan' => 'Menunggu']);
+        $this->actingAs($this->operasionalUser())
+            ->get(route('operasional.jadwal-kerja.pertukaran-shift.show', $requestId))
+            ->assertOk()
+            ->assertSee('Pengajuan belum dapat disetujui')
+            ->assertSee('Jadwal salah satu karyawan sudah diubah setelah pengajuan dibuat. Tolak pengajuan ini dan minta karyawan mengajukan ulang.');
     }
 
     public function test_requester_cancels_a_pending_request_and_can_submit_again(): void
@@ -170,14 +189,11 @@ class PertukaranShiftTest extends TestCase
 
     public function test_request_for_today_is_rejected_because_it_must_be_submitted_one_day_ahead(): void
     {
-        $todayRequesterScheduleId = $this->createSchedule(101, '2026-11-17', '07:00', '15:00', 'Pagi');
-        $todayPartnerScheduleId = $this->createSchedule(102, '2026-11-17', '15:00', '23:00', 'Siang');
+        $this->createSchedule(101, '2026-11-17', '07:00', '15:00', 'Pagi');
+        $this->createSchedule(102, '2026-11-17', '15:00', '23:00', 'Siang');
 
         $this->actingAs($this->employeeUser($this->requesterId))
-            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload([
-                'id_jadwal_pengaju' => $todayRequesterScheduleId,
-                'id_jadwal_rekan' => $todayPartnerScheduleId,
-            ]))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['tanggal_kerja' => '2026-11-17']))
             ->assertSessionHas('gagal', 'Pengajuan pertukaran shift paling lambat H-1 sebelum tanggal shift.');
 
         $this->assertDatabaseCount('tbl_pertukaran_shift', 0);
@@ -188,10 +204,10 @@ class PertukaranShiftTest extends TestCase
         $otherClientId = $this->createClient('KL002');
         $outsiderId = $this->createEmployee('SJI003', 'Citra Klien Lain');
         $this->createPlacement(103, $outsiderId, $otherClientId);
-        $outsiderScheduleId = $this->createSchedule(103, self::TANGGAL_SHIFT, '15:00', '23:00', 'Siang');
+        $this->createSchedule(103, self::TANGGAL_SHIFT, '15:00', '23:00', 'Siang');
 
         $this->actingAs($this->employeeUser($this->requesterId))
-            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['id_jadwal_rekan' => $outsiderScheduleId]))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['id_karyawan_rekan' => $outsiderId]))
             ->assertSessionHas('gagal', 'Pertukaran hanya dapat dilakukan dengan rekan pada klien yang sama.');
 
         $this->assertDatabaseCount('tbl_pertukaran_shift', 0);
@@ -202,10 +218,7 @@ class PertukaranShiftTest extends TestCase
         $this->createPendingRequest();
 
         $this->actingAs($this->employeeUser($this->partnerId))
-            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload([
-                'id_jadwal_pengaju' => $this->partnerScheduleId,
-                'id_jadwal_rekan' => $this->requesterScheduleId,
-            ]))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['id_karyawan_rekan' => $this->requesterId]))
             ->assertSessionHas('gagal', 'Salah satu jadwal sudah memiliki pengajuan yang masih menunggu persetujuan.');
 
         $this->assertDatabaseCount('tbl_pertukaran_shift', 1);
@@ -302,7 +315,7 @@ class PertukaranShiftTest extends TestCase
         $this->actingAs($operasional)
             ->patch(route('operasional.jadwal-kerja.pertukaran-shift.approve', $requestId))
             ->assertRedirect(route('operasional.jadwal-kerja.pertukaran-shift.show', $requestId))
-            ->assertSessionHas('success', 'Pengajuan disetujui. Tanggal dan shift kedua jadwal sudah ditukar.');
+            ->assertSessionHas('success', 'Pengajuan disetujui. Jadwal kedua karyawan sudah ditukar.');
 
         $this->assertScheduleHours($this->requesterScheduleId, '15:00:00', 'Siang');
         $this->assertScheduleHours($this->partnerScheduleId, '07:00:00', 'Pagi');
@@ -381,23 +394,22 @@ class PertukaranShiftTest extends TestCase
         $this->assertDatabaseHas('tbl_pertukaran_shift', ['id' => $requestId, 'status' => 'Menunggu']);
     }
 
-    public function test_coworker_cannot_accept_when_the_new_shift_overlaps_the_next_day(): void
+    public function test_request_is_rejected_when_the_new_shift_overlaps_the_next_day(): void
     {
         DB::table('tbl_jadwal_kerja')->where('id', $this->partnerScheduleId)->update([
             'jam_masuk' => '22:00:00', 'jam_pulang' => '06:00:00', 'nama_shift_snapshot' => 'Malam',
         ]);
         $this->createSchedule(101, '2026-11-21', '05:00', '13:00', 'Subuh');
-        $requestId = $this->submitRequest();
 
-        $this->actingAs($this->employeeUser($this->partnerId))
-            ->patch(route('tenaga-kerja.tukar-shift.tanggapi', $requestId), ['tanggapan' => 'terima'])
-            ->assertSessionHas('gagal', 'Shift baru Andi Pengaju bertumpuk dengan jadwalnya pada 21/11/2026.');
+        $this->actingAs($this->employeeUser($this->requesterId))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload())
+            ->assertSessionHas('gagal', 'Shift baru Anda bertumpuk dengan jadwal Anda pada 21/11/2026.');
 
         $this->assertScheduleHours($this->requesterScheduleId, '07:00:00', 'Pagi');
-        $this->assertDatabaseHas('tbl_pertukaran_shift', ['id' => $requestId, 'status' => 'Menunggu', 'status_rekan' => 'Menunggu']);
+        $this->assertDatabaseCount('tbl_pertukaran_shift', 0);
     }
 
-    public function test_approval_is_refused_when_the_new_shift_overlaps_a_day_scheduled_after_the_coworker_accepted(): void
+    public function test_approval_is_refused_when_the_new_shift_overlaps_a_day_scheduled_after_the_request(): void
     {
         DB::table('tbl_jadwal_kerja')->where('id', $this->partnerScheduleId)->update([
             'jam_masuk' => '22:00:00', 'jam_pulang' => '06:00:00', 'nama_shift_snapshot' => 'Malam',
@@ -413,69 +425,123 @@ class PertukaranShiftTest extends TestCase
         $this->assertDatabaseHas('tbl_pertukaran_shift', ['id' => $requestId, 'status' => 'Menunggu']);
     }
 
-    public function test_approval_swaps_dates_and_shifts_while_each_schedule_keeps_its_placement(): void
+    public function test_tukar_shift_page_offers_coworker_schedules_on_other_dates(): void
     {
-        $requesterScheduleId = $this->createSchedule(101, '2026-11-23', '08:00', '16:00', 'Pagi');
-        $partnerScheduleId = $this->createSchedule(102, '2026-11-25', '16:00', '00:00', 'Sore');
-        $requestId = $this->createPendingRequest($requesterScheduleId, $partnerScheduleId);
+        $this->createSchedule(102, self::TANGGAL_SHIFT_REKAN, '15:00', '23:00', 'Siang');
+
+        $this->actingAs($this->employeeUser($this->requesterId))
+            ->get(route('tenaga-kerja.tukar-shift.index'))
+            ->assertOk()
+            ->assertSee('Pilih jadwal rekan')
+            ->assertSee(self::TANGGAL_SHIFT_REKAN, false);
+    }
+
+    public function test_swap_across_two_dates_exchanges_shift_values_and_keeps_each_date(): void
+    {
+        $partnerOtherDateId = $this->createSchedule(102, self::TANGGAL_SHIFT_REKAN, '15:00', '23:00', 'Siang');
+        $requestId = $this->createPendingRequest(['tanggal_kerja_rekan' => self::TANGGAL_SHIFT_REKAN]);
+        $this->assertDatabaseHas('tbl_pertukaran_shift', [
+            'id' => $requestId,
+            'tanggal_kerja' => self::TANGGAL_SHIFT,
+            'id_jadwal_pengaju' => $this->requesterScheduleId,
+            'id_jadwal_rekan' => $partnerOtherDateId,
+        ]);
         $operasional = $this->operasionalUser();
 
         $this->actingAs($operasional)
+            ->get(route('operasional.jadwal-kerja.pertukaran-shift.show', $requestId))
+            ->assertOk()
+            ->assertSeeInOrder(['Andi Pengaju', '20/11/2026', 'Pagi · 07:00–15:00', 'Budi Rekan', '22/11/2026', 'Siang · 15:00–23:00'], false);
+        $this->actingAs($operasional)
             ->patch(route('operasional.jadwal-kerja.pertukaran-shift.approve', $requestId))
-            ->assertSessionHas('success', 'Pengajuan disetujui. Tanggal dan shift kedua jadwal sudah ditukar.');
+            ->assertSessionHas('success', 'Pengajuan disetujui. Jadwal kedua karyawan sudah ditukar.');
 
-        $this->assertDatabaseHas('tbl_jadwal_kerja', [
-            'id' => $requesterScheduleId, 'id_penempatan' => 101, 'tanggal_kerja' => '2026-11-25',
-            'jam_masuk' => '16:00:00', 'jam_pulang' => '00:00:00', 'nama_shift_snapshot' => 'Sore', 'diubah_oleh' => $operasional->id,
-        ]);
-        $this->assertDatabaseHas('tbl_jadwal_kerja', [
-            'id' => $partnerScheduleId, 'id_penempatan' => 102, 'tanggal_kerja' => '2026-11-23',
-            'jam_masuk' => '08:00:00', 'jam_pulang' => '16:00:00', 'nama_shift_snapshot' => 'Pagi', 'diubah_oleh' => $operasional->id,
-        ]);
-        $this->assertDatabaseHas('tbl_pertukaran_shift', [
-            'id' => $requestId, 'status' => 'Disetujui', 'tanggal_kerja' => '2026-11-23', 'tanggal_kerja_rekan' => '2026-11-25',
-        ]);
-
-        $history = DB::table('tbl_jadwal_kerja_riwayat')->where('id_jadwal_kerja', $requesterScheduleId)->sole();
-        $before = json_decode($history->data_sebelum, true);
-        $after = json_decode($history->data_sesudah, true);
-        $this->assertSame('Diubah', $history->aksi);
-        $this->assertSame([101, '2026-11-23', '08:00'], [$before['id_penempatan'], $before['tanggal_kerja'], $before['jam_masuk']]);
-        $this->assertSame([101, '2026-11-25', '16:00:00'], [$after['id_penempatan'], $after['tanggal_kerja'], $after['jam_masuk']]);
-        $this->assertSame(['pertukaran_shift' => $requestId], $after['sumber']);
+        $this->assertDatabaseHas('tbl_jadwal_kerja', ['id' => $this->requesterScheduleId, 'tanggal_kerja' => self::TANGGAL_SHIFT, 'jam_masuk' => '15:00:00', 'nama_shift_snapshot' => 'Siang']);
+        $this->assertDatabaseHas('tbl_jadwal_kerja', ['id' => $partnerOtherDateId, 'tanggal_kerja' => self::TANGGAL_SHIFT_REKAN, 'jam_masuk' => '07:00:00', 'nama_shift_snapshot' => 'Pagi']);
+        $this->assertScheduleHours($this->partnerScheduleId, '15:00:00', 'Siang');
     }
 
-    public function test_request_is_rejected_when_the_target_date_already_has_another_schedule(): void
+    public function test_request_is_rejected_when_the_coworker_date_is_not_at_least_one_day_ahead(): void
     {
-        $requesterScheduleId = $this->createSchedule(101, '2026-11-23', '08:00', '16:00', 'Pagi');
-        $partnerScheduleId = $this->createSchedule(102, '2026-11-25', '16:00', '00:00', 'Sore');
-        $this->createDayOff(101, '2026-11-25');
+        $this->createSchedule(102, '2026-11-17', '15:00', '23:00', 'Siang');
 
         $this->actingAs($this->employeeUser($this->requesterId))
-            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload([
-                'id_jadwal_pengaju' => $requesterScheduleId,
-                'id_jadwal_rekan' => $partnerScheduleId,
-            ]))
-            ->assertSessionHas('gagal', 'Anda atau rekan sudah memiliki jadwal lain pada tanggal tujuan pertukaran.');
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['tanggal_kerja_rekan' => '2026-11-17']))
+            ->assertSessionHas('gagal', 'Pengajuan pertukaran shift paling lambat H-1 sebelum tanggal shift.');
 
         $this->assertDatabaseCount('tbl_pertukaran_shift', 0);
     }
 
-    public function test_approval_is_refused_without_violating_the_unique_date_when_the_target_date_was_filled_later(): void
+    public function test_request_is_rejected_when_the_coworker_has_no_schedule_on_the_chosen_date(): void
     {
-        $requesterScheduleId = $this->createSchedule(101, '2026-11-23', '08:00', '16:00', 'Pagi');
-        $partnerScheduleId = $this->createSchedule(102, '2026-11-25', '16:00', '00:00', 'Sore');
-        $requestId = $this->createPendingRequest($requesterScheduleId, $partnerScheduleId);
-        $this->createDayOff(101, '2026-11-25');
+        $this->actingAs($this->employeeUser($this->requesterId))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['tanggal_kerja_rekan' => self::TANGGAL_SHIFT_REKAN]))
+            ->assertSessionHas('gagal', 'Rekan yang dipilih tidak memiliki jadwal pada tanggal tersebut.');
 
-        $this->actingAs($this->operasionalUser())
+        $this->assertDatabaseCount('tbl_pertukaran_shift', 0);
+    }
+
+    public function test_attendance_is_checked_on_the_coworker_own_date(): void
+    {
+        $this->createSchedule(102, self::TANGGAL_SHIFT_REKAN, '15:00', '23:00', 'Siang');
+        Schema::create('tbl_absensi', function (Blueprint $table): void {
+            $table->increments('id');
+            $table->unsignedInteger('id_karyawan');
+            $table->date('tgl');
+        });
+        DB::table('tbl_absensi')->insert(['id_karyawan' => $this->partnerId, 'tgl' => self::TANGGAL_SHIFT_REKAN]);
+
+        $this->actingAs($this->employeeUser($this->requesterId))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['tanggal_kerja_rekan' => self::TANGGAL_SHIFT_REKAN]))
+            ->assertSessionHas('gagal', 'Absensi pada salah satu tanggal sudah tercatat. Jadwal tidak dapat ditukar.');
+
+        $this->assertDatabaseCount('tbl_pertukaran_shift', 0);
+    }
+
+    public function test_request_is_rejected_when_the_coworker_new_shift_overlaps_the_day_before_their_own_date(): void
+    {
+        $this->createSchedule(102, '2026-11-21', '23:00', '08:00', 'Malam');
+        $this->createSchedule(102, self::TANGGAL_SHIFT_REKAN, '15:00', '23:00', 'Siang');
+
+        $this->actingAs($this->employeeUser($this->requesterId))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload(['tanggal_kerja_rekan' => self::TANGGAL_SHIFT_REKAN]))
+            ->assertSessionHas('gagal', 'Shift baru rekan bertumpuk dengan jadwalnya pada 21/11/2026.');
+
+        $this->assertDatabaseCount('tbl_pertukaran_shift', 0);
+    }
+
+    public function test_pending_request_expires_when_the_earlier_coworker_date_arrives(): void
+    {
+        $this->createSchedule(101, self::TANGGAL_SHIFT_REKAN, '07:00', '15:00', 'Pagi');
+        $requestId = $this->createPendingRequest(['tanggal_kerja' => self::TANGGAL_SHIFT_REKAN, 'tanggal_kerja_rekan' => self::TANGGAL_SHIFT]);
+        $this->travelTo(CarbonImmutable::parse('2026-11-20 09:00:00'));
+        $operasional = $this->operasionalUser();
+
+        $this->actingAs($this->employeeUser($this->requesterId))
+            ->get(route('tenaga-kerja.tukar-shift.index'))
+            ->assertSee('Kedaluwarsa');
+        $this->actingAs($operasional)
+            ->get(route('operasional.beranda'))
+            ->assertDontSee('data-badge-menu="operasional.jadwal-kerja">1</span>', false);
+        $this->actingAs($operasional)
             ->patch(route('operasional.jadwal-kerja.pertukaran-shift.approve', $requestId))
-            ->assertSessionHas('error', 'Sudah ada jadwal lain untuk Andi Pengaju pada 25/11/2026.');
+            ->assertSessionHas('error', 'Tanggal shift sudah lewat atau sedang berlangsung, pengajuan tidak dapat disetujui.');
+    }
 
-        $this->assertDatabaseHas('tbl_jadwal_kerja', ['id' => $requesterScheduleId, 'tanggal_kerja' => '2026-11-23', 'jam_masuk' => '08:00:00']);
-        $this->assertDatabaseHas('tbl_jadwal_kerja', ['id' => $partnerScheduleId, 'tanggal_kerja' => '2026-11-25', 'jam_masuk' => '16:00:00']);
-        $this->assertDatabaseHas('tbl_pertukaran_shift', ['id' => $requestId, 'status' => 'Menunggu']);
-        $this->assertDatabaseCount('tbl_jadwal_kerja_riwayat', 0);
+    public function test_coworker_schedule_on_another_date_stays_protected_while_a_request_is_pending(): void
+    {
+        $this->createSchedule(102, self::TANGGAL_SHIFT_REKAN, '15:00', '23:00', 'Siang');
+        $this->createPendingRequest(['tanggal_kerja_rekan' => self::TANGGAL_SHIFT_REKAN]);
+        $thirdId = $this->createEmployee('SJI003', 'Citra Ketiga');
+        $this->createPlacement(103, $thirdId, $this->clientId);
+        $this->createSchedule(103, self::TANGGAL_SHIFT_REKAN, '07:00', '15:00', 'Pagi');
+
+        $this->actingAs($this->employeeUser($thirdId))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload([
+                'tanggal_kerja' => self::TANGGAL_SHIFT_REKAN,
+                'id_karyawan_rekan' => $this->partnerId,
+            ]))
+            ->assertSessionHas('gagal', 'Salah satu jadwal sudah memiliki pengajuan yang masih menunggu persetujuan.');
     }
 
     public function test_approval_is_refused_when_attendance_was_recorded_after_the_request(): void
@@ -503,40 +569,35 @@ class PertukaranShiftTest extends TestCase
     private function requestPayload(array $override = []): array
     {
         return array_filter([
-            'id_jadwal_pengaju' => $this->requesterScheduleId,
-            'id_jadwal_rekan' => $this->partnerScheduleId,
+            'tanggal_kerja' => self::TANGGAL_SHIFT,
+            'id_karyawan_rekan' => $this->partnerId,
             'alasan' => 'Ada keperluan keluarga pada pagi hari.',
             ...$override,
         ], static fn (mixed $nilai): bool => $nilai !== null);
     }
 
     /**
-     * Pengajuan baru yang masih menunggu tanggapan rekan.
+     * Pengajuan baru: langsung berstatus Menunggu persetujuan Operasional.
+     *
+     * @param  array<string, mixed>  $override
      */
-    private function submitRequest(?int $requesterScheduleId = null, ?int $partnerScheduleId = null): int
+    private function submitRequest(array $override = []): int
     {
         $this->actingAs($this->employeeUser($this->requesterId))
-            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload([
-                'id_jadwal_pengaju' => $requesterScheduleId ?? $this->requesterScheduleId,
-                'id_jadwal_rekan' => $partnerScheduleId ?? $this->partnerScheduleId,
-            ]))
+            ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload($override))
             ->assertSessionHas('sukses');
 
         return (int) DB::table('tbl_pertukaran_shift')->latest('id')->value('id');
     }
 
     /**
-     * Pengajuan yang sudah diterima rekan sehingga menunggu keputusan Operasional.
+     * Pengajuan Menunggu yang siap diputuskan Operasional (tanpa langkah persetujuan rekan).
+     *
+     * @param  array<string, mixed>  $override
      */
-    private function createPendingRequest(?int $requesterScheduleId = null, ?int $partnerScheduleId = null): int
+    private function createPendingRequest(array $override = []): int
     {
-        $requestId = $this->submitRequest($requesterScheduleId, $partnerScheduleId);
-
-        $this->actingAs($this->employeeUser($this->partnerId))
-            ->patch(route('tenaga-kerja.tukar-shift.tanggapi', $requestId), ['tanggapan' => 'terima'])
-            ->assertSessionHas('sukses');
-
-        return $requestId;
+        return $this->submitRequest($override);
     }
 
     /**
@@ -549,13 +610,13 @@ class PertukaranShiftTest extends TestCase
         $partnerId = $this->createEmployee('SJI004', 'Dodi Rekan');
         $this->createPlacement(103, $requesterId, $clientId);
         $this->createPlacement(104, $partnerId, $clientId);
-        $requesterScheduleId = $this->createSchedule(103, '2026-11-22', '07:00', '15:00', 'Pagi');
-        $partnerScheduleId = $this->createSchedule(104, '2026-11-22', '15:00', '23:00', 'Siang');
+        $this->createSchedule(103, '2026-11-22', '07:00', '15:00', 'Pagi');
+        $this->createSchedule(104, '2026-11-22', '15:00', '23:00', 'Siang');
 
         $this->actingAs($this->employeeUser($requesterId))
             ->post(route('tenaga-kerja.tukar-shift.store'), $this->requestPayload([
-                'id_jadwal_pengaju' => $requesterScheduleId,
-                'id_jadwal_rekan' => $partnerScheduleId,
+                'tanggal_kerja' => '2026-11-22',
+                'id_karyawan_rekan' => $partnerId,
             ]))
             ->assertSessionHas('sukses');
 
@@ -654,11 +715,6 @@ class PertukaranShiftTest extends TestCase
             'tgl_selesai' => null,
             'status' => 'Aktif',
         ]);
-    }
-
-    private function createDayOff(int $placementId, string $date): void
-    {
-        DB::table('tbl_jadwal_kerja')->insert(['id_penempatan' => $placementId, 'tanggal_kerja' => $date, 'status' => 'Libur']);
     }
 
     private function createSchedule(int $placementId, string $date, string $start, string $end, string $shiftName): int
