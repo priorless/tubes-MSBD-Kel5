@@ -25,7 +25,6 @@ use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\TenagaKerja\LaporanAktivitasController;
 use App\Http\Controllers\TenagaKerja\PembatalanTukarShiftController;
 use App\Http\Controllers\TenagaKerja\PengajuanTukarShiftController;
-use App\Http\Controllers\TenagaKerja\TanggapanTukarShiftController;
 use App\Http\Controllers\TenagaKerjaController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Middleware\PastikanKaryawan;
@@ -193,11 +192,9 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             Route::post('/absensi/check-in', 'checkIn')->middleware('throttle:10,1')->name('absensi.check-in');
             Route::post('/absensi/check-out', 'checkOut')->middleware('throttle:10,1')->name('absensi.check-out');
 
-            // Tukar shift (roker) dengan rekan: pengajuan, tanggapan rekan, dan pembatalan oleh pengaju.
+            // Tukar shift (roker) dengan rekan: pengajuan langsung ke Operasional, dan pembatalan oleh pengaju.
             Route::get('/tukar-shift', 'tukarShift')->name('tukar-shift.index');
             Route::post('/tukar-shift', PengajuanTukarShiftController::class)->middleware('throttle:10,1')->name('tukar-shift.store');
-            Route::patch('/tukar-shift/{pertukaranShift}/tanggapi', TanggapanTukarShiftController::class)
-                ->whereNumber('pertukaranShift')->middleware('throttle:10,1')->name('tukar-shift.tanggapi');
             Route::patch('/tukar-shift/{pertukaranShift}/batalkan', PembatalanTukarShiftController::class)
                 ->whereNumber('pertukaranShift')->middleware('throttle:10,1')->name('tukar-shift.batalkan');
 
