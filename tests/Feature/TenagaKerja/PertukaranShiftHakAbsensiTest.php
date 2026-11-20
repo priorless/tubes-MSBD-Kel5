@@ -119,7 +119,6 @@ class PertukaranShiftHakAbsensiTest extends TestCase
                 'id_jadwal_pengaju' => $this->idJadwalAndi,
                 'id_jadwal_rekan' => $this->idJadwalBudi,
                 'alasan' => 'Ada keperluan keluarga pada pagi hari.',
-                'konfirmasi_rekan' => '1',
             ])
             ->assertSessionHas('sukses', 'Pengajuan tukar shift terkirim. Menunggu persetujuan rekan, lalu persetujuan akhir Operasional.');
 
