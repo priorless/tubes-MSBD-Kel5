@@ -95,6 +95,9 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::post('absensi-karyawan/ketidakhadiran', KetidakhadiranController::class)->name('absensi.ketidakhadiran');
         Route::post('absensi-karyawan/lembur/{absensi}', PersetujuanLemburController::class)->whereNumber('absensi')->name('absensi.lembur');
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
+        // Data Klien: controller & tampilan yang sama dengan Operasional (satu sumber data tbl_klien).
+        Route::resource('klien', KlienController::class);
+        Route::patch('klien/{klien}/status', [KlienController::class, 'updateStatus'])->whereNumber('klien')->name('klien.status');
     });
 
     /* =====================================================================
