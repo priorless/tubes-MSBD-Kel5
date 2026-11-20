@@ -5,32 +5,28 @@ namespace App\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Pengajuan Pertukaran Shift: karyawan menukar satu jadwalnya dengan satu jadwal rekan
- * pada klien yang sama (tanggal boleh berbeda). Rekan menyetujui lebih dulu (dinyatakan
- * pengaju saat mengajukan), lalu Operasional memberi persetujuan akhir.
+ * Pengajuan Pertukaran Shift: karyawan menukar nilai shift jadwalnya dengan jadwal rekan
+ * pada klien yang sama. Pengajuan langsung masuk ke Operasional (tanpa persetujuan rekan),
+ * lalu Operasional menyetujui atau menolak.
  *
- * Saat disetujui, TANGGAL dan ISI SHIFT kedua jadwal ditukar, sedangkan id_penempatan
- * tetap milik karyawan masing-masing. Contoh: jadwal A (penempatan 425, 23/11 08–16) dan
- * jadwal B (penempatan 424, 25/11 16–00) menjadi A = 25/11 16–00, B = 23/11 08–16.
+ * Tanggal kedua jadwal boleh berbeda. tbl_pertukaran_shift.tanggal_kerja menyimpan tanggal jadwal
+ * pengaju dan tanggal_kerja_rekan menyimpan tanggal jadwal rekan (pengajuan lama tanpa nilai ini
+ * memakai tanggal pengaju). Saat disetujui,
+ * pengaju menerima nilai shift rekan pada tanggal pengaju, dan rekan menerima nilai shift pengaju
+ * pada tanggal rekan. Tanggal kerja dan penempatan tidak pernah dipindahkan.
  *
  * Aturan:
- * - kedua tanggal paling lambat H-1 (harus setelah hari ini);
- * - kedua karyawan punya penempatan Aktif di klien yang sama yang berlaku pada tanggal asal
- *   dan tanggal tujuan;
- * - kedua karyawan memiliki jenis layanan yang sama;
- * - rekan menerima pengajuan lebih dulu (status_rekan 'Diterima'); bila rekan menolak, pengajuan langsung Ditolak;
- * - pengaju dapat membatalkan pengajuan selama masih Menunggu;
- * - belum ada absensi pada kedua tanggal dan belum ada pengajuan lain yang menunggu;
- * - tidak ada jadwal lain milik karyawan pada tanggal tujuan;
- * - saat disetujui, jadwal harus masih sama dengan saat pengajuan dan shift baru tidak
- *   boleh bertumpuk dengan shift hari sebelum/sesudahnya;
- * - pengajuan yang sudah diproses tidak dapat diproses lagi.
+ * - pengajuan paling lambat H-1 (kedua tanggal shift harus setelah hari ini);
+ * - kedua karyawan punya penempatan Aktif di klien yang sama dan jadwal pada tanggal masing-masing;
+ * - kedua karyawan memiliki jenis layanan yang sama (mis. Satpam hanya dengan Satpam);
+ * - pengaju dapat membatalkan pengajuannya selama masih Menunggu;
+ * - shift keduanya berbeda, belum ada absensi, belum ada pengajuan lain yang menunggu, dan shift baru
+ *   tidak bertumpuk dengan jadwal hari sebelum/sesudah tanggal masing-masing;
  * - saat disetujui, jadwal harus masih sama dengan saat pengajuan dan shift baru tidak
  *   boleh bertumpuk dengan shift hari sebelum/sesudahnya;
  * - pengajuan yang sudah diproses tidak dapat diproses lagi.
@@ -43,10 +39,11 @@ class PertukaranShiftService
 
     public const string STATUS_DITOLAK = 'Ditolak';
 
-    public const string REKAN_MENUNGGU = 'Menunggu';
-
-    public const string REKAN_DITERIMA = 'Diterima';
-
+    /**
+     * Nilai status_rekan 'Ditolak' hanya ada pada data lama dari alur persetujuan rekan yang sudah
+     * dihapus; dipertahankan agar riwayat lama tetap berlabel "Ditolak Rekan". Kolom status_rekan,
+     * catatan_rekan, dan ditanggapi_rekan_pada tidak lagi diisi atau diperiksa oleh alur baru.
+     */
     public const string REKAN_DITOLAK = 'Ditolak';
 
     /** Catatan keputusan penanda pengajuan yang dibatalkan oleh pengajunya sendiri. */
@@ -63,10 +60,10 @@ class PertukaranShiftService
     }
 
     /**
-     * Pilihan form karyawan: jadwal mendatang miliknya beserta jadwal rekan (klien yang sama)
-     * yang dapat diajak bertukar. Pasangan yang pasti gagal disaring sejak awal.
+     * Pilihan form karyawan: tanggal mendatang miliknya beserta rekan dan jadwal rekan (tanggal boleh
+     * berbeda) yang dapat diajak bertukar.
      *
-     * @return list<array{id_jadwal: int, tanggal: string, shift: string, rekan: list<array{id_jadwal: int, id_karyawan: int, nama: string, nip: string, tanggal: string, shift: string}>}>
+     * @return list<array{tanggal: string, shift: string, rekan: list<array{id_karyawan: int, nama: string, nip: string, jadwal: list<array{tanggal: string, shift: string}>}>}>
      */
     public function opsiPengajuan(int $idKaryawan): array
     {
@@ -94,21 +91,9 @@ class PertukaranShiftService
             ->addSelect(['k.nama', 'k.nip'])
             ->orderBy('k.nama')
             ->orderBy('j.tanggal_kerja')
-            ->get();
+            ->get()
+            ->groupBy('id_klien');
 
-        // Semua jadwal (status apa pun, penempatan mana pun) para karyawan terkait dalam rentang
-        // pilihan, untuk menyaring pasangan yang tanggal tujuannya sudah terisi jadwal lain.
-        $jadwalTerisi = DB::table('tbl_jadwal_kerja as j')
-            ->join('tbl_penempatan as p', 'p.id', '=', 'j.id_penempatan')
-            ->whereIn('p.id_karyawan', [$idKaryawan, ...$jadwalRekan->pluck('id_karyawan')->unique()->all()])
-            ->whereBetween('j.tanggal_kerja', [$besok, $batas])
-            ->get(['j.id', 'j.tanggal_kerja', 'p.id_karyawan'])
-            ->groupBy('id_karyawan');
-
-        $tanggalTujuanBebas = static fn (int $idPemilik, string $tanggal, array $kecualikan): bool => ! collect($jadwalTerisi->get($idPemilik, []))
-            ->contains(static fn (object $item): bool => (string) $item->tanggal_kerja === $tanggal && ! in_array((int) $item->id, $kecualikan, true));
-
-        $jadwalRekan = $jadwalRekan->groupBy('id_klien');
         $sedangDiajukan = $this->idJadwalMenunggu();
         $opsi = [];
 
@@ -118,24 +103,18 @@ class PertukaranShiftService
             }
 
             $rekan = collect($jadwalRekan->get($jadwal->id_klien, []))
-                ->reject(function (object $item) use ($jadwal, $idKaryawan, $sedangDiajukan, $tanggalTujuanBebas): bool {
-                    $kecualikan = [(int) $jadwal->id, (int) $item->id];
-
-                    return in_array((int) $item->id, $sedangDiajukan, true)
-                        || ! $this->layananSama($jadwal, $item)
-                        || ! $this->pasanganBermakna($jadwal, $item)
-                        || ! $this->jadwalKerjaService->tanggalBerlaku((string) $item->tanggal_kerja, $jadwal)
-                        || ! $this->jadwalKerjaService->tanggalBerlaku((string) $jadwal->tanggal_kerja, $item)
-                        || ! $tanggalTujuanBebas($idKaryawan, (string) $item->tanggal_kerja, $kecualikan)
-                        || ! $tanggalTujuanBebas((int) $item->id_karyawan, (string) $jadwal->tanggal_kerja, $kecualikan);
-                })
-                ->map(fn (object $item): array => [
-                    'id_jadwal' => (int) $item->id,
-                    'id_karyawan' => (int) $item->id_karyawan,
-                    'nama' => (string) $item->nama,
-                    'nip' => (string) $item->nip,
-                    'tanggal' => (string) $item->tanggal_kerja,
-                    'shift' => $this->labelShift($this->jadwalKerjaService->snapshot($item)),
+                ->reject(fn (object $item): bool => in_array((int) $item->id, $sedangDiajukan, true)
+                    || ! $this->layananSama($jadwal, $item)
+                    || $this->shiftSama($jadwal, $item))
+                ->groupBy('id_karyawan')
+                ->map(fn ($jadwalSatuRekan): array => [
+                    'id_karyawan' => (int) $jadwalSatuRekan->first()->id_karyawan,
+                    'nama' => (string) $jadwalSatuRekan->first()->nama,
+                    'nip' => (string) $jadwalSatuRekan->first()->nip,
+                    'jadwal' => $jadwalSatuRekan->map(fn (object $item): array => [
+                        'tanggal' => (string) $item->tanggal_kerja,
+                        'shift' => $this->labelShift($this->jadwalKerjaService->snapshot($item)),
+                    ])->values()->all(),
                 ])
                 ->values()
                 ->all();
@@ -145,7 +124,6 @@ class PertukaranShiftService
             }
 
             $opsi[] = [
-                'id_jadwal' => (int) $jadwal->id,
                 'tanggal' => (string) $jadwal->tanggal_kerja,
                 'shift' => $this->labelShift($this->jadwalKerjaService->snapshot($jadwal)),
                 'rekan' => $rekan,
@@ -156,104 +134,72 @@ class PertukaranShiftService
     }
 
     /**
-     * Membuat pengajuan berstatus Menunggu untuk menukar jadwal pengaju dengan jadwal rekan
-     * (tanggal boleh sama atau berbeda).
+     * Membuat pengajuan berstatus Menunggu. $tanggalRekan = tanggal jadwal rekan; bila null sama dengan $tanggal.
      */
-    public function ajukan(
-        int $idKaryawan,
-        int $idJadwalPengaju,
-        int $idJadwalRekan,
-        string $alasan,
-    ): int {
-        return DB::transaction(function () use (
-            $idKaryawan,
-            $idJadwalPengaju,
-            $idJadwalRekan,
-            $alasan,
-        ): int {
-            if ($idJadwalPengaju === $idJadwalRekan) {
-                $this->gagal('id_jadwal_rekan', 'Pilih dua jadwal yang berbeda.');
+    public function ajukan(int $idKaryawan, int $idKaryawanRekan, string $tanggal, string $alasan, ?string $tanggalRekan = null): int
+    {
+        $tanggalRekan ??= $tanggal;
+
+        return DB::transaction(function () use ($idKaryawan, $idKaryawanRekan, $tanggal, $tanggalRekan, $alasan): int {
+            if ($idKaryawan === $idKaryawanRekan) {
+                $this->gagal('id_karyawan_rekan', 'Rekan yang diajak bertukar tidak boleh diri sendiri.');
             }
 
-            $jadwalPengaju = $this->queryJadwalAktif()
-                ->where('j.id', $idJadwalPengaju)
-                ->where('p.id_karyawan', $idKaryawan)
-                ->lockForUpdate()
-                ->first();
-
-            if ($jadwalPengaju === null) {
-                $this->gagal('id_jadwal_pengaju', 'Jadwal Anda tidak ditemukan atau penempatan sudah tidak aktif.');
-            }
-
-            $jadwalRekan = $this->queryJadwalAktif()
-                ->where('j.id', $idJadwalRekan)
-                ->lockForUpdate()
-                ->first();
-
-            if ($jadwalRekan === null || (int) $jadwalRekan->id_karyawan === $idKaryawan) {
-                $this->gagal('id_jadwal_rekan', 'Jadwal rekan tidak ditemukan atau tidak valid.');
-            }
-
-            $tanggalPengaju = (string) $jadwalPengaju->tanggal_kerja;
-            $tanggalRekan = (string) $jadwalRekan->tanggal_kerja;
-
-            $this->pastikanMinimalHMinusSatu($tanggalPengaju);
-            $this->pastikanMinimalHMinusSatu($tanggalRekan);
+            $this->pastikanMinimalHMinusSatu($tanggal, 'tanggal_kerja');
+            $this->pastikanMinimalHMinusSatu($tanggalRekan, 'tanggal_kerja_rekan');
 
             $batas = $this->hariIni()->addDays(self::HARI_KE_DEPAN)->toDateString();
+            if ($tanggal > $batas || $tanggalRekan > $batas) {
+                $this->gagal('tanggal_kerja_rekan', 'Jadwal yang dipilih berada di luar batas pilihan tanggal.');
+            }
 
-            if ($tanggalPengaju > $batas || $tanggalRekan > $batas) {
-                $this->gagal('id_jadwal_rekan', 'Jadwal yang dipilih berada di luar batas pilihan tanggal.');
+            $jadwalPengaju = $this->jadwalKaryawan($idKaryawan, $tanggal, true);
+            if ($jadwalPengaju === null) {
+                $this->gagal('tanggal_kerja', 'Anda tidak memiliki jadwal pada tanggal tersebut dengan penempatan aktif.');
+            }
+
+            $jadwalRekan = $this->jadwalKaryawan($idKaryawanRekan, $tanggalRekan, true);
+            if ($jadwalRekan === null) {
+                $this->gagal('id_karyawan_rekan', 'Rekan yang dipilih tidak memiliki jadwal pada tanggal tersebut.');
             }
 
             if ((int) $jadwalPengaju->id_klien !== (int) $jadwalRekan->id_klien) {
-                $this->gagal('id_jadwal_rekan', 'Pertukaran hanya dapat dilakukan dengan rekan pada klien yang sama.');
+                $this->gagal('id_karyawan_rekan', 'Pertukaran hanya dapat dilakukan dengan rekan pada klien yang sama.');
             }
 
             if (! $this->layananSama($jadwalPengaju, $jadwalRekan)) {
-                $this->gagal('id_jadwal_rekan', 'Pertukaran hanya dapat dilakukan dengan rekan yang memiliki jenis layanan yang sama.');
+                $this->gagal('id_karyawan_rekan', 'Pertukaran hanya dapat dilakukan dengan rekan yang memiliki jenis layanan yang sama.');
             }
 
-            if (! $this->pasanganBermakna($jadwalPengaju, $jadwalRekan)) {
-                $this->gagal('id_jadwal_rekan', 'Shift Anda dan rekan sama, tidak ada yang perlu ditukar.');
+            if ($this->shiftSama($jadwalPengaju, $jadwalRekan)) {
+                $this->gagal('id_karyawan_rekan', 'Shift Anda dan shift rekan yang dipilih sama, tidak ada yang perlu ditukar.');
             }
 
-            $idJadwal = [$idJadwalPengaju, $idJadwalRekan];
-
+            $idJadwal = [(int) $jadwalPengaju->id, (int) $jadwalRekan->id];
             if (array_intersect($idJadwal, $this->idJadwalMenunggu()) !== []) {
-                $this->gagal('id_jadwal_pengaju', 'Salah satu jadwal sudah memiliki pengajuan yang masih menunggu persetujuan.');
+                $this->gagal('tanggal_kerja', 'Salah satu jadwal sudah memiliki pengajuan yang masih menunggu persetujuan.');
             }
 
-            $idKaryawanRekan = (int) $jadwalRekan->id_karyawan;
-            $idKaryawanTerlibat = [$idKaryawan, $idKaryawanRekan];
-
-            if (
-                $this->sudahAbsen($idKaryawanTerlibat, $tanggalPengaju)
-                || $this->sudahAbsen($idKaryawanTerlibat, $tanggalRekan)
-            ) {
-                $this->gagal('id_jadwal_pengaju', 'Absensi pada salah satu tanggal sudah tercatat. Jadwal tidak dapat ditukar.');
+            if ($this->sudahAbsen([[$idKaryawan, $tanggal], [$idKaryawanRekan, $tanggalRekan]])) {
+                $this->gagal('tanggal_kerja', 'Absensi pada salah satu tanggal sudah tercatat. Jadwal tidak dapat ditukar.');
             }
 
-            if (
-                ! $this->jadwalKerjaService->tanggalBerlaku($tanggalRekan, $jadwalPengaju)
-                || ! $this->jadwalKerjaService->tanggalBerlaku($tanggalPengaju, $jadwalRekan)
-            ) {
-                $this->gagal('id_jadwal_rekan', 'Tanggal tujuan berada di luar masa berlaku penempatan Anda atau rekan.');
+            $bentrok = $this->bentrokDenganHariSekitar($idKaryawan, $tanggal, $jadwalRekan);
+            if ($bentrok !== null) {
+                $this->gagal('tanggal_kerja_rekan', "Shift baru Anda bertumpuk dengan jadwal Anda pada {$bentrok}.");
             }
 
-            if (
-                $this->adaJadwalLain($idKaryawan, $tanggalRekan, $idJadwal)
-                || $this->adaJadwalLain($idKaryawanRekan, $tanggalPengaju, $idJadwal)
-            ) {
-                $this->gagal('id_jadwal_rekan', 'Anda atau rekan sudah memiliki jadwal lain pada tanggal tujuan pertukaran.');
+            $bentrok = $this->bentrokDenganHariSekitar($idKaryawanRekan, $tanggalRekan, $jadwalPengaju);
+            if ($bentrok !== null) {
+                $this->gagal('tanggal_kerja_rekan', "Shift baru rekan bertumpuk dengan jadwalnya pada {$bentrok}.");
             }
 
             return (int) DB::table('tbl_pertukaran_shift')->insertGetId([
                 'id_karyawan_pengaju' => $idKaryawan,
-                'id_karyawan_rekan' => $jadwalRekan->id_karyawan,
+                'id_karyawan_rekan' => $idKaryawanRekan,
                 'id_jadwal_pengaju' => $jadwalPengaju->id,
                 'id_jadwal_rekan' => $jadwalRekan->id,
-                'tanggal_kerja' => $tanggalPengaju,
+                'tanggal_kerja' => $tanggal,
                 'tanggal_kerja_rekan' => $tanggalRekan,
                 'snapshot_pengaju' => json_encode($this->jadwalKerjaService->snapshot($jadwalPengaju), JSON_THROW_ON_ERROR),
                 'snapshot_rekan' => json_encode($this->jadwalKerjaService->snapshot($jadwalRekan), JSON_THROW_ON_ERROR),
@@ -266,119 +212,65 @@ class PertukaranShiftService
     }
 
     /**
-     * Persetujuan akhir Operasional: tanggal dan isi shift kedua jadwal ditukar dalam satu
-     * transaksi, id_penempatan tidak berubah, dan setiap perubahan tercatat di riwayat jadwal.
+     * Menyetujui pengajuan: nilai shift kedua jadwal ditukar, masing-masing tetap pada tanggalnya sendiri.
      */
     public function setujui(int $idPengajuan, int $idUser): void
     {
-        try {
-            DB::transaction(function () use ($idPengajuan, $idUser): void {
-                $pengajuan = $this->ambilUntukDiproses($idPengajuan);
-                $jadwal = DB::table('tbl_jadwal_kerja')
-                    ->whereIn('id', [(int) $pengajuan->id_jadwal_pengaju, (int) $pengajuan->id_jadwal_rekan])
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->get()
-                    ->keyBy('id');
-
-                // Kunci penempatan agar status/masa berlakunya tidak berubah di tengah proses.
-                DB::table('tbl_penempatan')
-                    ->whereIn('id', $jadwal->pluck('id_penempatan')->all())
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->get(['id']);
-
-                $masalah = $this->masalahPersetujuan($pengajuan);
-                if ($masalah !== []) {
-                    $this->gagal('pengajuan', $masalah[0]);
-                }
-
-                $jadwalPengaju = $jadwal->get((int) $pengajuan->id_jadwal_pengaju);
-                $jadwalRekan = $jadwal->get((int) $pengajuan->id_jadwal_rekan);
-                $sumber = ['pertukaran_shift' => (int) $pengajuan->id];
-
-                $this->jadwalKerjaService->tukarTanggalDanNilai(
-                    $jadwalPengaju,
-                    (string) $jadwalRekan->tanggal_kerja,
-                    $this->nilaiJadwal($jadwalRekan),
-                    $idUser,
-                    $sumber,
-                );
-                $this->jadwalKerjaService->tukarTanggalDanNilai(
-                    $jadwalRekan,
-                    (string) $jadwalPengaju->tanggal_kerja,
-                    $this->nilaiJadwal($jadwalPengaju),
-                    $idUser,
-                    $sumber,
-                );
-
-                $this->simpanKeputusan($idPengajuan, self::STATUS_DISETUJUI, $idUser, null);
-            });
-        } catch (UniqueConstraintViolationException) {
-            // Jadwal lain sempat dibuat pada tanggal tujuan setelah pemeriksaan; transaksi sudah di-rollback.
-            $this->gagal('pengajuan', 'Sudah ada jadwal lain pada tanggal tujuan salah satu karyawan. Muat ulang halaman lalu periksa kembali.');
-        }
-    }
-
-    /**
-     * Tanggapan rekan atas pengajuan yang ditujukan kepadanya. Menerima = diteruskan ke Operasional;
-     * menolak = pengajuan langsung Ditolak. Jadwal tidak pernah disentuh di tahap ini.
-     */
-    public function tanggapiRekan(int $idPengajuan, int $idKaryawanRekan, bool $terima, ?string $catatan, int $idUser): void
-    {
-        DB::transaction(function () use ($idPengajuan, $idKaryawanRekan, $terima, $catatan, $idUser): void {
+        DB::transaction(function () use ($idPengajuan, $idUser): void {
             $pengajuan = $this->ambilUntukDiproses($idPengajuan);
+            $jadwal = DB::table('tbl_jadwal_kerja')
+                ->whereIn('id', [(int) $pengajuan->id_jadwal_pengaju, (int) $pengajuan->id_jadwal_rekan])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
 
-            if ((int) $pengajuan->id_karyawan_rekan !== $idKaryawanRekan) {
-                $this->gagal('pengajuan', 'Pengajuan pertukaran shift tidak ditemukan.');
+            // Kunci penempatan agar status/masa berlakunya tidak berubah di tengah proses.
+            DB::table('tbl_penempatan')
+                ->whereIn('id', $jadwal->pluck('id_penempatan')->all())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id']);
+
+            $masalah = $this->masalahPersetujuan($pengajuan);
+            if ($masalah !== []) {
+                $this->gagal('pengajuan', $masalah[0]);
             }
 
-            if (($pengajuan->status_rekan ?? self::REKAN_DITERIMA) !== self::REKAN_MENUNGGU) {
-                $this->gagal('pengajuan', 'Anda sudah menanggapi pengajuan ini sebelumnya.');
-            }
+            $jadwalPengaju = $jadwal->get($pengajuan->id_jadwal_pengaju);
+            $jadwalRekan = $jadwal->get($pengajuan->id_jadwal_rekan);
+            $sumber = ['pertukaran_shift' => (int) $pengajuan->id];
 
-            if ($terima && $this->tanggalSudahLewat((string) $pengajuan->tanggal_kerja)) {
-                $this->gagal('pengajuan', 'Tanggal shift sudah lewat atau sedang berlangsung, pengajuan tidak dapat diterima.');
-            }
+            $this->jadwalKerjaService->simpanNilaiJadwal(
+                (int) $jadwalPengaju->id_penempatan,
+                (string) $jadwalPengaju->tanggal_kerja,
+                $jadwalPengaju,
+                $this->nilaiJadwal($jadwalRekan),
+                'Diubah',
+                $idUser,
+                $sumber,
+            );
+            $this->jadwalKerjaService->simpanNilaiJadwal(
+                (int) $jadwalRekan->id_penempatan,
+                (string) $jadwalRekan->tanggal_kerja,
+                $jadwalRekan,
+                $this->nilaiJadwal($jadwalPengaju),
+                'Diubah',
+                $idUser,
+                $sumber,
+            );
 
-            if ($terima) {
-                $masalah = $this->masalahJadwal($pengajuan);
-                if ($masalah !== []) {
-                    $this->gagal('pengajuan', $masalah[0]);
-                }
-            }
-
-            $nilai = [
-                'status_rekan' => $terima ? self::REKAN_DITERIMA : self::REKAN_DITOLAK,
-                'catatan_rekan' => $catatan,
-                'ditanggapi_rekan_pada' => now(),
-                'updated_at' => now(),
-            ];
-
-            if (! $terima) {
-                $nilai += [
-                    'status' => self::STATUS_DITOLAK,
-                    'catatan_keputusan' => 'Ditolak oleh rekan'.(filled($catatan) ? ': '.$catatan : '.'),
-                    'diproses_oleh' => $idUser,
-                    'diproses_pada' => now(),
-                ];
-            }
-
-            DB::table('tbl_pertukaran_shift')
-                ->where('id', $idPengajuan)
-                ->where('status', self::STATUS_MENUNGGU)
-                ->where('status_rekan', self::REKAN_MENUNGGU)
-                ->update($nilai);
+            $this->simpanKeputusan($idPengajuan, self::STATUS_DISETUJUI, $idUser, null);
         });
     }
 
     /**
-     * Label tahap pengajuan untuk tampilan, mempertimbangkan persetujuan rekan.
+     * Label tahap pengajuan untuk tampilan.
      */
     public static function labelTahap(object $pengajuan): string
     {
         if ($pengajuan->status === self::STATUS_MENUNGGU
-            && (string) $pengajuan->tanggal_kerja <= CarbonImmutable::now((string) config('app.timezone', 'UTC'))->toDateString()) {
+            && self::tanggalTerawal($pengajuan) <= CarbonImmutable::now((string) config('app.timezone', 'UTC'))->toDateString()) {
             return 'Kedaluwarsa';
         }
 
@@ -386,15 +278,27 @@ class PertukaranShiftService
             return 'Dibatalkan';
         }
 
-        if ($pengajuan->status === self::STATUS_MENUNGGU && ($pengajuan->status_rekan ?? self::REKAN_DITERIMA) === self::REKAN_MENUNGGU) {
-            return 'Menunggu Persetujuan Rekan';
-        }
-
         if ($pengajuan->status === self::STATUS_MENUNGGU) {
             return 'Menunggu Persetujuan Operasional';
         }
 
         return ($pengajuan->status_rekan ?? null) === self::REKAN_DITOLAK ? 'Ditolak Rekan' : $pengajuan->status;
+    }
+
+    /**
+     * Tanggal jadwal rekan (kolom tanggal_kerja_rekan); pengajuan lama tanpa nilai ini memakai tanggal pengaju.
+     */
+    public static function tanggalRekan(object $pengajuan): string
+    {
+        return (string) ($pengajuan->tanggal_kerja_rekan ?? $pengajuan->tanggal_kerja);
+    }
+
+    /**
+     * Tanggal paling awal di antara kedua jadwal: pengajuan kedaluwarsa begitu tanggal ini tiba.
+     */
+    public static function tanggalTerawal(object $pengajuan): string
+    {
+        return min((string) $pengajuan->tanggal_kerja, self::tanggalRekan($pengajuan));
     }
 
     /**
@@ -436,74 +340,35 @@ class PertukaranShiftService
             return ['Pengajuan ini sudah diproses sebelumnya.'];
         }
 
-        if (($pengajuan->status_rekan ?? self::REKAN_DITERIMA) !== self::REKAN_DITERIMA) {
-            return ['Rekan belum menerima pengajuan ini. Persetujuan Operasional baru dapat diberikan setelah rekan menerima.'];
-        }
-
         return $this->masalahJadwal($pengajuan);
     }
 
     /**
-     * Pemeriksaan kondisi jadwal kedua karyawan (tanpa memandang tahap persetujuan):
+     * Pemeriksaan kondisi jadwal kedua karyawan:
      * tanggal, penempatan, klien, jenis layanan, perubahan jadwal, absensi, dan bentrok shift.
+     * Setiap pemeriksaan memakai tanggal jadwal milik masing-masing karyawan.
      *
      * @return list<string>
      */
     private function masalahJadwal(object $pengajuan): array
     {
         $tanggalPengaju = (string) $pengajuan->tanggal_kerja;
-        $tanggalRekan = $this->tanggalKerjaRekan($pengajuan);
+        $tanggalRekan = self::tanggalRekan($pengajuan);
 
-        if ($this->pengajuanKedaluwarsa($pengajuan)) {
-            return ['Salah satu tanggal shift sudah lewat atau sedang berlangsung.'];
+        if ($this->tanggalSudahLewat(self::tanggalTerawal($pengajuan))) {
+            return ['Tanggal shift sudah lewat atau sedang berlangsung, pengajuan tidak dapat disetujui.'];
         }
 
-        $jadwal = DB::table('tbl_jadwal_kerja as j')
-            ->join('tbl_penempatan as p', 'p.id', '=', 'j.id_penempatan')
-            ->join('tbl_karyawan as k', 'k.id', '=', 'p.id_karyawan')
-            ->whereIn('j.id', [(int) $pengajuan->id_jadwal_pengaju, (int) $pengajuan->id_jadwal_rekan])
-            ->get([
-                'j.*',
-                'p.id_karyawan',
-                'p.id_klien',
-                'p.status as status_penempatan',
-                'p.tgl_mulai',
-                'p.tgl_selesai',
-                'k.id_jenis_layanan',
-            ])
-            ->keyBy('id');
+        $jadwalPengaju = $this->jadwalKaryawan((int) $pengajuan->id_karyawan_pengaju, $tanggalPengaju);
+        $jadwalRekan = $this->jadwalKaryawan((int) $pengajuan->id_karyawan_rekan, $tanggalRekan);
 
-        $jadwalPengaju = $jadwal->get((int) $pengajuan->id_jadwal_pengaju);
-        $jadwalRekan = $jadwal->get((int) $pengajuan->id_jadwal_rekan);
-
-        if (
-            $jadwalPengaju === null
-            || $jadwalRekan === null
-            || (int) $jadwalPengaju->id_karyawan !== (int) $pengajuan->id_karyawan_pengaju
-            || (int) $jadwalRekan->id_karyawan !== (int) $pengajuan->id_karyawan_rekan
-            || (int) $jadwalPengaju->id_penempatan === (int) $jadwalRekan->id_penempatan
-        ) {
-            return ['Jadwal salah satu karyawan sudah tidak ditemukan atau tidak sesuai.'];
-        }
-
-        if ((string) $jadwalPengaju->tanggal_kerja !== $tanggalPengaju || (string) $jadwalRekan->tanggal_kerja !== $tanggalRekan) {
-            return ['Tanggal salah satu jadwal sudah berubah setelah pengajuan dibuat. Tolak pengajuan ini dan minta karyawan mengajukan ulang.'];
-        }
-
-        if ($jadwalPengaju->status_penempatan !== 'Aktif' || $jadwalRekan->status_penempatan !== 'Aktif') {
-            return ['Penempatan salah satu karyawan sudah tidak aktif.'];
+        if ($jadwalPengaju === null || (int) $jadwalPengaju->id !== (int) $pengajuan->id_jadwal_pengaju
+            || $jadwalRekan === null || (int) $jadwalRekan->id !== (int) $pengajuan->id_jadwal_rekan) {
+            return ['Penempatan salah satu karyawan sudah tidak aktif pada tanggal tersebut.'];
         }
 
         if ((int) $jadwalPengaju->id_klien !== (int) $jadwalRekan->id_klien) {
             return ['Kedua karyawan sudah tidak ditempatkan pada klien yang sama.'];
-        }
-
-        // Setelah ditukar: jadwal pengaju pindah ke tanggal rekan, jadwal rekan pindah ke tanggal pengaju.
-        if (
-            ! $this->jadwalKerjaService->tanggalBerlaku($tanggalRekan, $jadwalPengaju)
-            || ! $this->jadwalKerjaService->tanggalBerlaku($tanggalPengaju, $jadwalRekan)
-        ) {
-            return ['Tanggal tujuan berada di luar masa berlaku salah satu penempatan.'];
         }
 
         if (! $this->layananSama($jadwalPengaju, $jadwalRekan)) {
@@ -512,32 +377,20 @@ class PertukaranShiftService
 
         $masalah = [];
 
-        if (
-            $this->jadwalKerjaService->snapshot($jadwalPengaju) != $this->snapshotTersimpan($pengajuan->snapshot_pengaju)
-            || $this->jadwalKerjaService->snapshot($jadwalRekan) != $this->snapshotTersimpan($pengajuan->snapshot_rekan)
-        ) {
+        if ($this->jadwalKerjaService->snapshot($jadwalPengaju) != $this->snapshotTersimpan($pengajuan->snapshot_pengaju)
+            || $this->jadwalKerjaService->snapshot($jadwalRekan) != $this->snapshotTersimpan($pengajuan->snapshot_rekan)) {
             $masalah[] = 'Jadwal salah satu karyawan sudah diubah setelah pengajuan dibuat. Tolak pengajuan ini dan minta karyawan mengajukan ulang.';
         }
 
-        $idKaryawanTerlibat = [(int) $pengajuan->id_karyawan_pengaju, (int) $pengajuan->id_karyawan_rekan];
-
-        if ($this->sudahAbsen($idKaryawanTerlibat, $tanggalPengaju) || $this->sudahAbsen($idKaryawanTerlibat, $tanggalRekan)) {
+        if ($this->sudahAbsen([[(int) $pengajuan->id_karyawan_pengaju, $tanggalPengaju], [(int) $pengajuan->id_karyawan_rekan, $tanggalRekan]])) {
             $masalah[] = 'Absensi pada salah satu tanggal sudah tercatat.';
         }
 
-        $idJadwalDitukar = [(int) $jadwalPengaju->id, (int) $jadwalRekan->id];
-
         foreach ([
-            [(int) $pengajuan->id_karyawan_pengaju, $tanggalRekan, $jadwalRekan, $pengajuan->nama_pengaju ?? 'Pengaju'],
-            [(int) $pengajuan->id_karyawan_rekan, $tanggalPengaju, $jadwalPengaju, $pengajuan->nama_rekan ?? 'Rekan'],
-        ] as [$idKaryawan, $tanggalTujuan, $jadwalBaru, $nama]) {
-            // Jadwal apa pun (Kerja/Libur) pada tanggal tujuan akan melanggar unique id_penempatan + tanggal_kerja.
-            if ($this->adaJadwalLain($idKaryawan, $tanggalTujuan, $idJadwalDitukar)) {
-                $masalah[] = "Sudah ada jadwal lain untuk {$nama} pada ".CarbonImmutable::parse($tanggalTujuan)->format('d/m/Y').'.';
-            }
-
-            $bentrok = $this->bentrokDenganHariSekitar($idKaryawan, $tanggalTujuan, $jadwalBaru, $idJadwalDitukar);
-
+            [$pengajuan->id_karyawan_pengaju, $tanggalPengaju, $jadwalRekan, $pengajuan->nama_pengaju ?? 'Pengaju'],
+            [$pengajuan->id_karyawan_rekan, $tanggalRekan, $jadwalPengaju, $pengajuan->nama_rekan ?? 'Rekan'],
+        ] as [$idKaryawan, $tanggal, $jadwalBaru, $nama]) {
+            $bentrok = $this->bentrokDenganHariSekitar((int) $idKaryawan, $tanggal, $jadwalBaru);
             if ($bentrok !== null) {
                 $masalah[] = "Shift baru {$nama} bertumpuk dengan jadwalnya pada {$bentrok}.";
             }
@@ -547,11 +400,11 @@ class PertukaranShiftService
     }
 
     /**
-     * Tanggal asal jadwal rekan. Pengajuan lama (sebelum kolom ditambahkan) memakai tanggal yang sama.
+     * Versi instance dari tanggalRekan(), dipakai tampilan Operasional.
      */
     public function tanggalKerjaRekan(object $pengajuan): string
     {
-        return (string) ($pengajuan->tanggal_kerja_rekan ?? $pengajuan->tanggal_kerja);
+        return self::tanggalRekan($pengajuan);
     }
 
     /**
@@ -559,17 +412,12 @@ class PertukaranShiftService
      */
     public function pengajuanKedaluwarsa(object $pengajuan): bool
     {
-        return $this->tanggalSudahLewat(min((string) $pengajuan->tanggal_kerja, $this->tanggalKerjaRekan($pengajuan)));
+        return $this->tanggalSudahLewat(self::tanggalTerawal($pengajuan));
     }
 
     public function jumlahMenunggu(): int
     {
-        return $this->tersedia()
-            ? DB::table('tbl_pertukaran_shift')
-                ->where('status', self::STATUS_MENUNGGU)
-                ->where('tanggal_kerja', '>', $this->hariIni()->toDateString())
-                ->count()
-            : 0;
+        return $this->tersedia() ? $this->queryMenungguBerlaku()->count() : 0;
     }
 
     /**
@@ -599,6 +447,7 @@ class PertukaranShiftService
 
     /**
      * True bila tanggal shift sudah lewat atau hari ini: pengajuan Menunggu tidak lagi dapat disetujui.
+     * Untuk pengajuan, berikan tanggalTerawal() agar kedua tanggal ikut diperhitungkan.
      */
     public function tanggalSudahLewat(string $tanggal): bool
     {
@@ -606,7 +455,8 @@ class PertukaranShiftService
     }
 
     /**
-     * Query daftar pengajuan lengkap dengan nama karyawan, klien, dan pemroses.
+     * Query daftar pengajuan lengkap dengan nama karyawan, klien, dan pemroses. Alias jr = jadwal rekan
+     * (dipakai filter tanggal Operasional); tanggal_kerja_rekan berasal dari kolom ps.*.
      */
     public function queryDaftar(): Builder
     {
@@ -614,6 +464,7 @@ class PertukaranShiftService
             ->join('tbl_karyawan as kp', 'kp.id', '=', 'ps.id_karyawan_pengaju')
             ->join('tbl_karyawan as kr', 'kr.id', '=', 'ps.id_karyawan_rekan')
             ->join('tbl_jadwal_kerja as jp', 'jp.id', '=', 'ps.id_jadwal_pengaju')
+            ->join('tbl_jadwal_kerja as jr', 'jr.id', '=', 'ps.id_jadwal_rekan')
             ->join('tbl_penempatan as pp', 'pp.id', '=', 'jp.id_penempatan')
             ->join('tbl_klien as kl', 'kl.id', '=', 'pp.id_klien')
             ->leftJoin('tbl_users as u', 'u.id', '=', 'ps.diproses_oleh')
@@ -644,21 +495,6 @@ class PertukaranShiftService
             ->orderByDesc('ps.id')
             ->paginate($perHalaman)
             ->withQueryString();
-    }
-
-    /**
-     * Jumlah pengajuan yang menunggu tanggapan karyawan ini sebagai rekan.
-     */
-    public function jumlahMenungguTanggapan(int $idKaryawan): int
-    {
-        return $this->tersedia()
-            ? DB::table('tbl_pertukaran_shift')
-                ->where('id_karyawan_rekan', $idKaryawan)
-                ->where('status', self::STATUS_MENUNGGU)
-                ->where('status_rekan', self::REKAN_MENUNGGU)
-                ->where('tanggal_kerja', '>', $this->hariIni()->toDateString())
-                ->count()
-            : 0;
     }
 
     /**
@@ -694,9 +530,21 @@ class PertukaranShiftService
     }
 
     /**
-     * Jadwal dari penempatan Aktif yang berlaku pada tanggal jadwal itu. Masa berlaku penempatan
-     * ikut dipilih agar tanggal tujuan pertukaran dapat diperiksa dengan tanggalBerlaku().
+     * Jadwal karyawan pada satu tanggal, hanya dari penempatan Aktif yang berlaku pada tanggal itu.
      */
+    private function jadwalKaryawan(int $idKaryawan, string $tanggal, bool $kunci = false): ?object
+    {
+        $query = $this->queryJadwalAktif()
+            ->where('p.id_karyawan', $idKaryawan)
+            ->where('j.tanggal_kerja', $tanggal);
+
+        if ($kunci) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
+    }
+
     private function queryJadwalAktif(): Builder
     {
         return DB::table('tbl_jadwal_kerja as j')
@@ -745,29 +593,20 @@ class PertukaranShiftService
     /**
      * Mengembalikan tanggal (d/m/Y) yang bertumpuk bila $jadwalBaru dipasang pada $tanggal,
      * dibandingkan dengan jadwal Kerja karyawan pada hari sebelum dan sesudahnya.
-     * Jadwal yang sedang ditukar dikecualikan karena posisinya ikut berpindah.
-     *
-     * @param  list<int>  $kecualikanIdJadwal
      */
-    private function bentrokDenganHariSekitar(
-        int $idKaryawan,
-        string $tanggal,
-        object $jadwalBaru,
-        array $kecualikanIdJadwal = [],
-    ): ?string {
+    private function bentrokDenganHariSekitar(int $idKaryawan, string $tanggal, object $jadwalBaru): ?string
+    {
         if ($jadwalBaru->status !== 'Kerja') {
             return null;
         }
 
         $hari = CarbonImmutable::parse($tanggal);
         [$mulaiBaru, $selesaiBaru] = $this->rentangMenit($jadwalBaru, 0);
-        $jadwalSekitar = DB::table('tbl_jadwal_kerja as j')
-            ->join('tbl_penempatan as p', 'p.id', '=', 'j.id_penempatan')
+        $jadwalSekitar = $this->queryJadwalAktif()
             ->where('p.id_karyawan', $idKaryawan)
             ->where('j.status', 'Kerja')
             ->whereIn('j.tanggal_kerja', [$hari->subDay()->toDateString(), $hari->addDay()->toDateString()])
-            ->when($kecualikanIdJadwal !== [], fn (Builder $query) => $query->whereNotIn('j.id', $kecualikanIdJadwal))
-            ->get(['j.*']);
+            ->get();
 
         foreach ($jadwalSekitar as $jadwal) {
             $selisihHari = (string) $jadwal->tanggal_kerja < $tanggal ? -1 : 1;
@@ -779,21 +618,6 @@ class PertukaranShiftService
         }
 
         return null;
-    }
-
-    /**
-     * True bila karyawan punya jadwal lain (status apa pun, penempatan mana pun) pada tanggal itu.
-     *
-     * @param  list<int>  $kecualikanIdJadwal
-     */
-    private function adaJadwalLain(int $idKaryawan, string $tanggal, array $kecualikanIdJadwal): bool
-    {
-        return DB::table('tbl_jadwal_kerja as j')
-            ->join('tbl_penempatan as p', 'p.id', '=', 'j.id_penempatan')
-            ->where('p.id_karyawan', $idKaryawan)
-            ->where('j.tanggal_kerja', $tanggal)
-            ->whereNotIn('j.id', $kecualikanIdJadwal)
-            ->exists();
     }
 
     /**
@@ -826,16 +650,6 @@ class PertukaranShiftService
     }
 
     /**
-     * Pertukaran bermakna bila tanggalnya berbeda (hari kerja berpindah) atau,
-     * pada tanggal yang sama, shift keduanya berbeda.
-     */
-    private function pasanganBermakna(object $jadwalA, object $jadwalB): bool
-    {
-        return (string) $jadwalA->tanggal_kerja !== (string) $jadwalB->tanggal_kerja
-            || ! $this->shiftSama($jadwalA, $jadwalB);
-    }
-
-    /**
      * Jenis layanan kedua jadwal sama. Karyawan tanpa jenis layanan tidak pernah dianggap sama.
      */
     private function layananSama(object $jadwalA, object $jadwalB): bool
@@ -860,10 +674,8 @@ class PertukaranShiftService
      */
     private function idJadwalMenunggu(): array
     {
-        return DB::table('tbl_pertukaran_shift')
-            ->where('status', self::STATUS_MENUNGGU)
-            ->where('tanggal_kerja', '>', $this->hariIni()->toDateString())
-            ->get(['id_jadwal_pengaju', 'id_jadwal_rekan'])
+        return $this->queryMenungguBerlaku()
+            ->get(['ps.id_jadwal_pengaju', 'ps.id_jadwal_rekan'])
             ->flatMap(static fn (object $item): array => [(int) $item->id_jadwal_pengaju, (int) $item->id_jadwal_rekan])
             ->unique()
             ->values()
@@ -871,18 +683,40 @@ class PertukaranShiftService
     }
 
     /**
-     * @param  list<int>  $idKaryawan
+     * Pengajuan Menunggu yang kedua tanggal jadwalnya masih setelah hari ini (belum kedaluwarsa).
      */
-    private function sudahAbsen(array $idKaryawan, string $tanggal): bool
+    private function queryMenungguBerlaku(): Builder
     {
-        return Schema::hasTable('tbl_absensi')
-            && DB::table('tbl_absensi')->whereIn('id_karyawan', $idKaryawan)->where('tgl', $tanggal)->exists();
+        $hariIni = $this->hariIni()->toDateString();
+
+        return DB::table('tbl_pertukaran_shift as ps')
+            ->join('tbl_jadwal_kerja as jr', 'jr.id', '=', 'ps.id_jadwal_rekan')
+            ->where('ps.status', self::STATUS_MENUNGGU)
+            ->where('ps.tanggal_kerja', '>', $hariIni)
+            ->where('jr.tanggal_kerja', '>', $hariIni);
     }
 
-    private function pastikanMinimalHMinusSatu(string $tanggal): void
+    /**
+     * True bila salah satu karyawan sudah memiliki absensi pada tanggal jadwalnya sendiri.
+     *
+     * @param  list<array{0: int, 1: string}>  $karyawanPerTanggal  pasangan [id_karyawan, tanggal]
+     */
+    private function sudahAbsen(array $karyawanPerTanggal): bool
+    {
+        return Schema::hasTable('tbl_absensi')
+            && DB::table('tbl_absensi')
+                ->where(function (Builder $query) use ($karyawanPerTanggal): void {
+                    foreach ($karyawanPerTanggal as [$idKaryawan, $tanggal]) {
+                        $query->orWhere(fn (Builder $query) => $query->where('id_karyawan', $idKaryawan)->where('tgl', $tanggal));
+                    }
+                })
+                ->exists();
+    }
+
+    private function pastikanMinimalHMinusSatu(string $tanggal, string $kunci): void
     {
         if ($tanggal <= $this->hariIni()->toDateString()) {
-            $this->gagal('id_jadwal_pengaju', 'Pengajuan pertukaran shift paling lambat H-1 sebelum tanggal shift.');
+            $this->gagal($kunci, 'Pengajuan pertukaran shift paling lambat H-1 sebelum tanggal shift.');
         }
     }
 
