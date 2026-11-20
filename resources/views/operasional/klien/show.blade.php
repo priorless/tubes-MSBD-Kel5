@@ -8,13 +8,15 @@
         ? 'Nonaktifkan kerja sama dengan '.$klien->nama_perusahaan.'?'
             .($penempatanAktif->isEmpty() ? '' : ' Masih ada '.$penempatanAktif->count().' karyawan yang ditempatkan; penempatan mereka tidak berubah.')
         : 'Aktifkan kembali kerja sama dengan '.$klien->nama_perusahaan.'?';
+    // Penempatan & jadwal kerja hanya dapat diakses Operasional; tautannya disembunyikan saat dibuka dari modul HRD.
+    $modulOperasional = $ruteKlien === 'operasional.klien';
 @endphp
 
 @section('content')
     <x-ui.page-header :title="$klien->nama_perusahaan" :description="'Kode klien '.$klien->kode_klien.' · Status kerja sama: '.$klien->status">
-        <a href="{{ route('operasional.klien.index') }}" class="btn-secondary">Daftar Klien</a>
-        <a href="{{ route('operasional.klien.edit', $klien->id) }}" class="btn-secondary">Edit Informasi</a>
-        @if ($aktif)
+        <a href="{{ route($ruteKlien.'.index') }}" class="btn-secondary">Daftar Klien</a>
+        <a href="{{ route($ruteKlien.'.edit', $klien->id) }}" class="btn-secondary">Edit Informasi</a>
+        @if ($aktif && $modulOperasional)
             <a href="{{ route('operasional.penempatan.create', ['id_klien' => $klien->id]) }}" class="btn-primary">+ Buat Penempatan</a>
         @endif
     </x-ui.page-header>
@@ -88,7 +90,7 @@
             <div class="card-body">
                 <x-ui.empty-state title="Belum ada karyawan yang ditempatkan"
                     :message="$aktif ? 'Buat penempatan untuk mulai menugaskan karyawan di klien ini.' : 'Aktifkan kembali kerja sama sebelum membuat penempatan baru.'">
-                    @if ($aktif)
+                    @if ($aktif && $modulOperasional)
                         <a href="{{ route('operasional.penempatan.create', ['id_klien' => $klien->id]) }}" class="btn-primary btn-sm">+ Buat Penempatan</a>
                     @endif
                 </x-ui.empty-state>
@@ -97,7 +99,7 @@
             <div class="overflow-x-auto">
                 <table class="table">
                     <thead>
-                        <tr><th>Karyawan</th><th>Jenis Layanan</th><th>Lokasi Kerja</th><th>Periode</th><th class="text-right">Jadwal</th></tr>
+                        <tr><th>Karyawan</th><th>Jenis Layanan</th><th>Lokasi Kerja</th><th>Periode</th>@if ($modulOperasional)<th class="text-right">Jadwal</th>@endif</tr>
                     </thead>
                     <tbody>
                         @foreach ($penempatanAktif as $item)
@@ -109,9 +111,11 @@
                                     {{ \Carbon\Carbon::parse($item->tgl_mulai)->format('d/m/Y') }} &ndash;
                                     {{ $item->tgl_selesai === null ? 'sekarang' : \Carbon\Carbon::parse($item->tgl_selesai)->format('d/m/Y') }}
                                 </td>
-                                <td class="text-right">
-                                    <a href="{{ route('operasional.jadwal-kerja', ['id_karyawan' => $item->id_karyawan]) }}" class="btn-secondary btn-sm">Lihat Jadwal</a>
-                                </td>
+                                @if ($modulOperasional)
+                                    <td class="text-right">
+                                        <a href="{{ route('operasional.jadwal-kerja', ['id_karyawan' => $item->id_karyawan]) }}" class="btn-secondary btn-sm">Lihat Jadwal</a>
+                                    </td>
+                                @endif
                             </tr>
                         @endforeach
                     </tbody>
@@ -166,7 +170,7 @@
                         : 'Klien dapat dipilih kembali untuk penempatan.' }}
                 </p>
             </div>
-            <form method="POST" action="{{ route('operasional.klien.status', $klien->id) }}" onsubmit="return confirm(@js($pesanKonfirmasi))">
+            <form method="POST" action="{{ route($ruteKlien.'.status', $klien->id) }}" onsubmit="return confirm(@js($pesanKonfirmasi))">
                 @csrf
                 @method('PATCH')
                 <input type="hidden" name="status" value="{{ $aktif ? 'Nonaktif' : 'Aktif' }}">

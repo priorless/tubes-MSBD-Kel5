@@ -10,7 +10,7 @@
 @section('content')
     <x-ui.page-header :title="$isEditing ? 'Edit informasi '.$klien->nama_perusahaan : 'Tambah klien baru'" />
 
-    <form action="{{ $isEditing ? route('operasional.klien.update', $klien->id) : route('operasional.klien.store') }}" method="POST" class="card max-w-3xl">
+    <form action="{{ $isEditing ? route($ruteKlien.'.update', $klien->id) : route($ruteKlien.'.store') }}" method="POST" class="card max-w-3xl">
         @csrf
         @if ($isEditing)
             @method('PUT')
@@ -180,7 +180,7 @@
 
         <div class="card-footer justify-start">
             <button type="submit" class="btn-primary">{{ $isEditing ? 'Simpan Perubahan' : 'Simpan Klien' }}</button>
-            <a href="{{ $isEditing ? route('operasional.klien.show', $klien->id) : route('operasional.klien.index') }}" class="btn-secondary">Batal</a>
+            <a href="{{ $isEditing ? route($ruteKlien.'.show', $klien->id) : route($ruteKlien.'.index') }}" class="btn-secondary">Batal</a>
         </div>
     </form>
 @endsection
