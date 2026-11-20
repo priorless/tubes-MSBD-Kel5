@@ -24,6 +24,7 @@ use App\Http\Controllers\Operasional\TemplateJadwalController;
 use App\Http\Controllers\Operasional\TemplateShiftController;
 use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\TenagaKerja\LaporanAktivitasController;
+use App\Http\Controllers\TenagaKerja\PembatalanTukarShiftController;
 use App\Http\Controllers\TenagaKerja\PengajuanTukarShiftController;
 use App\Http\Controllers\TenagaKerja\TanggapanTukarShiftController;
 use App\Http\Controllers\TenagaKerjaController;
@@ -198,9 +199,14 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             Route::get('/absensi', 'absensi')->name('absensi');
             Route::post('/absensi/check-in', 'checkIn')->middleware('throttle:10,1')->name('absensi.check-in');
             Route::post('/absensi/check-out', 'checkOut')->middleware('throttle:10,1')->name('absensi.check-out');
-            Route::post('/absensi/tukar-shift', PengajuanTukarShiftController::class)->middleware('throttle:10,1')->name('tukar-shift.store');
-            Route::patch('/absensi/tukar-shift/{pertukaranShift}/tanggapi', TanggapanTukarShiftController::class)
+
+            // Tukar shift (roker) dengan rekan: pengajuan, tanggapan rekan, dan pembatalan oleh pengaju.
+            Route::get('/tukar-shift', 'tukarShift')->name('tukar-shift.index');
+            Route::post('/tukar-shift', PengajuanTukarShiftController::class)->middleware('throttle:10,1')->name('tukar-shift.store');
+            Route::patch('/tukar-shift/{pertukaranShift}/tanggapi', TanggapanTukarShiftController::class)
                 ->whereNumber('pertukaranShift')->middleware('throttle:10,1')->name('tukar-shift.tanggapi');
+            Route::patch('/tukar-shift/{pertukaranShift}/batalkan', PembatalanTukarShiftController::class)
+                ->whereNumber('pertukaranShift')->middleware('throttle:10,1')->name('tukar-shift.batalkan');
 
             // Laporan aktivitas: monitoring per jam (Satpam/Cleaning Service) & perjalanan (Driver).
             Route::post('/absensi/laporan', [LaporanAktivitasController::class, 'store'])->middleware('throttle:20,1')->name('laporan.store');
