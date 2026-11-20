@@ -104,7 +104,6 @@ class JadwalAbsensiHarianTest extends TestCase
 
         $layanan = app(PertukaranShiftService::class);
         $idPengajuan = $layanan->ajukan($idPengaju, $idRekan, $tanggal, 'Ada keperluan keluarga pada pagi hari.');
-        $layanan->tanggapiRekan($idPengajuan, $idRekan, true, null, $this->loginSebagai(Role::KaryawanLapangan)->id);
         $layanan->setujui($idPengajuan, $this->loginSebagai(Role::Operasional)->id);
 
         $pengaju = $this->checkIn($idPengaju, $tanggal, '15:05:00');
