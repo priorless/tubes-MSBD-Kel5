@@ -173,7 +173,7 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div>
+                            <div class="js-bagian-jaminan-kesehatan">
                                 <label for="jenis_jaminan_kesehatan" class="form-label">Jenis Jaminan Kesehatan</label>
                                 <select id="jenis_jaminan_kesehatan" name="jenis_jaminan_kesehatan" @class(['form-input', 'form-input-error' => $errors->has('jenis_jaminan_kesehatan')])>
                                     <option value="" disabled @selected(blank(old('jenis_jaminan_kesehatan', $karyawan?->jenis_jaminan_kesehatan)))>Belum diisi</option>
@@ -318,6 +318,7 @@
                 const kategori = kategoriTerpilih();
                 aturBagian('.js-bagian-lapangan', kategori === 'Lapangan');
                 aturBagian('.js-bagian-internal', kategori === 'Internal');
+                aturBagian('.js-bagian-jaminan-kesehatan', kategori !== 'Internal');
 
                 const sakelarAkun = document.getElementById('buat_akun');
                 if (sakelarAkun && kategori === 'Internal') {
