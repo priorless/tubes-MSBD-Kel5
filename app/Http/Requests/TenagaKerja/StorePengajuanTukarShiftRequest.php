@@ -6,8 +6,8 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Validasi bentuk isian pengajuan tukar shift. Aturan bisnis (H-1, klien sama, jadwal ada,
- * shift berbeda, belum ada pengajuan menunggu) diputuskan PertukaranShiftService.
+ * Validasi bentuk isian pengajuan tukar shift. Aturan bisnis (H-1, klien dan jenis layanan sama,
+ * jadwal ada, shift berbeda, belum ada pengajuan menunggu) diputuskan PertukaranShiftService.
  * Id pengaju tidak pernah dikirim dari form: selalu KaryawanAktif::id().
  */
 class StorePengajuanTukarShiftRequest extends FormRequest
@@ -26,7 +26,6 @@ class StorePengajuanTukarShiftRequest extends FormRequest
             'id_jadwal_pengaju' => ['bail', 'required', 'integer', 'min:1'],
             'id_jadwal_rekan' => ['bail', 'required', 'integer', 'min:1', 'different:id_jadwal_pengaju'],
             'alasan' => ['required', 'string', 'min:10', 'max:500'],
-            'konfirmasi_rekan' => ['accepted'],
         ];
     }
 
@@ -44,7 +43,6 @@ class StorePengajuanTukarShiftRequest extends FormRequest
             'different' => 'Pilih dua jadwal yang berbeda.',
             'string' => ':Attribute harus berupa teks.',
             'max' => ':Attribute maksimal :max karakter.',
-            'konfirmasi_rekan.accepted' => 'Pastikan rekan sudah menyetujui pertukaran, lalu centang pernyataan persetujuan rekan.',
         ];
     }
 

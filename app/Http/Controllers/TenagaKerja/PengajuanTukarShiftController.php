@@ -10,13 +10,13 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Karyawan mengajukan tukar shift dari menu Absensi. Pengaju selalu karyawan yang sedang login.
+ * Karyawan mengajukan tukar shift dari menu Tukar Shift. Pengaju selalu karyawan yang sedang login.
  */
 class PengajuanTukarShiftController extends Controller
 {
     public function __invoke(StorePengajuanTukarShiftRequest $request, PertukaranShiftService $pertukaranShiftService): RedirectResponse
     {
-        $kembali = redirect()->to(route('tenaga-kerja.absensi').'#tukar-shift');
+        $kembali = redirect()->route('tenaga-kerja.tukar-shift.index');
 
         if (! $pertukaranShiftService->tersedia()) {
             return $kembali->with('gagal', 'Fitur tukar shift belum tersedia. Hubungi bagian Operasional.');
