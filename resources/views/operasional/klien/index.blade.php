@@ -10,11 +10,11 @@
 @section('content')
     <x-ui.page-header title="Data Klien"
         description="Perusahaan mitra PT Satu Jaya Indonesia.">
-        <a href="{{ route('operasional.klien.create') }}" class="btn-primary">+ Tambah Klien</a>
+        <a href="{{ route($ruteKlien.'.create') }}" class="btn-primary">+ Tambah Klien</a>
     </x-ui.page-header>
 
     <div class="card">
-        <form method="GET" action="{{ route('operasional.klien.index') }}" class="card-body flex flex-col gap-4 border-b border-gray-200 lg:flex-row lg:items-end lg:justify-between">
+        <form method="GET" action="{{ route($ruteKlien.'.index') }}" class="card-body flex flex-col gap-4 border-b border-gray-200 lg:flex-row lg:items-end lg:justify-between">
             <div class="flex flex-1 flex-wrap items-end gap-2">
                 <div class="w-full max-w-md">
                     <label for="q" class="form-label">Cari klien</label>
@@ -25,13 +25,13 @@
                 @endif
                 <button type="submit" class="btn-secondary">Cari</button>
                 @if ($sedangMenyaring)
-                    <a href="{{ route('operasional.klien.index') }}" class="btn-secondary">Hapus filter</a>
+                    <a href="{{ route($ruteKlien.'.index') }}" class="btn-secondary">Hapus filter</a>
                 @endif
             </div>
             <nav class="flex flex-wrap gap-2" aria-label="Filter status klien">
                 @foreach (['' => 'Semua', 'Aktif' => 'Aktif', 'Nonaktif' => 'Nonaktif'] as $nilai => $label)
                     @php $aktif = ($status ?? '') === $nilai; @endphp
-                    <a href="{{ route('operasional.klien.index', array_filter(['q' => $kataKunci, 'status' => $nilai])) }}"
+                    <a href="{{ route($ruteKlien.'.index', array_filter(['q' => $kataKunci, 'status' => $nilai])) }}"
                        @class(['btn-sm', 'btn-primary' => $aktif, 'btn-secondary' => ! $aktif]) @if ($aktif) aria-current="page" @endif>
                         {{ $label }} ({{ $nilai === '' ? $jumlahSemua : ($jumlahPerStatus[$nilai] ?? 0) }})
                     </a>
@@ -43,11 +43,11 @@
             <div class="card-body">
                 @if ($sedangMenyaring)
                     <x-ui.empty-state title="Tidak ada klien yang cocok" message="Coba kata pencarian lain atau hapus filter.">
-                        <a href="{{ route('operasional.klien.index') }}" class="btn-secondary btn-sm">Tampilkan semua klien</a>
+                        <a href="{{ route($ruteKlien.'.index') }}" class="btn-secondary btn-sm">Tampilkan semua klien</a>
                     </x-ui.empty-state>
                 @else
                     <x-ui.empty-state title="Belum ada klien" message="Tambahkan perusahaan mitra pertama untuk mulai membuat penempatan karyawan.">
-                        <a href="{{ route('operasional.klien.create') }}" class="btn-primary btn-sm">+ Tambah Klien</a>
+                        <a href="{{ route($ruteKlien.'.create') }}" class="btn-primary btn-sm">+ Tambah Klien</a>
                     </x-ui.empty-state>
                 @endif
             </div>
@@ -72,7 +72,7 @@
                             @endphp
                             <tr>
                                 <td>
-                                    <a href="{{ route('operasional.klien.show', $item->id) }}" class="font-medium text-sji-biru hover:underline">{{ $item->nama_perusahaan }}</a>
+                                    <a href="{{ route($ruteKlien.'.show', $item->id) }}" class="font-medium text-sji-biru hover:underline">{{ $item->nama_perusahaan }}</a>
                                     <p class="text-xs text-gray-400">{{ $item->kode_klien }} &middot; {{ \Illuminate\Support\Str::limit($item->alamat, 60) }}</p>
                                 </td>
                                 <td>
@@ -90,8 +90,8 @@
                                 <td><span class="badge badge-{{ $item->status === 'Aktif' ? 'success' : 'secondary' }}">{{ $item->status }}</span></td>
                                 <td>
                                     <div class="flex flex-wrap justify-end gap-2">
-                                        <a href="{{ route('operasional.klien.show', $item->id) }}" class="btn-secondary btn-sm">Detail</a>
-                                        <a href="{{ route('operasional.klien.edit', $item->id) }}" class="btn-secondary btn-sm">Edit</a>
+                                        <a href="{{ route($ruteKlien.'.show', $item->id) }}" class="btn-secondary btn-sm">Detail</a>
+                                        <a href="{{ route($ruteKlien.'.edit', $item->id) }}" class="btn-secondary btn-sm">Edit</a>
                                     </div>
                                 </td>
                             </tr>

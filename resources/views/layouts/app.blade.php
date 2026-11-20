@@ -35,6 +35,7 @@
                 ['Pool Karyawan', 'hrd.pool', 'hrd.pool'],
                 ['Absensi Karyawan', 'hrd.absensi', 'hrd.absensi'],
                 ['Dokumen Sertifikat', 'hrd.sertifikat.index', 'hrd.sertifikat.*'],
+                ['Data Klien', 'hrd.klien.index', 'hrd.klien.*'],
             ];
         }
 

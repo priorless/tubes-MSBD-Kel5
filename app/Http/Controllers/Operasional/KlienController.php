@@ -42,6 +42,7 @@ class KlienController extends Controller
             'status' => $status,
             'jumlahPerStatus' => DB::table('tbl_klien')->groupBy('status')->selectRaw('status, COUNT(*) as jumlah')->pluck('jumlah', 'status'),
             'layananPerKlien' => $layananPerKlien,
+            'ruteKlien' => $this->ruteKlien(),
         ]);
     }
 
@@ -67,6 +68,7 @@ class KlienController extends Controller
             'kerjaSamaSejak' => $penempatan->min('tgl_mulai'),
             'managementFeeTersedia' => $this->managementFeeTersedia(),
             'bpjsTersedia' => $this->bpjsTersedia(),
+            'ruteKlien' => $this->ruteKlien(),
         ]);
     }
 
@@ -96,6 +98,7 @@ class KlienController extends Controller
             'klien' => null,
             'managementFeeTersedia' => $this->managementFeeTersedia(),
             'bpjsTersedia' => $this->bpjsTersedia(),
+            'ruteKlien' => $this->ruteKlien(),
         ]);
     }
 
@@ -113,7 +116,7 @@ class KlienController extends Controller
             return back()->withInput()->with('error', 'Kode klien sudah digunakan. Periksa kembali data klien.');
         }
 
-        return redirect()->route('operasional.klien.show', $idKlien)
+        return redirect()->route($this->ruteKlien().'.show', $idKlien)
             ->with('success', 'Klien berhasil ditambahkan. Langkah berikutnya: buat penempatan karyawan untuk klien ini.');
     }
 
@@ -123,6 +126,7 @@ class KlienController extends Controller
             'klien' => DB::table('tbl_klien')->where('id', $klien)->firstOrFail(),
             'managementFeeTersedia' => $this->managementFeeTersedia(),
             'bpjsTersedia' => $this->bpjsTersedia(),
+            'ruteKlien' => $this->ruteKlien(),
         ]);
     }
 
@@ -142,7 +146,7 @@ class KlienController extends Controller
             return back()->withInput()->with('error', 'Kode klien sudah digunakan. Periksa kembali data klien.');
         }
 
-        return redirect()->route('operasional.klien.show', $existingClient->id)->with('success', 'Data klien berhasil diperbarui.');
+        return redirect()->route($this->ruteKlien().'.show', $existingClient->id)->with('success', 'Data klien berhasil diperbarui.');
     }
 
     public function destroy(int $klien): RedirectResponse
@@ -159,7 +163,16 @@ class KlienController extends Controller
             return back()->with('error', 'Klien tidak dapat dihapus karena masih digunakan pada data operasional.');
         }
 
-        return redirect()->route('operasional.klien.index')->with('success', 'Data klien berhasil dihapus.');
+        return redirect()->route($this->ruteKlien().'.index')->with('success', 'Data klien berhasil dihapus.');
+    }
+
+    /**
+     * Prefix nama route Data Klien sesuai modul yang membuka halaman. Controller ini dipakai bersama oleh
+     * Operasional (operasional.klien.*) dan HRD (hrd.klien.*) agar data dan aturannya tetap satu sumber.
+     */
+    private function ruteKlien(): string
+    {
+        return request()->routeIs('hrd.*') ? 'hrd.klien' : 'operasional.klien';
     }
 
     /**
