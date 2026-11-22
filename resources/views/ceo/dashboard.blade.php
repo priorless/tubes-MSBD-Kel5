@@ -5,7 +5,6 @@
 
 @php
     $rupiah = fn (float $nilai): string => ($nilai < 0 ? '-Rp ' : 'Rp ').number_format(abs($nilai), 0, ',', '.');
-    $panah = '<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
     // Keterangan singkat tiap KPI dari CeoController::dashboard() (label tetap dari controller).
     $keteranganKpi = [
@@ -22,7 +21,7 @@
         :title="'Selamat datang, '.auth()->user()->namaTampilan()"
         :description="'Ringkasan kinerja perusahaan secara real-time · Periode berjalan: '.$labelPeriode">
         <a href="{{ route('ceo.log-aktivitas') }}" class="btn-secondary">Log Aktivitas</a>
-        <a href="{{ route('ceo.profit-klien') }}" class="btn-primary">Analisis Profit Klien</a>
+        <a href="{{ route('ceo.klien') }}" class="btn-primary">Lihat Klien</a>
     </x-ui.page-header>
 
     {{-- Ringkasan dari view v_dashboard_eksekutif: satu strip seperti Beranda Operasional. Piutang yang belum lunas diberi blok navy. --}}
@@ -47,15 +46,12 @@
                 @isset($keteranganKpi[$kartu['label']])
                     <span class="op-headline-hint">{{ $keteranganKpi[$kartu['label']] }}</span>
                 @endisset
-                @if ($kartu['label'] === 'Profit Bulan Berjalan')
-                    <a href="{{ route('ceo.profit-klien') }}" class="op-link">Analisis per Periode {!! $panah !!}</a>
-                @endif
             </div>
         @endforeach
     </section>
 
     {{-- Grafik arus kas dari view v_arus_kas_bulanan --}}
-    <div class="card mb-6">
+    <div class="card">
         <div class="card-header">
             <h3 class="card-title">Grafik Arus Kas <span class="text-sm font-normal text-gray-400">12 bulan terakhir</span></h3>
         </div>
@@ -67,70 +63,6 @@
             @else
                 <p class="text-gray-500">Belum ada mutasi keuangan yang tercatat.</p>
             @endif
-        </div>
-    </div>
-
-    {{-- Profit per klien dari function fn_profit_klien --}}
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">Profit per Klien &middot; {{ $labelPeriode }}</h3>
-            <a href="{{ route('ceo.profit-klien') }}" class="btn-secondary btn-sm">Analisis per Periode</a>
-        </div>
-
-        <div class="overflow-x-auto">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Kode</th>
-                        <th>Nama Perusahaan</th>
-                        <th class="text-right">Profit</th>
-                        <th class="text-center">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($profitKlien as $klien)
-                        @php $profit = (float) $klien->profit; @endphp
-                        <tr>
-                            <td class="text-gray-500">{{ $loop->iteration }}</td>
-                            <td class="font-mono text-gray-600">{{ $klien->kode_klien }}</td>
-                            <td>
-                                <a href="{{ route('ceo.profit-klien', ['id_klien' => $klien->id]) }}" class="font-medium text-sji-biru hover:underline">{{ $klien->nama_perusahaan }}</a>
-                            </td>
-                            <td @class([
-                                'text-right font-semibold tabular-nums',
-                                'text-red-500' => $profit < 0,
-                                'text-emerald-600' => $profit > 0,
-                                'text-gray-400' => $profit == 0,
-                            ])>{{ $rupiah($profit) }}</td>
-                            <td class="text-center">
-                                @if ($profit > 0)
-                                    <span class="badge badge-success">Untung</span>
-                                @elseif ($profit < 0)
-                                    <span class="badge badge-danger">Rugi</span>
-                                @else
-                                    <span class="badge badge-secondary">Belum ada transaksi</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="table-empty">Belum ada klien aktif.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-                @if ($profitKlien->isNotEmpty())
-                    <tfoot class="border-t border-gray-200 bg-gray-50">
-                        <tr>
-                            <th colspan="3" class="px-4 py-3 text-right font-semibold text-gray-700">Total</th>
-                            <th @class(['px-4 py-3 text-right font-bold tabular-nums', 'text-red-500' => $totalProfitKlien < 0, 'text-emerald-600' => $totalProfitKlien >= 0])>
-                                {{ $rupiah($totalProfitKlien) }}
-                            </th>
-                            <th></th>
-                        </tr>
-                    </tfoot>
-                @endif
-            </table>
         </div>
     </div>
 @endsection

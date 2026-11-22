@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BerandaController;
+use App\Http\Controllers\Ceo\KlienController as KlienCeoController;
 use App\Http\Controllers\Ceo\LogAktivitasController;
 use App\Http\Controllers\CeoController;
 use App\Http\Controllers\FotoAbsensiController;
@@ -79,7 +80,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
      * ===================================================================== */
     Route::middleware('role:'.Role::Ceo)->prefix('ceo')->name('ceo.')->group(function () {
         Route::get('/dashboard', [CeoController::class, 'dashboard'])->name('dashboard');
-        Route::get('/profit-klien', [CeoController::class, 'profitKlien'])->name('profit-klien');
+        Route::get('/klien', KlienCeoController::class)->name('klien');
         Route::get('/log-aktivitas', LogAktivitasController::class)->name('log-aktivitas');
     });
 

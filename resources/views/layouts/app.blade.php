@@ -25,7 +25,7 @@
         if ($penggunaAktif->hasRole(Role::Ceo)) {
             $menu['Eksekutif'] = [
                 ['Dashboard Eksekutif', 'ceo.dashboard', 'ceo.dashboard'],
-                ['Profit Klien', 'ceo.profit-klien', 'ceo.profit-klien'],
+                ['Klien', 'ceo.klien', 'ceo.klien'],
                 ['Log Aktivitas', 'ceo.log-aktivitas', 'ceo.log-aktivitas'],
             ];
         }
@@ -87,7 +87,7 @@
     $ikonGedung = '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1"/><path d="M10 21v-3h4v3"/>';
     $ikonMenu = [
         'ceo.dashboard' => $ikonDashboard,
-        'ceo.profit-klien' => '<path d="M22 7 13.5 15.5l-5-5L2 17"/><path d="M16 7h6v6"/>',
+        'ceo.klien' => $ikonGedung,
         'ceo.log-aktivitas' => '<path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
         'hrd.dashboard' => $ikonDashboard,
         'hrd.karyawan.index' => '<circle cx="9" cy="7" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1"/><path d="M16 3.13a4 4 0 0 1 0 7.75M22 21v-1a6 6 0 0 0-3-5.2"/>',
