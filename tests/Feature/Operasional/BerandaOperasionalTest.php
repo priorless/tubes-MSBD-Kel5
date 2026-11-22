@@ -97,9 +97,10 @@ class BerandaOperasionalTest extends TestCase
             ->get(route('operasional.beranda'))
             ->assertOk()
             ->assertSeeText('Selamat datang, '.$user->namaTampilan())
-            ->assertSee('href="'.route('operasional.jadwal-kerja').'" class="btn-primary justify-start">Atur Jadwal Kerja</a>', false)
-            ->assertSee('href="'.route('operasional.penempatan.create').'" class="btn-secondary justify-start">Buat Penempatan Baru</a>', false)
-            ->assertSee('href="'.route('operasional.klien.create').'" class="btn-secondary justify-start">Tambah Klien</a>', false)
+            ->assertSee('href="'.route('operasional.jadwal-kerja').'" class="op-akses-cepat"', false)
+            ->assertSee('href="'.route('operasional.penempatan.create').'" class="op-akses-cepat"', false)
+            ->assertSee('href="'.route('operasional.klien.create').'" class="op-akses-cepat"', false)
+            ->assertSeeTextInOrder(['Akses cepat', 'Atur Jadwal Kerja', 'Buat Penempatan Baru', 'Tambah Klien', 'Lihat Laporan'])
             ->assertSeeInOrder(['Operasional', 'Beranda', 'Data Utama', 'Data Klien', 'Penempatan', 'Kegiatan Operasional', 'Rotasi Karyawan', 'Jadwal Kerja', 'Monitoring Sebaran'])
             ->assertSee('href="'.route('operasional.beranda').'"', false)
             ->assertSee('aria-current="page"', false);

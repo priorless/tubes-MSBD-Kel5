@@ -12,7 +12,7 @@
 <{{ $href ? 'a' : 'div' }} @if ($href) href="{{ $href }}" @endif
     {{ $attributes->class(['stat-card block', 'transition-colors hover:border-sji-biru' => $href]) }}>
     <p class="stat-label">{{ $label }}</p>
-    <p class="stat-value {{ $kelasNilai }}">{{ $value }}</p>
+    <p class="stat-value {{ $kelasNilai }}" @if (is_int($value)) data-hitung @endif>{{ $value }}</p>
     @if ($hint)
         <p class="mt-1 text-xs text-gray-500">{{ $hint }}</p>
     @endif
