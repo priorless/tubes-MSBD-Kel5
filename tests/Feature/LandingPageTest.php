@@ -19,10 +19,32 @@ class LandingPageTest extends TestCase
             ->assertOk()
             ->assertViewIs('landing')
             ->assertSeeText('PT Satu Jaya Indonesia')
+            ->assertSeeText('Tenaga Kerja Andal, Dikelola dengan Tertib.')
             ->assertSeeTextInOrder(['Cleaning Service', 'Satpam', 'Driver'])
             ->assertSee('href="'.route('login').'"', false)
             ->assertSeeText('Masuk ke Sistem')
             ->assertDontSeeText('Buka Dashboard');
+    }
+
+    public function test_activity_section_links_only_official_social_media(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSeeText('Mengenal Lebih Dekat Kegiatan Satu Jaya')
+            ->assertSee('href="https://www.instagram.com/satujayaindonesia?knvt=MXVtaGJ0ems1cXA0dQ=="', false)
+            ->assertSee('href="https://www.youtube.com/@pt.satujayaindonesia3187/videos"', false)
+            ->assertDontSee('mailto:', false)
+            ->assertDontSee('wa.me', false);
+    }
+
+    public function test_activity_links_keep_the_kontak_anchor(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('id="kontak"', false)
+            ->assertSee('<a href="#kontak" class="lp-menu-link">Aktivitas</a>', false)
+            ->assertSee('<a href="#kontak">Aktivitas Perusahaan</a>', false)
+            ->assertSee('<a href="#kontak" class="lp-btn lp-btn-ghost">Lihat Aktivitas</a>', false);
     }
 
     #[DataProvider('halamanAwalRoleProvider')]
