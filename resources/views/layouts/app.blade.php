@@ -43,7 +43,7 @@
 
         if ($penggunaAktif->hasRole(Role::Operasional)) {
             $menu['Operasional'] = [
-                ['Beranda', 'operasional.beranda', 'operasional.beranda'],
+                ['Dashboard Operasional', 'operasional.beranda', 'operasional.beranda'],
             ];
             $menu['Data Utama'] = [
                 ['Data Klien', 'operasional.klien.index', 'operasional.klien.*'],
@@ -95,7 +95,7 @@
         'hrd.absensi' => '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
         'hrd.sertifikat.index' => '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
         'hrd.klien.index' => $ikonGedung,
-        'operasional.beranda' => '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
+        'operasional.beranda' => $ikonDashboard,
         'operasional.klien.index' => $ikonGedung,
         'operasional.penempatan.index' => '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="m16 11 2 2 4-4"/>',
         'operasional.rotasi.create' => '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
