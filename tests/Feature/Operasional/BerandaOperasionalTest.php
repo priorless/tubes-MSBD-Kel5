@@ -101,7 +101,8 @@ class BerandaOperasionalTest extends TestCase
             ->assertSee('href="'.route('operasional.penempatan.create').'" class="op-akses-cepat"', false)
             ->assertSee('href="'.route('operasional.klien.create').'" class="op-akses-cepat"', false)
             ->assertSeeTextInOrder(['Akses cepat', 'Atur Jadwal Kerja', 'Buat Penempatan Baru', 'Tambah Klien', 'Lihat Laporan'])
-            ->assertSeeInOrder(['Operasional', 'Beranda', 'Data Utama', 'Data Klien', 'Penempatan', 'Kegiatan Operasional', 'Rotasi Karyawan', 'Jadwal Kerja', 'Monitoring Sebaran'])
+            ->assertSee('<title>Dashboard Operasional - SJI</title>', false)
+            ->assertSeeInOrder(['aria-label="Menu utama"', 'Operasional', 'Dashboard Operasional', 'Data Utama', 'Data Klien', 'Penempatan', 'Kegiatan Operasional', 'Rotasi Karyawan', 'Jadwal Kerja', 'Monitoring Sebaran'], false)
             ->assertSee('href="'.route('operasional.beranda').'"', false)
             ->assertSee('aria-current="page"', false);
     }

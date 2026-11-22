@@ -178,7 +178,7 @@ class RekapOperasionalTest extends TestCase
             ->get(route('operasional.beranda'))
             ->assertOk()
             ->assertSeeInOrder(['Laporan', 'Rekap &amp; Laporan'], false)
-            ->assertSee('href="'.route('operasional.rekap.index').'" class="btn-secondary justify-start">Lihat Laporan</a>', false);
+            ->assertSee('href="'.route('operasional.rekap.index').'" class="btn-secondary">Lihat Laporan</a>', false);
     }
 
     /**

@@ -32,7 +32,8 @@ use App\Http\Middleware\PastikanKaryawan;
 use App\Models\Role;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login');
+// Landing page publik: dapat dibuka tamu maupun pengguna yang sudah login (tombol "Buka Dashboard").
+Route::view('/', 'landing')->name('landing');
 
 // PDF tagihan invoice untuk klien penerima tautan WhatsApp: tanpa login, hanya lewat signed URL per invoice.
 Route::get('/tagihan/{id}/pdf', [KeuanganController::class, 'pdfInvoicePublik'])
