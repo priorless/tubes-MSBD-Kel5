@@ -9,6 +9,8 @@
 @section('page-title', $isEditing ? 'Ubah Data Karyawan' : 'Tambah Karyawan')
 
 @section('content')
+    <x-ui.page-header :title="$isEditing ? 'Edit data '.$karyawan->nama : 'Tambah karyawan baru'" />
+
     <form action="{{ $isEditing ? route('hrd.karyawan.update', $karyawan->id) : route('hrd.karyawan.store') }}"
           method="POST" enctype="multipart/form-data">
         @csrf

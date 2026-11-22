@@ -3,12 +3,10 @@
 @section('title', 'Tambah User')
 
 @section('content')
+    <x-ui.page-header title="Data Akun Staff Baru" />
+
     <form method="POST" action="{{ route('users.store') }}" class="card max-w-2xl" novalidate>
         @csrf
-
-        <div class="card-header">
-            <h2 class="card-title">Data Akun Staff Baru</h2>
-        </div>
 
         <div class="card-body space-y-4">
             @include('users._form', ['roles' => $roles])

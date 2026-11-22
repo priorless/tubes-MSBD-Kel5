@@ -9,7 +9,8 @@
 @endphp
 
 @section('content')
-    <p class="mb-6 text-sm text-gray-500">Hitung laba/rugi per klien per periode langsung dari database.</p>
+    <x-ui.page-header title="Profitabilitas Klien"
+        description="Hitung laba/rugi per klien per periode langsung dari database." />
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <form action="{{ route('ceo.profit-klien') }}" method="GET" class="card space-y-4 p-6">
@@ -57,7 +58,7 @@
                     @endif
                 </div>
 
-                <h3 class="mt-8 mb-4 text-lg font-semibold text-gray-700">Tren Profit 6 Bulan</h3>
+                <h3 class="card-title mt-8 mb-4">Tren Profit 6 Bulan</h3>
                 <div class="relative h-64">
                     <canvas id="trenChart" role="img" aria-label="Grafik tren profit 6 bulan"></canvas>
                 </div>
@@ -77,11 +78,15 @@
             (() => {
                 const rupiah = (n) => (n < 0 ? '-Rp ' : 'Rp ') + Math.abs(Math.round(Number(n))).toLocaleString('id-ID');
 
+                // Warna mengikuti token tema (resources/css/operasional.css).
+                Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+                Chart.defaults.color = '#6b655b';
+
                 new Chart(document.getElementById('trenChart'), {
                     type: 'line',
                     data: {
                         labels: @json($trenLabels),
-                        datasets: [{ label: 'Profit', data: @json($trenProfit), borderColor: '#1e40af', backgroundColor: 'rgba(30,64,175,.08)', fill: true, tension: .3, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2 }],
+                        datasets: [{ label: 'Profit', data: @json($trenProfit), borderColor: '#1a2f5a', backgroundColor: 'rgba(26,47,90,.08)', fill: true, tension: .3, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2 }],
                     },
                     options: {
                         responsive: true,
@@ -91,7 +96,7 @@
                             tooltip: { callbacks: { label: (c) => ' ' + rupiah(c.parsed.y) } },
                         },
                         scales: {
-                            y: { ticks: { callback: (v) => rupiah(v) }, grid: { color: '#f3f4f6' } },
+                            y: { ticks: { callback: (v) => rupiah(v) }, grid: { color: '#efeae0' } },
                             x: { grid: { display: false } },
                         },
                     },

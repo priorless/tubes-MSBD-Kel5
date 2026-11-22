@@ -4,12 +4,10 @@
 @section('page-title', 'Tambah Dokumen Sertifikat')
 
 @section('content')
+    <x-ui.page-header title="Tambah dokumen sertifikat" description="Masukkan data dokumen karyawan." />
+
     <form action="{{ route('hrd.sertifikat.store') }}" method="POST" enctype="multipart/form-data" class="card max-w-3xl">
         @csrf
-
-        <div class="card-header">
-            <h2 class="card-title">Masukkan data dokumen karyawan</h2>
-        </div>
 
         <div class="card-body space-y-4">
             <div>
