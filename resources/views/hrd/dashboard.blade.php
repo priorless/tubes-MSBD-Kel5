@@ -2,21 +2,37 @@
 
 @section('title', 'Dashboard HRD')
 
+@php
+    $panah = '<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+@endphp
+
 @section('content')
-    <div class="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+    <x-ui.page-header :kicker="now()->locale('id')->translatedFormat('l, j F Y').' · Ringkasan HRD'"
+        :title="'Selamat datang, '.auth()->user()->namaTampilan()"
+        description="Ringkasan data karyawan, pool, dan dokumen yang perlu ditindaklanjuti.">
+        <a href="{{ route('hrd.pool') }}" class="btn-secondary">Pool Karyawan</a>
+        <a href="{{ route('hrd.karyawan.create') }}" class="btn-primary">+ Tambah Karyawan</a>
+    </x-ui.page-header>
+
+    {{-- Ringkasan: satu strip seperti Beranda Operasional. Dokumen yang hampir kedaluwarsa diberi blok navy. --}}
+    <section class="op-headline mb-6" style="--kolom: 4" aria-label="Ringkasan HRD">
         @foreach ([
-            ['label' => 'Lapangan Tersedia', 'nilai' => $ringkasan->lapangan_siap ?? 0, 'warna' => 'text-sky-700', 'tautan' => route('hrd.pool'), 'teks' => 'Lihat pool'],
-            ['label' => 'Lapangan Ditempatkan', 'nilai' => $ringkasan->lapangan_bertugas ?? 0, 'warna' => 'text-sji-biru', 'tautan' => route('hrd.karyawan.index', ['kategori' => 'Lapangan', 'status' => 'Ditempatkan']), 'teks' => 'Lihat data'],
-            ['label' => 'Staf Internal Aktif', 'nilai' => $ringkasan->internal_aktif ?? 0, 'warna' => 'text-emerald-600', 'tautan' => route('hrd.karyawan.index', ['kategori' => 'Internal']), 'teks' => 'Lihat data'],
-            ['label' => 'Dokumen < '.$batasHari.' Hari', 'nilai' => $jumlahDokumenHampirHabis, 'warna' => 'text-red-500', 'tautan' => route('hrd.sertifikat.index', ['hampir_habis' => 1]), 'teks' => 'Tinjau dokumen'],
+            ['label' => 'Lapangan Tersedia', 'nilai' => (int) ($ringkasan->lapangan_siap ?? 0), 'keterangan' => 'Karyawan lapangan siap ditempatkan', 'tautan' => route('hrd.pool'), 'teks' => 'Lihat pool', 'perluTindakan' => false],
+            ['label' => 'Lapangan Ditempatkan', 'nilai' => (int) ($ringkasan->lapangan_bertugas ?? 0), 'keterangan' => 'Karyawan lapangan bertugas di klien', 'tautan' => route('hrd.karyawan.index', ['kategori' => 'Lapangan', 'status' => 'Ditempatkan']), 'teks' => 'Lihat data', 'perluTindakan' => false],
+            ['label' => 'Staf Internal Aktif', 'nilai' => (int) ($ringkasan->internal_aktif ?? 0), 'keterangan' => 'Staf internal berstatus aktif', 'tautan' => route('hrd.karyawan.index', ['kategori' => 'Internal']), 'teks' => 'Lihat data', 'perluTindakan' => false],
+            ['label' => 'Dokumen < '.$batasHari.' Hari', 'nilai' => (int) $jumlahDokumenHampirHabis, 'keterangan' => 'Dokumen yang akan habis dalam '.$batasHari.' hari', 'tautan' => route('hrd.sertifikat.index', ['hampir_habis' => 1]), 'teks' => 'Tinjau dokumen', 'perluTindakan' => $jumlahDokumenHampirHabis > 0],
         ] as $kartu)
-            <div class="stat-card flex flex-col">
-                <h3 class="stat-label">{{ $kartu['label'] }}</h3>
-                <p class="stat-value {{ $kartu['warna'] }}">{{ $kartu['nilai'] }}</p>
-                <a href="{{ $kartu['tautan'] }}" class="mt-3 text-sm font-medium text-sji-biru hover:underline">{{ $kartu['teks'] }} &rarr;</a>
+            <div @class(['op-headline-item', 'is-perlu-tindakan' => $kartu['perluTindakan']])>
+                @if ($kartu['perluTindakan'])
+                    <span class="op-stempel">PERLU TINDAKAN</span>
+                @endif
+                <span class="stat-label">{{ $kartu['label'] }}</span>
+                <span class="op-headline-angka" data-hitung>{{ $kartu['nilai'] }}</span>
+                <span class="op-headline-hint">{{ $kartu['keterangan'] }}</span>
+                <a href="{{ $kartu['tautan'] }}" class="op-link">{{ $kartu['teks'] }} {!! $panah !!}</a>
             </div>
         @endforeach
-    </div>
+    </section>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div class="space-y-6 lg:col-span-7">

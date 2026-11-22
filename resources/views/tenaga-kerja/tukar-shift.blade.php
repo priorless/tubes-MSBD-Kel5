@@ -11,6 +11,8 @@
 @endphp
 
 @section('content')
+<x-ui.page-header title="Tukar Shift" description="Ajukan pertukaran shift dengan rekan kerja dan pantau status pengajuan Anda." />
+
 <div class="space-y-6">
     @if (! $tersedia)
         <section class="tk-reveal card p-6">

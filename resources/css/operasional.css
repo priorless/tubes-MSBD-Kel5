@@ -1,12 +1,16 @@
 /*
 |--------------------------------------------------------------------------
-| Tema Operasional (redesign UI/UX role Operasional)
+| Tema aplikasi (berasal dari redesign role Operasional)
 |--------------------------------------------------------------------------
-| Aktif hanya bila <body> memiliki kelas .tema-operasional (route operasional.*).
-| Modul lain (CEO, HRD, Keuangan, Tenaga Kerja) tidak terpengaruh.
+| Aktif bila <body> memiliki kelas .tema-operasional. Kelas ini dipasang oleh
+| layouts/app.blade.php dan layouts/guest.blade.php untuk SEMUA role.
 |
-| Aturan di file ini sengaja tidak memakai @layer: aturan tanpa layer menang atas
-| utility Tailwind, sehingga tampilan dapat diselaraskan tanpa mengubah logika halaman.
+| Dua jenis aturan:
+| 1. Token, sidebar, header, dan judul halaman: tanpa @layer, agar menang atas
+|    utility bawaan markup layout/komponen.
+| 2. Kulit komponen bersama (card, table, badge, tombol, form, callout): di dalam
+|    @layer components, agar utility per halaman (mis. text-red-700, border-red-200)
+|    tetap menang dan aksen warna bermakna tidak hilang.
 */
 
 .tema-operasional {
@@ -219,6 +223,7 @@
 }
 
 /* ---------- Komponen bersama ---------- */
+@layer components {
 .tema-operasional .card,
 .tema-operasional .stat-card {
     border-color: var(--op-line);
@@ -378,6 +383,13 @@
     --tw-ring-color: rgb(36 64 122 / 0.18);
 }
 
+/* Isian tidak valid tetap berbingkai merah (aturan .form-input di atas lebih spesifik dari .form-input-error). */
+.tema-operasional .form-input-error,
+.tema-operasional .form-input-error:focus {
+    border-color: var(--op-red);
+    --tw-ring-color: rgb(176 61 42 / 0.18);
+}
+
 .tema-operasional .form-hint {
     font-size: 12.5px;
     color: var(--op-text-3);
@@ -401,6 +413,35 @@
 
 .tema-operasional .font-mono {
     letter-spacing: -0.01em;
+}
+}
+
+/* ---------- Struk & invoice digital (modul Keuangan) ----------
+| Isi struk di modal dan area cetak memakai palet netral bawaan Tailwind,
+| agar tetap sama dengan dokumen PDF-nya. */
+.tema-operasional :is(#strukModalIsi, #areaCetakStruk) {
+    --color-gray-50: oklch(98.5% 0.002 247.839);
+    --color-gray-100: oklch(96.7% 0.003 264.542);
+    --color-gray-200: oklch(92.8% 0.006 264.531);
+    --color-gray-300: oklch(87.2% 0.01 258.338);
+    --color-gray-400: oklch(70.7% 0.022 261.325);
+    --color-gray-500: oklch(55.1% 0.027 264.364);
+    --color-gray-600: oklch(44.6% 0.03 256.802);
+    --color-gray-700: oklch(37.3% 0.034 259.733);
+    --color-gray-800: oklch(27.8% 0.033 256.848);
+    --color-gray-900: oklch(21% 0.034 264.665);
+    --color-blue-50: oklch(97% 0.014 254.604);
+    --color-blue-100: oklch(93.2% 0.032 255.585);
+    --color-blue-200: oklch(88.2% 0.059 254.128);
+    --color-blue-300: oklch(80.9% 0.105 251.813);
+    --color-blue-500: oklch(62.3% 0.214 259.815);
+    --color-blue-600: oklch(54.6% 0.245 262.881);
+    --color-blue-700: oklch(48.8% 0.243 264.376);
+    --color-blue-800: oklch(42.4% 0.199 265.638);
+    --color-blue-900: oklch(37.9% 0.146 265.522);
+    --color-sji-biru: #1e40af;
+    --color-sji-biru-tua: #172554;
+    --color-sji-emas: #e8b923;
 }
 
 /* ---------- Pola khusus halaman Operasional ---------- */
@@ -530,6 +571,50 @@
     font-size: 13px;
     line-height: 19px;
     color: var(--op-text-2);
+}
+
+/* Angka bermakna di strip ringkasan (mis. profit Dashboard CEO). */
+.op-headline-angka.is-positif {
+    color: var(--op-green);
+}
+
+.op-headline-angka.is-negatif {
+    color: var(--op-red);
+}
+
+/* Strip berisi nominal rupiah (Dashboard CEO): angka lebih kecil dan kolom lebih lebar. */
+.op-headline-angka.is-nominal {
+    font-size: 24px;
+    line-height: 32px;
+    letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 1535px) {
+    .op-headline.is-nominal {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .op-headline.is-nominal .op-headline-item {
+        margin-right: 0;
+        border-right: 0;
+    }
+
+    .op-headline.is-nominal .op-headline-item:not(.is-perlu-tindakan) {
+        padding-right: 16px;
+    }
+}
+
+@media (max-width: 1023px) {
+    .op-headline.is-nominal {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 639px) {
+    .op-headline.is-nominal {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 /* Daftar tugas "Perlu diperhatikan" */
@@ -712,6 +797,11 @@
 .tema-operasional main > :nth-child(4) { animation-delay: 210ms; }
 .tema-operasional main > :nth-child(5) { animation-delay: 280ms; }
 .tema-operasional main > :nth-child(n + 6) { animation-delay: 350ms; }
+
+/* Halaman Tenaga Kerja sudah punya animasi masuk sendiri (.tk-reveal); hindari animasi ganda. */
+.tema-operasional main > :has(.tk-reveal) {
+    animation: none;
+}
 
 .op-tumbuh {
     transform-origin: left center;

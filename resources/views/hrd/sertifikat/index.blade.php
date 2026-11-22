@@ -3,12 +3,11 @@
 @section('title', 'Dokumen Sertifikat')
 
 @section('content')
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">Masa berlaku dokumen karyawan</h2>
-            <a href="{{ route('hrd.sertifikat.create') }}" class="btn-primary btn-sm">+ Tambah Dokumen</a>
-        </div>
+    <x-ui.page-header title="Dokumen Sertifikat" description="Masa berlaku dokumen dan sertifikat karyawan.">
+        <a href="{{ route('hrd.sertifikat.create') }}" class="btn-primary">+ Tambah Dokumen</a>
+    </x-ui.page-header>
 
+    <div class="card overflow-hidden">
         <form method="GET" action="{{ route('hrd.sertifikat.index') }}" class="grid grid-cols-1 items-center gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4 md:grid-cols-12">
             <input type="search" name="q" value="{{ request('q') }}" class="form-input md:col-span-6" placeholder="Cari nama karyawan, NIP, atau nama dokumen" aria-label="Cari dokumen">
             <label class="inline-flex items-center gap-2 text-sm text-gray-700 md:col-span-4">

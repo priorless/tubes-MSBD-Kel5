@@ -4,6 +4,8 @@
 @section('page-title', 'Komponen Gaji')
 
 @section('content')
+    <x-ui.page-header title="Komponen Gaji" description="Isi tunjangan dan potongan pinjaman / koperasi karyawan per periode." />
+
     <div class="callout callout-info mb-6">
         <p class="font-semibold">Data otomatis hanya-baca</p>
         <p class="mt-1 text-sm">Gaji pokok dan potongan absensi mengikuti sumber serta rumus Generate Payroll yang berlaku. Hanya Tunjangan dan Potongan Pinjaman / Koperasi yang diisi manual.</p>

@@ -17,6 +17,8 @@
 @endphp
 
 @section('content')
+<x-ui.page-header title="Riwayat Absensi" description="Rekap kehadiran dan catatan check-in / check-out Anda per periode." />
+
 {{-- ===================== Ringkasan ===================== --}}
 <div class="mb-6 grid grid-cols-2 gap-6 lg:grid-cols-4">
     @foreach ($kartuRekap as $kunci => $kartu)

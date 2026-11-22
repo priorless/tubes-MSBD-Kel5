@@ -5,44 +5,69 @@
 
 @php
     $rupiah = fn (float $nilai): string => ($nilai < 0 ? '-Rp ' : 'Rp ').number_format(abs($nilai), 0, ',', '.');
+    $panah = '<svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+    // Keterangan singkat tiap KPI dari CeoController::dashboard() (label tetap dari controller).
+    $keteranganKpi = [
+        'Lapangan Bertugas' => 'orang sedang ditempatkan di klien',
+        'Lapangan Siap' => 'orang tersedia untuk ditempatkan',
+        'Internal Aktif' => 'orang staf internal berstatus aktif',
+        'Total Piutang' => 'Tagihan invoice klien berstatus Belum Lunas',
+        'Profit Bulan Berjalan' => 'Pemasukan dikurangi pengeluaran '.$labelPeriode,
+    ];
 @endphp
 
 @section('content')
-    <p class="mb-6 text-sm text-gray-500">Ringkasan kinerja perusahaan secara real-time &middot; Periode berjalan: <span class="font-medium text-gray-700">{{ $labelPeriode }}</span></p>
+    <x-ui.page-header :kicker="now()->locale('id')->translatedFormat('l, j F Y').' · Ringkasan eksekutif'"
+        :title="'Selamat datang, '.auth()->user()->namaTampilan()"
+        :description="'Ringkasan kinerja perusahaan secara real-time · Periode berjalan: '.$labelPeriode">
+        <a href="{{ route('ceo.log-aktivitas') }}" class="btn-secondary">Log Aktivitas</a>
+        <a href="{{ route('ceo.profit-klien') }}" class="btn-primary">Analisis Profit Klien</a>
+    </x-ui.page-header>
 
-    {{-- Kartu statistik dari view v_dashboard_eksekutif --}}
-    <div class="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-5">
+    {{-- Ringkasan dari view v_dashboard_eksekutif: satu strip seperti Beranda Operasional. Piutang yang belum lunas diberi blok navy. --}}
+    <section class="op-headline is-nominal mb-6" style="--kolom: {{ count($kpi) }}" aria-label="Ringkasan eksekutif">
         @foreach ($kpi as $kartu)
             @php
-                $warnaNilai = match (true) {
-                    $kartu['label'] === 'Total Piutang' && $kartu['nilai'] > 0 => 'text-red-500',
-                    $kartu['label'] === 'Profit Bulan Berjalan' && $kartu['nilai'] < 0 => 'text-red-500',
-                    $kartu['label'] === 'Profit Bulan Berjalan' => 'text-emerald-600',
-                    default => 'text-gray-800',
+                $perluTindakan = $kartu['label'] === 'Total Piutang' && $kartu['nilai'] > 0;
+                $kelasNilai = match (true) {
+                    $kartu['label'] === 'Profit Bulan Berjalan' && $kartu['nilai'] < 0 => 'is-negatif',
+                    $kartu['label'] === 'Profit Bulan Berjalan' => 'is-positif',
+                    default => null,
                 };
             @endphp
-            <div class="stat-card">
-                <h3 class="stat-label">{{ $kartu['label'] }}</h3>
-                <p class="stat-value {{ $warnaNilai }}">
+            <div @class(['op-headline-item', 'is-perlu-tindakan' => $perluTindakan])>
+                @if ($perluTindakan)
+                    <span class="op-stempel">PERLU TINDAKAN</span>
+                @endif
+                <span class="stat-label">{{ $kartu['label'] }}</span>
+                <span @class(['op-headline-angka', 'is-nominal' => $kartu['uang'], $kelasNilai])>
                     {{ $kartu['uang'] ? $rupiah($kartu['nilai']) : number_format($kartu['nilai'], 0, ',', '.') }}
-                </p>
-                @unless ($kartu['uang'])
-                    <p class="mt-1 text-xs text-gray-400">orang</p>
-                @endunless
+                </span>
+                @isset($keteranganKpi[$kartu['label']])
+                    <span class="op-headline-hint">{{ $keteranganKpi[$kartu['label']] }}</span>
+                @endisset
+                @if ($kartu['label'] === 'Profit Bulan Berjalan')
+                    <a href="{{ route('ceo.profit-klien') }}" class="op-link">Analisis per Periode {!! $panah !!}</a>
+                @endif
             </div>
         @endforeach
-    </div>
+    </section>
 
     {{-- Grafik arus kas dari view v_arus_kas_bulanan --}}
-    <div class="card mb-6 p-6">
-        <h3 class="mb-4 text-lg font-semibold text-gray-700">Grafik Arus Kas <span class="text-sm font-normal text-gray-400">12 bulan terakhir</span></h3>
-        @if (count($chartLabels) > 0)
-            <div class="relative h-80">
-                <canvas id="arusKasChart" role="img" aria-label="Grafik pemasukan dan pengeluaran per bulan"></canvas>
-            </div>
-        @else
-            <p class="text-gray-500">Belum ada mutasi keuangan yang tercatat.</p>
-        @endif
+    <div class="card mb-6">
+        <div class="card-header">
+            <h3 class="card-title">Grafik Arus Kas <span class="text-sm font-normal text-gray-400">12 bulan terakhir</span></h3>
+        </div>
+        <div class="card-body">
+            @if (count($chartLabels) > 0)
+                <div class="relative h-80">
+                    <canvas id="arusKasChart" role="img" aria-label="Grafik pemasukan dan pengeluaran per bulan"></canvas>
+                </div>
+            @else
+                <p class="text-gray-500">Belum ada mutasi keuangan yang tercatat.</p>
+            @endif
+        </div>
     </div>
 
     {{-- Profit per klien dari function fn_profit_klien --}}
@@ -117,13 +142,17 @@
             (() => {
                 const rupiah = (n) => (n < 0 ? '-Rp ' : 'Rp ') + Math.abs(Math.round(Number(n))).toLocaleString('id-ID');
 
+                // Warna mengikuti token tema (resources/css/operasional.css): hijau = pemasukan, merah = pengeluaran.
+                Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+                Chart.defaults.color = '#6b655b';
+
                 new Chart(document.getElementById('arusKasChart'), {
                     type: 'line',
                     data: {
                         labels: @json($chartLabels),
                         datasets: [
-                            { label: 'Pemasukan', data: @json($chartPemasukan), borderColor: '#059669', backgroundColor: 'rgba(5,150,105,.08)', fill: true, tension: .3, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2 },
-                            { label: 'Pengeluaran', data: @json($chartPengeluaran), borderColor: '#e11d24', backgroundColor: 'rgba(225,29,36,.06)', fill: true, tension: .3, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2 },
+                            { label: 'Pemasukan', data: @json($chartPemasukan), borderColor: '#2a6646', backgroundColor: 'rgba(42,102,70,.08)', fill: true, tension: .3, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2 },
+                            { label: 'Pengeluaran', data: @json($chartPengeluaran), borderColor: '#b03d2a', backgroundColor: 'rgba(176,61,42,.06)', fill: true, tension: .3, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2 },
                         ],
                     },
                     options: {
@@ -135,7 +164,7 @@
                             tooltip: { callbacks: { label: (c) => ' ' + c.dataset.label + ': ' + rupiah(c.parsed.y) } },
                         },
                         scales: {
-                            y: { beginAtZero: true, ticks: { callback: (v) => rupiah(v) }, grid: { color: '#f3f4f6' } },
+                            y: { beginAtZero: true, ticks: { callback: (v) => rupiah(v) }, grid: { color: '#efeae0' } },
                             x: { grid: { display: false } },
                         },
                     },

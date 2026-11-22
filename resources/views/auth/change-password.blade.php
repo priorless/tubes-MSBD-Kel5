@@ -3,6 +3,8 @@
 @section('title', 'Ganti Password')
 
 @section('content')
+    <x-ui.page-header title="Ganti Password" description="Gunakan password yang kuat dan jangan bagikan kepada siapa pun." />
+
     <div class="max-w-xl space-y-6">
         @if ($user->must_change_password)
             <div class="callout callout-warning">
