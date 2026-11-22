@@ -6,10 +6,19 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Beranda') - SJI</title>
     <link rel="icon" type="image/png" href="{{ asset('images/logo-sji.png') }}">
+    @php
+        // Tema redesign hanya untuk halaman role Operasional; modul lain tetap memakai tampilan lama.
+        $temaOperasional = request()->routeIs('operasional.*');
+    @endphp
+    @if ($temaOperasional)
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
 </head>
-<body class="min-h-screen bg-gray-50 font-sans text-gray-800 antialiased">
+<body @class(['min-h-screen bg-gray-50 font-sans text-gray-800 antialiased', 'tema-operasional' => $temaOperasional])>
 @php
     use App\Models\Role;
 
@@ -79,6 +88,34 @@
             $menu['Administrasi'] = [['Manajemen User', 'users.index', 'users.*']];
         }
     }
+
+    // Ikon garis untuk menu Operasional (dipakai oleh tema Operasional).
+    $ikonMenu = [
+        'operasional.beranda' => '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
+        'operasional.klien.index' => '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1"/><path d="M10 21v-3h4v3"/>',
+        'operasional.penempatan.index' => '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="m16 11 2 2 4-4"/>',
+        'operasional.rotasi.create' => '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+        'operasional.jadwal-kerja' => '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+        'operasional.monitoring' => '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>',
+        'operasional.rekap.index' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+    ];
+
+    // Inisial nama pengguna untuk avatar di header tema Operasional.
+    $inisialPengguna = collect(explode(' ', (string) $penggunaAktif?->namaTampilan()))
+        ->filter()
+        ->take(2)
+        ->map(fn (string $kata): string => mb_strtoupper(mb_substr($kata, 0, 1)))
+        ->implode('');
+
+    // Grup menu dari halaman yang sedang dibuka, untuk breadcrumb di header tema Operasional.
+    $grupAktif = null;
+    foreach ($menu as $grup => $itemMenu) {
+        foreach ($itemMenu as [, , $polaAktif]) {
+            if (request()->routeIs($polaAktif)) {
+                $grupAktif = $grup;
+            }
+        }
+    }
 @endphp
 
 <div class="flex min-h-screen">
@@ -104,12 +141,15 @@
                             <li>
                                 <a href="{{ route($namaRoute) }}"
                                    @class([
-                                       'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                                       'nav-link flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                                        'bg-white/10 text-white' => $sedangAktif,
                                        'hover:bg-white/5 hover:text-white' => ! $sedangAktif,
                                    ])
                                    @if ($sedangAktif) aria-current="page" @endif>
-                                    <span @class(['h-4 w-1 rounded-full', 'bg-sji-emas' => $sedangAktif, 'bg-transparent' => ! $sedangAktif])></span>
+                                    <span @class(['nav-indikator h-4 w-1 rounded-full', 'bg-sji-emas' => $sedangAktif, 'bg-transparent' => ! $sedangAktif])></span>
+                                    @if ($temaOperasional && isset($ikonMenu[$namaRoute]))
+                                        <svg class="size-[19px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $ikonMenu[$namaRoute] !!}</svg>
+                                    @endif
                                     {{ $label }}
                                     @if (($badgeMenu[$namaRoute] ?? 0) > 0)
                                         <span class="ml-auto rounded-full bg-sji-emas px-2 py-0.5 text-xs font-bold text-sji-biru-tua"
@@ -130,25 +170,33 @@
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">
-        <header class="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+        <header class="app-header sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur sm:px-6">
             <div class="flex min-w-0 items-center gap-3">
                 <button type="button" class="rounded-md p-2 text-gray-500 hover:bg-gray-100 md:hidden" data-sidebar-open aria-label="Buka menu">
                     <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
                 </button>
-                <h1 class="truncate text-lg font-semibold text-gray-800">
-                    @hasSection('page-title')
-                        @yield('page-title')
-                    @else
-                        @yield('title')
+                <div class="min-w-0">
+                    @if ($temaOperasional && $grupAktif)
+                        <p class="op-crumb">{{ $grupAktif }}</p>
                     @endif
-                </h1>
+                    <h1 class="truncate text-lg font-semibold text-gray-800">
+                        @hasSection('page-title')
+                            @yield('page-title')
+                        @else
+                            @yield('title')
+                        @endif
+                    </h1>
+                </div>
             </div>
 
             @if ($penggunaAktif)
-                <div class="flex items-center gap-3 sm:gap-4">
-                    <div class="hidden text-right sm:block">
+                <div @class(['flex items-center gap-3 sm:gap-4', 'op-pengguna' => $temaOperasional])>
+                    @if ($temaOperasional)
+                        <span class="op-avatar" aria-hidden="true">{{ $inisialPengguna }}</span>
+                    @endif
+                    <div @class(['hidden sm:block', 'text-right' => ! $temaOperasional])>
                         <p class="text-sm font-medium text-gray-800">{{ $penggunaAktif->namaTampilan() }}</p>
                         <p class="text-xs text-gray-500">{{ $penggunaAktif->role?->nama_role }}</p>
                     </div>
@@ -185,6 +233,9 @@
         document.querySelectorAll('[data-flash-close]').forEach((el) => el.addEventListener('click', () => el.closest('[role="alert"]').remove()));
     })();
 </script>
+@if ($temaOperasional)
+    <script src="{{ asset('js/operasional.js') }}?v=1"></script>
+@endif
 @stack('scripts')
 </body>
 </html>

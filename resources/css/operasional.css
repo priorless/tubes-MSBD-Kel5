@@ -1,0 +1,797 @@
+/*
+|--------------------------------------------------------------------------
+| Tema Operasional (redesign UI/UX role Operasional)
+|--------------------------------------------------------------------------
+| Aktif hanya bila <body> memiliki kelas .tema-operasional (route operasional.*).
+| Modul lain (CEO, HRD, Keuangan, Tenaga Kerja) tidak terpengaruh.
+|
+| Aturan di file ini sengaja tidak memakai @layer: aturan tanpa layer menang atas
+| utility Tailwind, sehingga tampilan dapat diselaraskan tanpa mengubah logika halaman.
+*/
+
+.tema-operasional {
+    /* Token warna */
+    --op-ink: #0e1b36;
+    --op-navy: #1a2f5a;
+    --op-navy-2: #24407a;
+    --op-navy-soft: #e6eaf3;
+    --op-navy-100: #d6deee;
+    --op-paper: #f4f0e8;
+    --op-paper-2: #ece6da;
+    --op-subtle: #fbf9f5;
+    --op-line: #e4ddcf;
+    --op-line-2: #efeae0;
+    --op-line-strong: #d3caba;
+    --op-text: #1b1a17;
+    --op-text-2: #524d46;
+    --op-text-3: #6b655b;
+    --op-gold: #d9a53a;
+    --op-gold-2: #946812;
+    --op-gold-soft: #f6eacb;
+    --op-gold-line: #e9cf8f;
+    --op-red: #b03d2a;
+    --op-red-soft: #f7e2dc;
+    --op-red-line: #e8b4a9;
+    --op-green: #2a6646;
+    --op-green-soft: #e0eee5;
+
+    /* Petakan ulang variabel tema Tailwind agar utility yang sudah ada ikut berubah */
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --color-sji-biru: var(--op-navy);
+    --color-sji-biru-tua: var(--op-ink);
+    --color-sji-emas: var(--op-gold);
+    --color-gray-50: #fbf9f5;
+    --color-gray-100: #f4f0e8;
+    --color-gray-200: #e4ddcf;
+    --color-gray-300: #d3caba;
+    --color-gray-400: #9c9588;
+    --color-gray-500: #6b655b;
+    --color-gray-600: #524d46;
+    --color-gray-700: #3b3732;
+    --color-gray-800: #1b1a17;
+    --color-gray-900: #121110;
+    --color-blue-50: #eef1f8;
+    --color-blue-100: #e6eaf3;
+    --color-blue-200: #c9d3e6;
+    --color-blue-300: #9db0d4;
+    --color-blue-500: #24407a;
+    --color-blue-600: #24407a;
+    --color-blue-700: #1a2f5a;
+    --color-blue-800: #16294f;
+    --color-blue-900: #0e1b36;
+
+    background-color: var(--op-paper);
+    color: var(--op-text);
+    font-size: 14px;
+    line-height: 21px;
+}
+
+/* ---------- Sidebar ---------- */
+.tema-operasional #sidebar {
+    background-color: var(--op-ink);
+}
+
+.tema-operasional #sidebar nav {
+    padding-right: 0;
+}
+
+.tema-operasional #sidebar nav p {
+    color: rgb(255 255 255 / 0.5);
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    font-size: 11px;
+}
+
+.tema-operasional .nav-link {
+    position: relative;
+    height: 40px;
+    gap: 12px;
+    border-radius: 10px 0 0 10px;
+    color: rgb(255 255 255 / 0.82);
+    transition: color 0.2s, background-color 0.2s, padding 0.2s;
+}
+
+.tema-operasional .nav-link svg {
+    flex: none;
+    color: rgb(255 255 255 / 0.55);
+}
+
+.tema-operasional .nav-link:not([aria-current]):hover {
+    padding-left: 1rem;
+    background-color: rgb(255 255 255 / 0.05);
+    color: #fff;
+}
+
+.tema-operasional .nav-link .nav-indikator {
+    display: none;
+}
+
+.tema-operasional .nav-link[aria-current='page'] {
+    background-color: var(--op-paper);
+    color: var(--op-ink);
+    font-weight: 700;
+    animation: op-tab-masuk 0.45s cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+
+.tema-operasional .nav-link[aria-current='page'] svg {
+    color: var(--op-gold-2);
+}
+
+.tema-operasional .nav-link[aria-current='page']::before,
+.tema-operasional .nav-link[aria-current='page']::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+}
+
+.tema-operasional .nav-link[aria-current='page']::before {
+    top: -14px;
+    border-bottom-right-radius: 12px;
+    box-shadow: 5px 5px 0 5px var(--op-paper);
+}
+
+.tema-operasional .nav-link[aria-current='page']::after {
+    bottom: -14px;
+    border-top-right-radius: 12px;
+    box-shadow: 5px -5px 0 5px var(--op-paper);
+}
+
+.tema-operasional .nav-link [data-badge-menu] {
+    margin-right: 0.5rem;
+    background-color: var(--op-gold);
+    color: var(--op-ink);
+}
+
+/* ---------- Header ---------- */
+.tema-operasional .app-header {
+    background-color: rgb(244 240 232 / 0.92);
+    border-bottom-color: transparent;
+}
+
+.tema-operasional .op-crumb {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    color: var(--op-text-3);
+}
+
+.tema-operasional .op-pengguna {
+    padding: 4px 6px 4px 4px;
+    border: 1px solid var(--op-line);
+    border-radius: 999px;
+    background: #fff;
+}
+
+.tema-operasional .op-avatar {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--op-ink);
+    color: var(--op-gold);
+    font-size: 11.5px;
+    font-weight: 800;
+}
+
+/* ---------- Judul halaman (x-ui.page-header) ---------- */
+@media (min-width: 640px) {
+    .tema-operasional .page-header {
+        align-items: flex-end;
+    }
+}
+
+.tema-operasional .page-header-kicker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--op-gold-2);
+}
+
+.tema-operasional .page-header-kicker::after {
+    content: '';
+    width: 40px;
+    height: 1px;
+    background: var(--op-gold);
+}
+
+.tema-operasional .page-header-title {
+    font-size: 28px;
+    line-height: 36px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: var(--op-ink);
+}
+
+.tema-operasional .page-header-desc {
+    font-size: 14.5px;
+    line-height: 22px;
+    color: var(--op-text-2);
+}
+
+/* ---------- Komponen bersama ---------- */
+.tema-operasional .card,
+.tema-operasional .stat-card {
+    border-color: var(--op-line);
+    border-radius: 14px;
+    box-shadow: none;
+}
+
+.tema-operasional .card-header {
+    border-color: var(--op-line-2);
+}
+
+.tema-operasional .card-title {
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 700;
+    color: var(--op-ink);
+}
+
+.tema-operasional .card-footer {
+    border-color: var(--op-line-2);
+    color: var(--op-text-2);
+}
+
+.tema-operasional .stat-card {
+    transition: box-shadow 0.25s, transform 0.25s, border-color 0.25s;
+}
+
+.tema-operasional a.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgb(14 27 54 / 0.08);
+}
+
+.tema-operasional .stat-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--op-text-3);
+}
+
+.tema-operasional .stat-value {
+    font-size: 30px;
+    line-height: 38px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+}
+
+.tema-operasional .table th {
+    background-color: var(--op-subtle);
+    color: var(--op-text-2);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    border-bottom: 1px solid var(--op-line);
+}
+
+.tema-operasional .table td {
+    color: var(--op-text);
+}
+
+.tema-operasional .table tbody tr {
+    transition: background-color 0.2s;
+}
+
+.tema-operasional .table tbody tr:hover {
+    background-color: #fcfaf6;
+}
+
+.tema-operasional .badge,
+.tema-operasional [class^='badge-'] {
+    font-weight: 600;
+}
+
+.tema-operasional .badge-success {
+    background-color: var(--op-green-soft);
+    color: var(--op-green);
+    --tw-ring-color: transparent;
+}
+
+.tema-operasional .badge-warning {
+    background-color: var(--op-gold-soft);
+    color: #7e5710;
+    --tw-ring-color: transparent;
+}
+
+.tema-operasional .badge-danger {
+    background-color: var(--op-red-soft);
+    color: var(--op-red);
+    --tw-ring-color: transparent;
+}
+
+.tema-operasional .badge-info,
+.tema-operasional .badge-primary {
+    background-color: var(--op-navy-soft);
+    color: var(--op-navy);
+    --tw-ring-color: transparent;
+}
+
+.tema-operasional .badge-secondary {
+    background-color: var(--op-paper-2);
+    color: var(--op-text-2);
+    --tw-ring-color: transparent;
+}
+
+.tema-operasional :is(.btn, .btn-primary, .btn-secondary, .btn-success, .btn-danger, .btn-warning, .btn-outline-danger) {
+    border-radius: 999px;
+    font-weight: 700;
+    box-shadow: none;
+    transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+
+.tema-operasional .btn-primary {
+    background-color: var(--op-ink);
+    color: #fff;
+}
+
+.tema-operasional .btn-primary:hover {
+    background-color: var(--op-navy);
+    box-shadow: 0 6px 18px rgb(14 27 54 / 0.18);
+    transform: translateY(-1px);
+}
+
+.tema-operasional .btn-secondary {
+    border-color: var(--op-line-strong);
+    color: var(--op-text);
+}
+
+.tema-operasional .btn-secondary:hover {
+    border-color: var(--op-text-3);
+    background-color: #fff;
+}
+
+.tema-operasional .btn-warning {
+    background-color: var(--op-gold);
+    color: var(--op-ink);
+}
+
+.tema-operasional .btn-warning:hover {
+    background-color: #e4b24a;
+}
+
+.tema-operasional .form-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--op-text);
+}
+
+.tema-operasional .form-input {
+    min-height: 42px;
+    border-color: var(--op-line-strong);
+    border-radius: 10px;
+    box-shadow: none;
+    font-size: 14px;
+}
+
+.tema-operasional .form-input:focus {
+    border-color: var(--op-navy-2);
+    --tw-ring-color: rgb(36 64 122 / 0.18);
+}
+
+.tema-operasional .form-hint {
+    font-size: 12.5px;
+    color: var(--op-text-3);
+}
+
+.tema-operasional .callout {
+    border-radius: 10px;
+}
+
+.tema-operasional .callout-info {
+    border-color: var(--op-navy-100);
+    background-color: var(--op-navy-soft);
+    color: var(--op-navy);
+}
+
+.tema-operasional .callout-warning {
+    border-color: var(--op-gold-line);
+    background-color: var(--op-gold-soft);
+    color: #7e5710;
+}
+
+.tema-operasional .font-mono {
+    letter-spacing: -0.01em;
+}
+
+/* ---------- Pola khusus halaman Operasional ---------- */
+.op-lab {
+    font-size: 11.5px;
+    line-height: 16px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--op-text-3);
+}
+
+.op-sheet {
+    border: 1px solid var(--op-line);
+    border-radius: 14px;
+    background: #fff;
+}
+
+.op-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--op-navy-2);
+}
+
+.op-link svg {
+    transition: transform 0.25s;
+}
+
+.op-link:hover {
+    color: var(--op-ink);
+}
+
+.op-link:hover svg {
+    transform: translateX(4px);
+}
+
+.op-avatar-sm {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--op-navy-soft);
+    color: var(--op-navy);
+    font-size: 12.5px;
+    font-weight: 800;
+    transition: transform 0.25s;
+}
+
+/* Ringkasan utama Beranda */
+.op-headline {
+    display: grid;
+    grid-template-columns: repeat(var(--kolom, 4), minmax(0, 1fr));
+    border-top: 2px solid var(--op-ink);
+    border-bottom: 1px solid var(--op-line);
+}
+
+.op-headline-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-right: 22px;
+    padding: 16px 22px 18px 0;
+    border-right: 1px solid var(--op-line);
+}
+
+.op-headline-item:last-child {
+    margin-right: 0;
+    border-right: 0;
+}
+
+.op-headline-angka {
+    margin: 6px 0 2px;
+    font-size: 32px;
+    line-height: 40px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--op-ink);
+}
+
+.op-headline-item .op-link {
+    margin-top: auto;
+    padding-top: 12px;
+}
+
+.op-headline-item.is-perlu-tindakan {
+    margin: -1px 0;
+    padding: 16px 22px 18px;
+    border-radius: 0 0 14px 14px;
+    background: var(--op-ink);
+    color: #fff;
+}
+
+.is-perlu-tindakan .stat-label,
+.is-perlu-tindakan .op-headline-angka {
+    color: var(--op-gold);
+}
+
+.is-perlu-tindakan .op-headline-hint {
+    color: rgb(255 255 255 / 0.8);
+}
+
+.is-perlu-tindakan .op-link {
+    color: #fff;
+}
+
+.op-stempel {
+    align-self: flex-start;
+    margin-bottom: 8px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--op-gold);
+    color: var(--op-ink);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    transform-origin: left center;
+    animation: op-stempel 2.8s ease-in-out infinite;
+}
+
+.op-headline-hint {
+    font-size: 13px;
+    line-height: 19px;
+    color: var(--op-text-2);
+}
+
+/* Daftar tugas "Perlu diperhatikan" */
+.op-grup {
+    display: flex;
+    gap: 10px;
+    margin: 4px 24px 8px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--op-paper);
+    font-size: 13px;
+    line-height: 19px;
+    color: var(--op-text-2);
+}
+
+.op-grup.is-bahaya {
+    background: var(--op-red-soft);
+}
+
+.op-grup.is-info {
+    background: var(--op-navy-soft);
+}
+
+.op-grup strong {
+    display: block;
+    color: var(--op-text);
+}
+
+.op-tugas {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) minmax(0, 230px) auto;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 24px;
+    border-top: 1px solid var(--op-line-2);
+    transition: background-color 0.2s;
+}
+
+.op-tugas:hover {
+    background: #fcfaf6;
+}
+
+.op-tugas:hover .op-avatar-sm {
+    transform: scale(1.08);
+}
+
+.op-tugas-no {
+    font-size: 15px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--op-text-3);
+}
+
+.op-hari {
+    display: grid;
+    grid-template-columns: repeat(var(--jumlah, 30), minmax(0, 1fr));
+    gap: 2px;
+    margin-top: 7px;
+}
+
+.op-hari i {
+    height: 12px;
+    border-radius: 2px;
+    background: var(--op-navy-soft);
+}
+
+.op-hari i.is-kosong {
+    background: repeating-linear-gradient(135deg, var(--op-red) 0 2px, var(--op-red-soft) 2px 5px);
+}
+
+/* Kartu navy pertukaran shift */
+.op-kartu-navy {
+    position: relative;
+    overflow: hidden;
+    padding: 20px 22px 18px;
+    border-radius: 14px;
+    background: var(--op-ink);
+    color: #fff;
+}
+
+.op-kartu-navy::after {
+    content: '';
+    position: absolute;
+    top: -100px;
+    right: -90px;
+    width: 200px;
+    height: 200px;
+    border: 26px solid rgb(217 165 58 / 0.12);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.op-trio {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 16px;
+    border-top: 1px solid rgb(255 255 255 / 0.14);
+}
+
+.op-trio a {
+    display: block;
+    padding: 12px 0 4px;
+    border-radius: 6px;
+}
+
+.op-trio a + a {
+    padding-left: 14px;
+    border-left: 1px solid rgb(255 255 255 / 0.14);
+}
+
+.op-trio a:hover .op-trio-angka {
+    color: var(--op-gold);
+}
+
+.op-trio-label {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    color: rgb(255 255 255 / 0.7);
+}
+
+.op-trio-angka {
+    margin-top: 4px;
+    font-size: 30px;
+    line-height: 38px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.2s;
+}
+
+.op-trio a.is-menunggu .op-trio-angka {
+    color: var(--op-gold);
+}
+
+/* Akses cepat */
+.op-akses-cepat {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 22px;
+    border-top: 1px solid var(--op-line-2);
+    font-weight: 700;
+    color: var(--op-text);
+}
+
+.op-akses-cepat-no {
+    width: 20px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--op-text-3);
+}
+
+.op-akses-cepat-panah {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    margin-left: auto;
+    border: 1px solid var(--op-line);
+    border-radius: 50%;
+    color: var(--op-text-2);
+    transition: all 0.2s;
+}
+
+.op-akses-cepat:hover .op-akses-cepat-panah {
+    border-color: var(--op-ink);
+    background: var(--op-ink);
+    color: var(--op-gold);
+}
+
+/* ---------- Animasi ---------- */
+.tema-operasional main > :not(script) {
+    animation: op-naik 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.tema-operasional main > :nth-child(2) { animation-delay: 70ms; }
+.tema-operasional main > :nth-child(3) { animation-delay: 140ms; }
+.tema-operasional main > :nth-child(4) { animation-delay: 210ms; }
+.tema-operasional main > :nth-child(5) { animation-delay: 280ms; }
+.tema-operasional main > :nth-child(n + 6) { animation-delay: 350ms; }
+
+.op-tumbuh {
+    transform-origin: left center;
+    animation: op-tumbuh 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(0.3s + var(--d, 0) * 40ms);
+}
+
+.op-muncul {
+    animation: op-muncul 0.4s cubic-bezier(0.3, 0.8, 0.3, 1.2) both;
+    animation-delay: calc(0.35s + var(--d, 0) * 18ms);
+}
+
+@keyframes op-naik {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+}
+
+@keyframes op-tumbuh {
+    from {
+        transform: scaleX(0);
+    }
+}
+
+@keyframes op-muncul {
+    0% {
+        opacity: 0;
+        transform: scale(0.6);
+    }
+    70% {
+        transform: scale(1.06);
+    }
+}
+
+@keyframes op-tab-masuk {
+    from {
+        clip-path: inset(0 100% 0 0 round 10px 0 0 10px);
+    }
+    to {
+        clip-path: inset(0 0 0 0 round 10px 0 0 10px);
+    }
+}
+
+@keyframes op-stempel {
+    0%,
+    100% {
+        transform: rotate(-2deg);
+    }
+    50% {
+        transform: rotate(-2deg) scale(1.05);
+    }
+}
+
+@media (max-width: 1023px) {
+    .op-headline {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .op-headline-item {
+        margin-right: 0;
+        padding-right: 16px;
+        border-right: 0;
+    }
+
+    .op-tugas {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .op-tugas-no,
+    .op-tugas .op-avatar-sm {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tema-operasional *,
+    .tema-operasional *::before,
+    .tema-operasional *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}
