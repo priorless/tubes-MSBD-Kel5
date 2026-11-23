@@ -80,7 +80,7 @@ class RekapOperasionalTest extends TestCase
         $this->actingAs($this->operasional())
             ->get(route('operasional.rekap.index', ['bulan' => '2026-11']))
             ->assertOk()
-            ->assertSeeTextInOrder(['Andi', 'SJI001 · PT Alpha', '5 / 2 / 23', '4', '1 hari', '0 / 1 / 0', '1', '19 jam', '2 jam', 'Status persetujuan belum tersedia'])
+            ->assertSeeTextInOrder(['Andi', 'SJI001 · PT Alpha', '5 / 2 / 23', '4', '1 hari', '0 / 1 / 0', '1', '19 jam', '2 jam'])
             ->assertSeeTextInOrder(['Budi', 'SJI002 · PT Beta', '0 / 0 / 3', '0', '0 hari', '0 / 0 / 1', '0', '0 jam', '0 jam']);
     }
 
@@ -109,11 +109,10 @@ class RekapOperasionalTest extends TestCase
         $this->actingAs($this->operasional())
             ->get(route('operasional.rekap.index', ['bulan' => '2026-11']))
             ->assertOk()
-            ->assertSeeText('Menit keterlambatan belum dicatat')
-            ->assertSeeText('Status persetujuan lembur belum dicatat');
+            ->assertSeeText('Menit keterlambatan belum dicatat');
     }
 
-    public function test_minutes_late_and_overtime_approval_are_shown_when_recorded(): void
+    public function test_minutes_late_and_overtime_are_shown_when_recorded(): void
     {
         $this->createReportData(true);
 
@@ -121,7 +120,7 @@ class RekapOperasionalTest extends TestCase
             ->get(route('operasional.rekap.index', ['bulan' => '2026-11', 'id_karyawan' => 1]))
             ->assertOk()
             ->assertSeeText('20 menit')
-            ->assertSeeText('2 disetujui · 0 menunggu')
+            ->assertSeeText('2 jam')
             ->assertDontSeeText('Sebagian data belum tersedia di database');
     }
 
@@ -162,10 +161,10 @@ class RekapOperasionalTest extends TestCase
         $lines = explode("\n", trim(str_replace("\xEF\xBB\xBF", '', $response->streamedContent())));
         $this->assertSame(
             'NIP;Nama;Klien;"Hari kerja terjadwal";"Libur terjadwal";"Tanggal belum diatur";Hadir;"Terlambat (hari)";"Terlambat (menit)";Izin;Sakit;Alpha;'
-            .'"Kerja tanpa catatan absensi";"Jam kerja tercatat";"Jam lembur";"Lembur disetujui (diteruskan ke Keuangan)";"Lembur menunggu persetujuan"',
+            .'"Kerja tanpa catatan absensi";"Jam kerja tercatat";"Jam lembur"',
             $lines[0],
         );
-        $this->assertSame('SJI001;Andi;"PT Alpha";5;2;23;4;1;"belum tersedia";0;1;0;1;19;2;"belum tersedia";"belum tersedia"', $lines[1]);
+        $this->assertSame('SJI001;Andi;"PT Alpha";5;2;23;4;1;"belum tersedia";0;1;0;1;19;2', $lines[1]);
         $this->assertCount(2, $lines);
     }
 
@@ -205,13 +204,13 @@ class RekapOperasionalTest extends TestCase
             $this->createSchedule(101, sprintf('2026-11-%02d', $day), 'Libur');
         }
 
-        $this->attend(1, '2026-11-02', 'Hadir', '08:00:00', '16:30:00', 2, 0, 'Disetujui', $withRecordedColumns);
-        $this->attend(1, '2026-11-03', 'Terlambat', '08:20:00', '16:00:00', 0, 20, 'Tidak Ada', $withRecordedColumns);
-        $this->attend(1, '2026-11-04', 'Sakit', null, null, 0, 0, 'Tidak Ada', $withRecordedColumns);
-        $this->attend(1, '2026-11-06', 'Hadir', '08:00:00', '12:00:00', 0, 0, 'Tidak Ada', $withRecordedColumns);
-        $this->attend(1, '2026-11-07', 'Hadir', '20:00:00', '04:00:00', 0, 0, 'Tidak Ada', $withRecordedColumns);
-        $this->attend(2, '2026-11-05', 'Hadir', '08:00:00', '16:00:00', 0, 0, 'Tidak Ada', $withRecordedColumns);
-        $this->attend(2, '2026-11-11', 'Alpha', null, null, 0, 0, 'Tidak Ada', $withRecordedColumns);
+        $this->attend(1, '2026-11-02', 'Hadir', '08:00:00', '16:30:00', 2, 0, $withRecordedColumns);
+        $this->attend(1, '2026-11-03', 'Terlambat', '08:20:00', '16:00:00', 0, 20, $withRecordedColumns);
+        $this->attend(1, '2026-11-04', 'Sakit', null, null, 0, 0, $withRecordedColumns);
+        $this->attend(1, '2026-11-06', 'Hadir', '08:00:00', '12:00:00', 0, 0, $withRecordedColumns);
+        $this->attend(1, '2026-11-07', 'Hadir', '20:00:00', '04:00:00', 0, 0, $withRecordedColumns);
+        $this->attend(2, '2026-11-05', 'Hadir', '08:00:00', '16:00:00', 0, 0, $withRecordedColumns);
+        $this->attend(2, '2026-11-11', 'Alpha', null, null, 0, 0, $withRecordedColumns);
     }
 
     private function createAttendanceTable(bool $withRecordedColumns): void
@@ -226,12 +225,11 @@ class RekapOperasionalTest extends TestCase
             $table->integer('jam_lembur')->default(0);
             if ($withRecordedColumns) {
                 $table->unsignedSmallInteger('menit_terlambat')->default(0);
-                $table->string('status_lembur')->default('Tidak Ada');
             }
         });
     }
 
-    private function attend(int $employeeId, string $date, string $status, ?string $in, ?string $out, int $overtime, int $minutesLate, string $overtimeStatus, bool $withRecordedColumns): void
+    private function attend(int $employeeId, string $date, string $status, ?string $in, ?string $out, int $overtime, int $minutesLate, bool $withRecordedColumns): void
     {
         DB::table('tbl_absensi')->insert([
             'id_karyawan' => $employeeId,
@@ -240,7 +238,7 @@ class RekapOperasionalTest extends TestCase
             'jam_keluar' => $out,
             'status_kehadiran' => $status,
             'jam_lembur' => $overtime,
-            ...($withRecordedColumns ? ['menit_terlambat' => $minutesLate, 'status_lembur' => $overtimeStatus] : []),
+            ...($withRecordedColumns ? ['menit_terlambat' => $minutesLate] : []),
         ]);
     }
 

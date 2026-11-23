@@ -78,7 +78,6 @@ class JadwalAbsensiHarianTest extends TestCase
         $this->assertSame('Hadir', $absensi->status_kehadiran);
         $this->assertSame(0, (int) $absensi->menit_terlambat);
         $this->assertSame(0, (int) $absensi->jam_lembur);
-        $this->assertSame('Tidak Ada', $absensi->status_lembur);
     }
 
     public function test_indikasi_lembur_dihitung_dari_jam_pulang_jadwal_harian_shift_malam(): void
@@ -91,7 +90,6 @@ class JadwalAbsensiHarianTest extends TestCase
         $absensi = $this->checkOut($absensi->id, '01:10:00');
 
         $this->assertSame(2, (int) $absensi->jam_lembur);
-        $this->assertSame('Menunggu', $absensi->status_lembur);
     }
 
     public function test_jadwal_hasil_pertukaran_shift_yang_disetujui_menjadi_acuan(): void

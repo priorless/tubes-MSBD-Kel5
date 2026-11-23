@@ -19,6 +19,11 @@
             <h3 class="font-semibold text-gray-800">Karyawan</h3>
             <div>
                 <label for="id_karyawan" class="form-label">Karyawan Lapangan</label>
+                @if ($karyawan->isNotEmpty())
+                    <input id="cari_karyawan" type="search" class="form-input mb-2" autocomplete="off"
+                           placeholder="Ketik nama atau NIP untuk mencari..." aria-controls="id_karyawan">
+                    <p id="status-cari-karyawan" class="form-hint mb-2" aria-live="polite" hidden></p>
+                @endif
                 <select id="id_karyawan" name="id_karyawan" @class(['form-input', 'form-input-error' => $errors->has('id_karyawan')]) required>
                     <option value="">Pilih karyawan</option>
                     @foreach ($karyawan as $item)
@@ -114,6 +119,33 @@
             };
             pilihKaryawan.addEventListener('change', perbaruiLayanan);
             perbaruiLayanan();
+
+            // Saring pilihan karyawan sesuai nama/NIP yang diketik; satu hasil langsung dipilih.
+            const cari = document.getElementById('cari_karyawan');
+            const statusCari = document.getElementById('status-cari-karyawan');
+            if (cari) {
+                const pilihan = [...pilihKaryawan.options].filter((opsi) => opsi.value !== '');
+                cari.addEventListener('input', () => {
+                    const kata = cari.value.trim().toLowerCase();
+                    const cocok = pilihan.filter((opsi) => {
+                        const tampil = kata === '' || opsi.textContent.toLowerCase().includes(kata);
+                        opsi.hidden = !tampil;
+                        opsi.disabled = !tampil;
+                        return tampil;
+                    });
+                    if (pilihKaryawan.selectedOptions[0]?.disabled) {
+                        pilihKaryawan.value = '';
+                    }
+                    if (kata !== '' && cocok.length === 1) {
+                        pilihKaryawan.value = cocok[0].value;
+                    }
+                    statusCari.hidden = kata === '';
+                    statusCari.textContent = cocok.length === 0
+                        ? 'Tidak ada karyawan yang cocok.'
+                        : `${cocok.length} karyawan cocok${cocok.length === 1 ? ' dan sudah dipilih' : ', pilih dari daftar di bawah'}.`;
+                    perbaruiLayanan();
+                });
+            }
         })();
     </script>
 @endsection

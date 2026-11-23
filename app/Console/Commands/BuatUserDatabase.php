@@ -13,12 +13,15 @@ use Illuminate\Support\Facades\DB;
  *
  * Password dibuat acak dan HANYA ditampilkan sekali di terminal (tidak disimpan di repo/.env).
  * Karyawan Lapangan sengaja tidak punya user MySQL (lihat penjelasan di file SQL 10).
+ *
+ * Bagian "app" membuat user sji_app (role sji_role_app: DML + EXECUTE, tanpa DDL/GRANT) untuk koneksi aplikasi
+ * di server: isi DB_USERNAME=sji_app dan DB_PASSWORD di .env, sedangkan migration tetap memakai user pemilik skema.
  */
 #[Signature('sji:buat-user-db
-    {bagian=semua : hrd, operasional, keuangan, ceo, atau semua}
+    {bagian=semua : hrd, operasional, keuangan, ceo, app, atau semua}
     {--host=localhost : Host asal koneksi user MySQL (mis. localhost atau %)}
     {--reset : Buat password baru untuk user yang sudah ada}')]
-#[Description('Membuat user MySQL per bagian (hrd/operasional/keuangan/ceo) dengan role hak akses dan password acak.')]
+#[Description('Membuat user MySQL per bagian (hrd/operasional/keuangan/ceo) atau user aplikasi (app) dengan role hak akses dan password acak.')]
 class BuatUserDatabase extends Command
 {
     /** @var array<string, string> bagian => role */
@@ -27,6 +30,7 @@ class BuatUserDatabase extends Command
         'operasional' => 'sji_role_operasional',
         'keuangan' => 'sji_role_keuangan',
         'ceo' => 'sji_role_ceo',
+        'app' => 'sji_role_app',
     ];
 
     public function handle(): int
