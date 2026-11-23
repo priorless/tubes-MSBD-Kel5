@@ -134,6 +134,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Backup & Restore (php artisan sji:backup-db / sji:restore-db)
+    |--------------------------------------------------------------------------
+    |
+    | Path program klien MySQL. Isi MYSQLDUMP_PATH / MYSQL_PATH di .env bila tidak ada di PATH,
+    | mis. C:/laragon/bin/mysql/mysql-8.0.30-winx64/bin/mysqldump.exe.
+    |
+    */
+
+    'backup' => [
+        'mysqldump' => env('MYSQLDUMP_PATH', 'mysqldump'),
+        'mysql' => env('MYSQL_PATH', 'mysql'),
+        'folder' => storage_path('app/backup'),
+        'simpan_hari' => 7,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Redis Databases
     |--------------------------------------------------------------------------
     |
