@@ -7,12 +7,11 @@
 @section('title', 'Data Karyawan')
 
 @section('content')
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">Daftar karyawan SJI</h2>
-            <a href="{{ route('hrd.karyawan.create') }}" class="btn-primary btn-sm">+ Tambah Karyawan</a>
-        </div>
+    <x-ui.page-header title="Data Karyawan" description="Daftar karyawan SJI, baik karyawan lapangan maupun staf internal.">
+        <a href="{{ route('hrd.karyawan.create') }}" class="btn-primary">+ Tambah Karyawan</a>
+    </x-ui.page-header>
 
+    <div class="card overflow-hidden">
         <form method="GET" action="{{ route('hrd.karyawan.index') }}" class="grid grid-cols-1 gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4 md:grid-cols-12">
             <input type="search" name="q" value="{{ request('q') }}" class="form-input md:col-span-5" placeholder="Cari nama atau NIP" aria-label="Cari nama atau NIP">
             <select name="kategori" class="form-input md:col-span-3" aria-label="Filter kategori">

@@ -8,14 +8,10 @@
 @endphp
 
 @section('content')
-    <div class="card">
-        <div class="card-header">
-            <div>
-                <h2 class="card-title">Log Aktivitas Sistem</h2>
-                <p class="text-sm text-gray-500">Dicatat otomatis oleh database setiap ada perubahan penting. Log tidak dapat diubah atau dihapus dari aplikasi.</p>
-            </div>
-        </div>
+    <x-ui.page-header title="Log Aktivitas Sistem"
+        description="Dicatat otomatis oleh database setiap ada perubahan penting. Log tidak dapat diubah atau dihapus dari aplikasi." />
 
+    <div class="card overflow-hidden">
         <form method="GET" action="{{ route('ceo.log-aktivitas') }}" class="grid grid-cols-1 gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4 md:grid-cols-12">
             <select name="tabel" class="form-input md:col-span-4" aria-label="Filter tabel">
                 <option value="">Semua data</option>

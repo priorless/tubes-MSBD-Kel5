@@ -3,11 +3,9 @@
 @section('title', 'Pool Karyawan')
 
 @section('content')
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">Karyawan Lapangan berstatus <span class="text-sky-700">Tersedia</span> dan siap ditempatkan</h2>
-        </div>
+    <x-ui.page-header title="Pool Karyawan" description="Karyawan Lapangan berstatus Tersedia dan siap ditempatkan." />
 
+    <div class="card overflow-hidden">
         <form method="GET" action="{{ route('hrd.pool') }}" class="grid grid-cols-1 gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4 md:grid-cols-12">
             <input type="search" name="q" value="{{ request('q') }}" class="form-input md:col-span-6" placeholder="Cari nama atau NIP" aria-label="Cari nama atau NIP">
             <select name="layanan" class="form-input md:col-span-4" aria-label="Filter jenis layanan">

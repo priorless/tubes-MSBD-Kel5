@@ -3,6 +3,8 @@
 @section('title', 'Invoice Klien')
 
 @section('content')
+    <x-ui.page-header title="Invoice Klien" description="Generate invoice tagihan klien per periode, lihat struk, kirim, dan catat pelunasan." />
+
     @if ($invoiceBaru)
         <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-sji-biru/20 bg-blue-50 px-5 py-4">
             <div class="flex items-center gap-3">
