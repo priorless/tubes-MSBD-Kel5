@@ -86,25 +86,30 @@ class PayrollInvoiceProrataTest extends TestCase
         $this->assertEquals(1100000, (float) $p->total_gaji);
     }
 
-    public function test_hanya_lembur_disetujui_masuk_ke_payroll(): void
+    public function test_lembur_payroll_mengikuti_aturan_komponen_gaji(): void
     {
         $id = $this->buatKaryawan('Lapangan');
         $this->buatPenempatan($id, $this->buatKlien(), $this->tgl(1), null, [], 2500000, 25);
-        $this->absensiBanyak($id, range(1, 25), 'Hadir');
-        $lembur = fn (int $hari, int $jam, string $status) => DB::table('tbl_absensi')
-            ->where('id_karyawan', $id)->where('tgl', $this->tgl($hari))
-            ->update(['jam_lembur' => $jam, 'status_lembur' => $status]);
-        $lembur(3, 2, 'Disetujui');
-        $lembur(4, 5, 'Ditolak');
-        $lembur(5, 7, 'Menunggu');
+        $this->absensiBanyak($id, [1, 2, ...range(6, 25)], 'Hadir');
+        $checkInOut = function (int $hari, ?string $keluar) use ($id): void {
+            $idAbsen = $this->buatAbsensi($id, $this->tgl($hari), 'Hadir', ['jam_masuk' => '08:00:00']);
+            if ($keluar !== null) {
+                DB::table('tbl_absensi')->where('id', $idAbsen)->update(['jam_keluar' => $keluar]);
+            }
+        };
+        $checkInOut(3, '18:10:00'); // jadwal pulang 16:00 -> 2 jam penuh (1,5x + 2x)
+        $checkInOut(4, '16:59:00'); // lewat 59 menit -> belum lembur
+        $checkInOut(5, null);       // belum check-out -> tidak dihitung walau jam_lembur terisi
+        DB::table('tbl_absensi')->where('id_karyawan', $id)->where('tgl', $this->tgl(5))->update(['jam_lembur' => 4]);
 
         $this->generatePayroll();
         $p = $this->payroll($id);
 
         $this->assertSame(25, (int) $p->hari_wajib);
         $this->assertSame(0, (int) $p->hari_absen);
-        $this->assertEquals(50000, (float) $p->total_lembur, 'Hanya 2 jam yang disetujui x Rp25.000');
-        $this->assertEquals(2550000, (float) $p->total_gaji);
+        // 2.500.000 x (1,5 + 2) / 173 = 50.578,03
+        $this->assertEquals(50578.03, (float) $p->total_lembur);
+        $this->assertEquals(2550578.03, (float) $p->total_gaji);
     }
 
     public function test_rotasi_tengah_bulan_memakai_kontrak_terbaru_dan_profit_dibagi_per_klien(): void
@@ -175,29 +180,49 @@ class PayrollInvoiceProrataTest extends TestCase
         $this->assertEquals(900000, (float) $p->total_gaji);
     }
 
-    public function test_invoice_prorata_per_hari_penempatan(): void
+    public function test_invoice_dari_payroll_prorata_karyawan_masuk_tengah_bulan_dan_rotasi_antar_klien(): void
     {
-        $tarif = (float) DB::table('tbl_jenis_layanan')->where('nama_layanan', 'Driver')->value('tarif_tagihan_klien');
-        $klien = $this->buatKlien();
+        $klienA = $this->buatKlien(['management_fee' => 10]);
+        $klienB = $this->buatKlien(['management_fee' => 0]);
+        $rotasi = $this->buatKaryawan('Lapangan');
+        $this->buatPenempatan($rotasi, $klienA, $this->tgl(1), $this->tgl(14), ['status' => 'Rotasi'], 2500000, 25);
+        $this->buatPenempatan($rotasi, $klienB, $this->tgl(14), null, [], 3000000, 25);
+        $this->absensiBanyak($rotasi, range(1, 28), 'Hadir');
+        $masukTengahBulan = $this->buatKaryawan('Lapangan');
+        $this->buatPenempatan($masukTengahBulan, $klienA, $this->tgl(15), null, [], 2500000, 25);
+        $this->absensiBanyak($masukTengahBulan, range(15, 28), 'Hadir');
 
-        $this->buatPenempatan($this->buatKaryawan(), $klien, '2099-01-15');
-        $this->buatPenempatan($this->buatKaryawan(), $klien, $this->tgl(15));
-        $dua = $this->buatKaryawan();
-        $this->buatPenempatan($dua, $klien, $this->tgl(1), $this->tgl(10), ['status' => 'Rotasi']);
-        $this->buatPenempatan($dua, $klien, $this->tgl(10), $this->tgl(20), ['status' => 'Selesai']);
+        $this->generatePayroll();
+        $payrollSebelum = DB::table('tbl_payroll')->whereIn('id_karyawan', [$rotasi, $masukTengahBulan])->orderBy('id')->get()->toJson();
 
-        DatabaseService::callGenerateInvoiceKlien($klien, self::BULAN, self::TAHUN);
+        DatabaseService::callGenerateInvoiceKlien($klienA, self::BULAN, self::TAHUN);
+        DatabaseService::callGenerateInvoiceKlien($klienB, self::BULAN, self::TAHUN);
 
-        $invoice = DB::table('tbl_invoice')->where('id_klien', $klien)->first();
-        $harapan = round($tarif * 28 / 28, 2) + round($tarif * 14 / 28, 2) + round($tarif * 10 / 28, 2) + round($tarif * 11 / 28, 2);
-        $this->assertSame(3, (int) $invoice->jumlah_tenaga, 'Karyawan dengan 2 penempatan dihitung sekali');
-        $this->assertEquals(round($harapan, 2), (float) $invoice->total_tagihan);
+        $invoiceA = DB::table('tbl_invoice')->where('id_klien', $klienA)->sole();
+        $invoiceB = DB::table('tbl_invoice')->where('id_klien', $klienB)->sole();
+        $detail = fn (object $invoice, int $karyawan): object => DB::table('tbl_invoice_detail')
+            ->where('id_invoice', $invoice->id)->where('id_karyawan', $karyawan)->sole();
+
+        // Masuk tanggal 15: payroll sudah prorata (13 hari wajib x 100.000), seluruhnya ditagihkan ke klien A.
+        $this->assertSame([14, 14], [(int) $detail($invoiceA, $masukTengahBulan)->hari_klien, (int) $detail($invoiceA, $masukTengahBulan)->hari_total]);
+        $this->assertEquals(1300000, (float) $detail($invoiceA, $masukTengahBulan)->biaya_tenaga_kerja);
+        // Rotasi: gaji 3.000.000 dibagi 14/29 (klien A) dan 15/29 (klien B), totalnya tepat gaji payroll.
+        $this->assertEquals(1448276, (float) $detail($invoiceA, $rotasi)->biaya_tenaga_kerja);
+        $this->assertEquals(1551724, (float) $detail($invoiceB, $rotasi)->biaya_tenaga_kerja);
+        $this->assertEquals(3000000, (float) $detail($invoiceA, $rotasi)->biaya_tenaga_kerja + (float) $detail($invoiceB, $rotasi)->biaya_tenaga_kerja);
+
+        $this->assertSame([2, 1], [(int) $invoiceA->jumlah_tenaga, (int) $invoiceB->jumlah_tenaga]);
+        $this->assertEquals(2748276, (float) $invoiceA->sub_total);
+        $this->assertSame([274828.0, 30231.0, 3053335.0], [(float) $invoiceA->management_fee, (float) $invoiceA->ppn, (float) $invoiceA->total_tagihan]);
+        $this->assertSame([0.0, 0.0, 1551724.0], [(float) $invoiceB->management_fee, (float) $invoiceB->ppn, (float) $invoiceB->total_tagihan], 'Fee 0% tetap dipakai');
+
+        $this->assertSame($payrollSebelum, DB::table('tbl_payroll')->whereIn('id_karyawan', [$rotasi, $masukTengahBulan])->orderBy('id')->get()->toJson(), 'Payroll tidak berubah');
     }
 
     public function test_invoice_tanpa_penempatan_ditolak_dengan_pesan(): void
     {
         try {
-            DatabaseService::callGenerateInvoiceKlien($this->buatKlien(), self::BULAN, self::TAHUN);
+            DatabaseService::callGenerateInvoiceKlien($this->buatKlien(['management_fee' => 10]), self::BULAN, self::TAHUN);
             $this->fail('Invoice tanpa penempatan seharusnya ditolak.');
         } catch (QueryException $exception) {
             $this->assertSame('Tidak ada tenaga yang ditempatkan di klien ini pada periode tersebut', $exception->errorInfo[2]);
@@ -216,7 +241,7 @@ class PayrollInvoiceProrataTest extends TestCase
 
         $this->get(route('keuangan.payroll.index', ['bulan' => self::BULAN, 'tahun' => self::TAHUN]))
             ->assertOk()
-            ->assertSee('Hari (W/M/A)')
+            ->assertSee('Hari (Wajib / Hadir / Absen)')
             ->assertSee('13 / 11 / 2');
 
         $this->withHeader('X-Requested-With', 'XMLHttpRequest')

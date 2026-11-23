@@ -6,5 +6,5 @@
 @extends('layouts.app')
 
 @push('scripts')
-    <script src="{{ asset('js/tenaga-kerja.js') }}?v=9"></script>
+    <script src="{{ asset('js/tenaga-kerja.js') }}?v=10"></script>
 @endpush

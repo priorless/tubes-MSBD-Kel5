@@ -44,6 +44,10 @@ GRANT SELECT ON tbl_absensi TO 'sji_role_hrd';
 GRANT SELECT ON v_pool_karyawan_hrd TO 'sji_role_hrd';
 GRANT SELECT ON v_absensi_harian TO 'sji_role_hrd';
 GRANT SELECT ON v_rekap_absensi_pribadi TO 'sji_role_hrd';
+-- Dokumentasi absensi (laporan aktivitas Satpam/Cleaning Service/Driver & P2H Driver): hanya baca.
+GRANT SELECT ON tbl_laporan_aktivitas TO 'sji_role_hrd';
+GRANT SELECT ON tbl_p2h TO 'sji_role_hrd';
+GRANT SELECT ON tbl_p2h_item TO 'sji_role_hrd';
 GRANT SELECT ON v_dashboard_eksekutif TO 'sji_role_hrd';
 GRANT EXECUTE ON FUNCTION fn_sisa_hari_dokumen TO 'sji_role_hrd';
 GRANT EXECUTE ON PROCEDURE sp_input_ketidakhadiran TO 'sji_role_hrd';
@@ -65,13 +69,32 @@ GRANT SELECT ON v_pool_karyawan_hrd TO 'sji_role_operasional';
 GRANT EXECUTE ON PROCEDURE sp_assign_penempatan TO 'sji_role_operasional';
 GRANT EXECUTE ON PROCEDURE sp_rotasi_karyawan TO 'sji_role_operasional';
 GRANT EXECUTE ON PROCEDURE sp_selesai_penempatan TO 'sji_role_operasional';
+-- Jadwal Kerja (roster): tanpa DELETE, template dinonaktifkan dan riwayat hanya ditambah.
+GRANT SELECT, INSERT, UPDATE ON tbl_template_shift TO 'sji_role_operasional';
+GRANT SELECT, INSERT, UPDATE ON tbl_jadwal_kerja TO 'sji_role_operasional';
+GRANT SELECT, INSERT ON tbl_jadwal_kerja_riwayat TO 'sji_role_operasional';
+-- Template Jadwal Bulanan: template dinonaktifkan (tanpa DELETE); DELETE pada detail diperlukan
+-- karena mengosongkan hari = menghapus baris pola (Belum Diatur); log penerapan hanya ditambah.
+GRANT SELECT, INSERT, UPDATE ON tbl_template_jadwal TO 'sji_role_operasional';
+GRANT SELECT, INSERT, UPDATE, DELETE ON tbl_template_jadwal_detail TO 'sji_role_operasional';
+GRANT SELECT, INSERT ON tbl_template_jadwal_penerapan TO 'sji_role_operasional';
+-- Pertukaran Shift: Operasional hanya membaca dan memutuskan (UPDATE status); pengajuan dibuat karyawan.
+GRANT SELECT, UPDATE ON tbl_pertukaran_shift TO 'sji_role_operasional';
 
 -- ------------------------------------------------------------
 -- Keuangan — payroll, invoice, buku kas
 -- Payroll, invoice, dan mutasi kas TIDAK bisa diubah langsung: wajib lewat procedure/trigger.
 -- ------------------------------------------------------------
 GRANT SELECT ON tbl_payroll TO 'sji_role_keuangan';
+GRANT SELECT, INSERT, UPDATE ON tbl_komponen_gaji TO 'sji_role_keuangan';
 GRANT SELECT ON tbl_invoice TO 'sji_role_keuangan';
+-- Lampiran invoice (snapshot dari payroll) dan catatan tukar shift pada lampiran: hanya dibaca.
+GRANT SELECT ON tbl_invoice_detail TO 'sji_role_keuangan';
+GRANT SELECT ON tbl_pertukaran_shift TO 'sji_role_keuangan';
+-- Mode edit dokumen tagihan: teks surat & catatan manual per invoice, riwayat audit hanya ditambah.
+GRANT SELECT, INSERT, UPDATE ON tbl_invoice_dokumen TO 'sji_role_keuangan';
+GRANT SELECT, INSERT, UPDATE, DELETE ON tbl_invoice_catatan TO 'sji_role_keuangan';
+GRANT SELECT, INSERT ON tbl_invoice_dokumen_riwayat TO 'sji_role_keuangan';
 GRANT SELECT ON tbl_mutasi_keuangan TO 'sji_role_keuangan';
 GRANT SELECT ON tbl_klien TO 'sji_role_keuangan';
 GRANT SELECT ON tbl_kontrak TO 'sji_role_keuangan';
@@ -107,6 +130,11 @@ GRANT SELECT ON v_arus_kas_bulanan TO 'sji_role_ceo';
 GRANT SELECT ON v_monitoring_sebaran_operasional TO 'sji_role_ceo';
 GRANT SELECT ON v_slip_gaji_detail TO 'sji_role_ceo';
 GRANT SELECT ON tbl_log_aktivitas TO 'sji_role_ceo';
+GRANT SELECT ON tbl_template_shift TO 'sji_role_ceo';
+GRANT SELECT ON tbl_jadwal_kerja TO 'sji_role_ceo';
+GRANT SELECT ON tbl_template_jadwal TO 'sji_role_ceo';
+GRANT SELECT ON tbl_template_jadwal_detail TO 'sji_role_ceo';
+GRANT SELECT ON tbl_template_jadwal_penerapan TO 'sji_role_ceo';
 GRANT EXECUTE ON FUNCTION fn_profit_klien TO 'sji_role_ceo';
 GRANT EXECUTE ON FUNCTION fn_total_piutang TO 'sji_role_ceo';
 

@@ -2,15 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\FotoAbsensiService;
+use App\Services\JadwalAbsensiService;
+use App\Services\LaporanAktivitasService;
+use App\Services\PertukaranShiftService;
 use App\Services\TenagaKerjaService;
+use App\Support\AbsensiDitolak;
 use App\Support\FormatKolom;
 use App\Support\FotoAbsensiTidakValid;
+use App\Support\JamServer;
 use App\Support\KaryawanAktif;
 use App\Support\KolomTidakDitemukan;
+use App\Support\LabelBpjs;
+use App\Support\ShiftAbsensi;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -27,7 +37,7 @@ class TenagaKerjaController extends Controller
      * Absensi
      * ===================================================================== */
 
-    public function absensi()
+    public function absensi(JadwalAbsensiService $jadwal, LaporanAktivitasService $laporan, JamServer $jam)
     {
         $id = KaryawanAktif::id();
         $data = ['hariIni' => null, 'waktuServer' => now()->toDateTimeString(), 'status' => 'belum', 'masukIso' => null, 'penugasan' => null];
@@ -45,11 +55,73 @@ class TenagaKerjaController extends Controller
         }
 
         $data['foto'] = $this->urlFoto($data['hariIni']);
+        $data['monitoring'] = $this->dataMonitoring($jadwal, $laporan, $jam, $id, $data['hariIni']);
 
         return view('tenaga-kerja.absensi', $data + $this->dataUmum() + $this->kolomAbsensi());
     }
 
-    public function checkIn(Request $request): JsonResponse|RedirectResponse
+    /**
+     * Data shift & monitoring untuk halaman Absensi. Kegagalan di sini tidak boleh mengganggu absensi.
+     *
+     * @return array{jenis: string|null, tersedia: bool, shift: ShiftAbsensi|null, statusJadwal: string|null,
+     *     pesanJadwal: string|null, jendela: string|null, periode: list<array<string, mixed>>, laporan: Collection<int, object>,
+     *     p2h: array{p2h: object, item: Collection<string, object>}|null, perjalananSelesai: bool, muatUlangPada: string|null}
+     */
+    private function dataMonitoring(JadwalAbsensiService $jadwal, LaporanAktivitasService $laporan, JamServer $jam, int $idKaryawan, ?object $hariIni): array
+    {
+        $hasil = ['jenis' => null, 'tersedia' => false, 'shift' => null, 'statusJadwal' => null, 'pesanJadwal' => null, 'jendela' => null,
+            'periode' => [], 'laporan' => collect(), 'p2h' => null, 'perjalananSelesai' => true, 'muatUlangPada' => null];
+
+        try {
+            $sekarang = $jam->sekarang();
+            $hasil['jenis'] = LaporanAktivitasService::jenisMonitoring($this->db->namaLayanan($idKaryawan));
+            $hasil['tersedia'] = $laporan->tersedia();
+            $idAbsensi = $this->idBaris($hariIni);
+
+            if ($idAbsensi !== null && filled($hariIni->jam_masuk ?? null)) {
+                $hasil['shift'] = $jadwal->shiftAbsensi($hariIni);
+                $hasil['statusJadwal'] = $hasil['shift'] ? JadwalAbsensiService::STATUS_KERJA : null;
+            } else {
+                try {
+                    $hasil['shift'] = $jadwal->shiftUntukCheckIn($idKaryawan, $sekarang);
+                    $hasil['statusJadwal'] = JadwalAbsensiService::STATUS_KERJA;
+                    $hasil['jendela'] = 'dibuka';
+                } catch (AbsensiDitolak $e) {
+                    ['status' => $hasil['statusJadwal'], 'shift' => $hasil['shift']] = $jadwal->jadwalPada($idKaryawan, $sekarang->toDateString());
+                    $hasil['pesanJadwal'] = $e->getMessage();
+                    $hasil['jendela'] = $hasil['shift'] === null ? null : ($sekarang->lt($hasil['shift']->bukaCheckIn()) ? 'belum' : 'berakhir');
+                    if ($hasil['jendela'] === 'belum') {
+                        $hasil['muatUlangPada'] = $hasil['shift']->bukaCheckIn()->format('Y-m-d\TH:i:s');
+                    }
+                }
+            }
+
+            if ($hasil['tersedia'] && $idAbsensi !== null && $hasil['jenis'] === LaporanAktivitasService::JENIS_BERKALA) {
+                $hasil['periode'] = $laporan->periodeDenganLaporan($hariIni);
+                $berikutnya = collect($hasil['periode'])->first(fn (array $periode): bool => $periode['status'] !== JadwalAbsensiService::PERIODE_DITUTUP);
+                $hasil['muatUlangPada'] = $berikutnya === null ? null
+                    : ($berikutnya['status'] === JadwalAbsensiService::PERIODE_DIBUKA ? $berikutnya['selesai'] : $berikutnya['mulai'])->format('Y-m-d\TH:i:s');
+            }
+
+            if ($hasil['tersedia'] && $idAbsensi !== null && $hasil['jenis'] === LaporanAktivitasService::JENIS_PERJALANAN) {
+                $hasil['laporan'] = $laporan->laporanAbsensi($idKaryawan, $idAbsensi);
+                $hasil['p2h'] = $laporan->p2hAbsensi($idKaryawan, $idAbsensi);
+                $terakhir = $hasil['laporan']->last();
+                $hasil['perjalananSelesai'] = $terakhir === null || $terakhir->tahapan === LaporanAktivitasService::TAHAPAN_SELESAI;
+            }
+        } catch (QueryException) {
+            $hasil['tersedia'] = false;
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Check-in hanya untuk shift milik sendiri yang berlaku (bukan Libur / tanpa jadwal), mulai tepat
+     * 30 menit sebelum shift dimulai sampai shift berakhir — diperiksa dengan waktu server.
+     * Driver wajib melengkapi P2H (9 komponen) dan foto kendaraan; semuanya tersimpan dalam satu transaksi.
+     */
+    public function checkIn(Request $request, JadwalAbsensiService $jadwal, LaporanAktivitasService $laporan, FotoAbsensiService $fotoService, JamServer $jam): JsonResponse|RedirectResponse
     {
         $foto = $this->fotoDariRequest($request);
 
@@ -57,25 +129,46 @@ class TenagaKerjaController extends Controller
             return $this->balasAbsensi($request, false, self::pesanFotoWajib());
         }
 
+        $idKaryawan = KaryawanAktif::id();
+        $pathTambahan = [];
+
         try {
-            $this->db->checkIn(KaryawanAktif::id(), $foto);
+            $shift = $jadwal->shiftUntukCheckIn($idKaryawan, $jam->sekarang());
+            $lanjutan = null;
+
+            if (LaporanAktivitasService::jenisMonitoring($this->db->namaLayanan($idKaryawan)) === LaporanAktivitasService::JENIS_PERJALANAN) {
+                $itemP2h = $this->validasiDokumentasiKendaraan($request, awal: true);
+                $jpegKendaraan = $fotoService->siapkan((string) $this->fotoDariRequest($request, 'foto_kendaraan'));
+                $lanjutan = function (int $idAbsensi, object $waktu) use ($laporan, $idKaryawan, $itemP2h, $jpegKendaraan, &$pathTambahan): void {
+                    $pathTambahan[] = $laporan->simpanP2hAwal($idAbsensi, $idKaryawan, $itemP2h['p2h'], $jpegKendaraan, $waktu);
+                };
+            }
+
+            $this->db->checkIn($idKaryawan, $foto, $shift->tanggal, $lanjutan);
         } catch (QueryException $e) {
+            $this->hapusFotoTambahan($fotoService, $pathTambahan);
             // 1062 = UNIQUE (id_karyawan, tgl) — terjadi jika dua permintaan check-in
             // masuk bersamaan sehingga trigger belum melihat baris pertama.
             if ((int) ($e->errorInfo[1] ?? 0) === 1062) {
-                return $this->balasAbsensi($request, false, 'Anda sudah check-in hari ini.');
+                return $this->balasAbsensi($request, false, 'Anda sudah check-in untuk shift ini.');
             }
 
             // SQLSTATE 45000 dari trigger (absensi ganda, belum ditempatkan, dsb.)
             return $this->balasAbsensi($request, false, TenagaKerjaService::pesanError($e));
-        } catch (KolomTidakDitemukan|FotoAbsensiTidakValid $e) {
+        } catch (KolomTidakDitemukan|FotoAbsensiTidakValid|AbsensiDitolak $e) {
+            $this->hapusFotoTambahan($fotoService, $pathTambahan);
+
             return $this->balasAbsensi($request, false, $e->getMessage());
         }
 
         return $this->balasAbsensi($request, true, $this->pesanSukses('masuk'));
     }
 
-    public function checkOut(Request $request): JsonResponse|RedirectResponse
+    /**
+     * Check-out sesi aktif (minimal 30 menit setelah check-in — trigger database). Driver wajib foto kendaraan,
+     * kondisi akhir kendaraan, dan laporan perjalanan yang sudah diselesaikan. Setelah check-out monitoring berhenti.
+     */
+    public function checkOut(Request $request, LaporanAktivitasService $laporan, FotoAbsensiService $fotoService): JsonResponse|RedirectResponse
     {
         $foto = $this->fotoDariRequest($request);
 
@@ -83,14 +176,34 @@ class TenagaKerjaController extends Controller
             return $this->balasAbsensi($request, false, self::pesanFotoWajib());
         }
 
+        $idKaryawan = KaryawanAktif::id();
+        $pathTambahan = [];
+
         try {
             // Simpan id baris yang akan di-check-out: untuk shift malam, setelah check-out baris
             // kemarin tidak lagi "aktif", padahal respons harus menampilkan hasil baris tersebut.
-            $idAbsensi = $this->idBaris($this->db->absensiHariIni(KaryawanAktif::id()));
-            $jumlah = $this->db->checkOut(KaryawanAktif::id(), $foto);
+            $idAbsensi = $this->idBaris($this->db->absensiHariIni($idKaryawan));
+            $lanjutan = null;
+
+            if ($idAbsensi !== null
+                && LaporanAktivitasService::jenisMonitoring($this->db->namaLayanan($idKaryawan)) === LaporanAktivitasService::JENIS_PERJALANAN) {
+                $akhir = $this->validasiDokumentasiKendaraan($request, awal: false);
+                $laporan->pastikanPerjalananSelesai($idKaryawan, $idAbsensi);
+                $jpegKendaraan = $fotoService->siapkan((string) $this->fotoDariRequest($request, 'foto_kendaraan'));
+                $lanjutan = function (int $idBaris, object $waktu) use ($laporan, $idKaryawan, $akhir, $jpegKendaraan, &$pathTambahan): void {
+                    $pathTambahan[] = $laporan->simpanP2hAkhir($idBaris, $idKaryawan, $akhir['kondisi_akhir'],
+                        isset($akhir['catatan_akhir']) ? trim($akhir['catatan_akhir']) : null, $jpegKendaraan, $waktu);
+                };
+            }
+
+            $jumlah = $this->db->checkOut($idKaryawan, $foto, $lanjutan);
         } catch (QueryException $e) {
+            $this->hapusFotoTambahan($fotoService, $pathTambahan);
+
             return $this->balasAbsensi($request, false, TenagaKerjaService::pesanError($e));
-        } catch (KolomTidakDitemukan|FotoAbsensiTidakValid $e) {
+        } catch (KolomTidakDitemukan|FotoAbsensiTidakValid|AbsensiDitolak $e) {
+            $this->hapusFotoTambahan($fotoService, $pathTambahan);
+
             return $this->balasAbsensi($request, false, $e->getMessage());
         }
 
@@ -109,6 +222,29 @@ class TenagaKerjaController extends Controller
         }
 
         return $this->balasAbsensi($request, true, $this->pesanSukses('keluar', $selesai), baris: $selesai);
+    }
+
+    /* =====================================================================
+     * Tukar Shift (Roker)
+     * ===================================================================== */
+
+    public function tukarShift(PertukaranShiftService $pertukaranShiftService)
+    {
+        $idKaryawan = KaryawanAktif::id();
+        $data = ['tersedia' => false, 'opsi' => [], 'riwayat' => null, 'layananTukar' => $pertukaranShiftService];
+
+        try {
+            if ($pertukaranShiftService->tersedia()) {
+                $data['tersedia'] = true;
+                $data['opsi'] = $pertukaranShiftService->opsiPengajuan($idKaryawan);
+                $data['riwayat'] = $pertukaranShiftService->riwayatKaryawan($idKaryawan);
+            }
+        } catch (QueryException $e) {
+            $data['tersedia'] = false;
+            session()->now('gagal', TenagaKerjaService::pesanError($e));
+        }
+
+        return view('tenaga-kerja.tukar-shift', $data + $this->dataUmum());
     }
 
     /** Primary key baris absensi (kolom sesuai config), atau null. */
@@ -159,22 +295,90 @@ class TenagaKerjaController extends Controller
         return sprintf(self::PESAN_FOTO_WAJIB, intdiv((int) config('tenaga_kerja.foto.ukuran_maks_kb', 15360), 1024));
     }
 
-    /** Isi file foto yang valid, atau null. */
-    private function fotoDariRequest(Request $request): ?string
+    /**
+     * Aturan validasi file foto (dipakai foto absensi, foto kendaraan, dan foto laporan aktivitas).
+     *
+     * @return list<string>
+     */
+    public static function aturanFoto(): array
     {
         $piksel = (int) config('tenaga_kerja.foto.piksel_maks', 8000);
-        $validator = validator($request->only('foto'), [
-            'foto' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.(int) config('tenaga_kerja.foto.ukuran_maks_kb', 15360),
-                "dimensions:min_width=160,min_height=120,max_width=$piksel,max_height=$piksel"],
-        ]);
+
+        return ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.(int) config('tenaga_kerja.foto.ukuran_maks_kb', 15360),
+            "dimensions:min_width=160,min_height=120,max_width=$piksel,max_height=$piksel"];
+    }
+
+    /** Isi file foto yang valid, atau null. */
+    private function fotoDariRequest(Request $request, string $kolom = 'foto'): ?string
+    {
+        $validator = validator($request->only($kolom), [$kolom => self::aturanFoto()]);
 
         if ($validator->fails()) {
             return null;
         }
 
-        $isi = $request->file('foto')->get();
+        $isi = $request->file($kolom)->get();
 
         return $isi === false || $isi === '' ? null : $isi;
+    }
+
+    /**
+     * Validasi dokumentasi kendaraan Driver.
+     * Check-in: 9 komponen P2H (kondisi wajib, keterangan wajib bila tidak "Baik") + foto kendaraan.
+     * Check-out: kondisi akhir kendaraan (catatan wajib bila tidak "Baik") + foto kendaraan setelah digunakan.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws AbsensiDitolak
+     */
+    private function validasiDokumentasiKendaraan(Request $request, bool $awal): array
+    {
+        $kondisi = Rule::in(LaporanAktivitasService::KONDISI);
+        $aturan = ['foto_kendaraan' => self::aturanFoto()];
+        $pesan = [
+            'foto_kendaraan.required' => $awal ? 'Foto kondisi kendaraan wajib diunggah sebelum check-in.' : 'Foto kondisi kendaraan setelah digunakan wajib diunggah.',
+            'foto_kendaraan.*' => 'Foto kendaraan harus berupa foto JPG, PNG, atau WEBP yang valid (maksimal '.intdiv((int) config('tenaga_kerja.foto.ukuran_maks_kb', 15360), 1024).' MB).',
+        ];
+
+        if ($awal) {
+            $aturan['p2h'] = ['required', 'array'];
+            foreach (LaporanAktivitasService::KOMPONEN_P2H as $kunci => $label) {
+                $aturan["p2h.$kunci.kondisi"] = ['required', $kondisi];
+                $aturan["p2h.$kunci.keterangan"] = ['nullable', 'string', 'max:255', "required_unless:p2h.$kunci.kondisi,Baik"];
+                $pesan["p2h.$kunci.kondisi.required"] = "P2H belum lengkap: pilih kondisi \"$label\".";
+                $pesan["p2h.$kunci.kondisi.in"] = "Kondisi \"$label\" tidak valid.";
+                $pesan["p2h.$kunci.keterangan.required_unless"] = "Isi keterangan untuk \"$label\" karena kondisinya tidak Baik.";
+                $pesan["p2h.$kunci.keterangan.max"] = "Keterangan \"$label\" maksimal 255 karakter.";
+            }
+            $pesan['p2h.required'] = 'Checklist P2H wajib diisi sebelum check-in.';
+        } else {
+            $aturan['kondisi_akhir'] = ['required', $kondisi];
+            $aturan['catatan_akhir'] = ['nullable', 'string', 'max:500', 'required_unless:kondisi_akhir,Baik'];
+            $pesan['kondisi_akhir.required'] = 'Pilih kondisi akhir kendaraan sebelum check-out.';
+            $pesan['kondisi_akhir.in'] = 'Kondisi akhir kendaraan tidak valid.';
+            $pesan['catatan_akhir.required_unless'] = 'Isi catatan kondisi akhir kendaraan karena kondisinya tidak Baik.';
+            $pesan['catatan_akhir.max'] = 'Catatan kondisi akhir maksimal 500 karakter.';
+        }
+
+        $validator = validator($request->all(), $aturan, $pesan);
+
+        if ($validator->fails()) {
+            throw new AbsensiDitolak($validator->errors()->first());
+        }
+
+        return $validator->validated();
+    }
+
+    /**
+     * Hapus foto tambahan yang sudah ditulis bila transaksi absensi gagal.
+     *
+     * @param  list<string>  $paths
+     */
+    private function hapusFotoTambahan(FotoAbsensiService $fotoService, array $paths): void
+    {
+        foreach ($paths as $path) {
+            $fotoService->hapus($path);
+        }
     }
 
     /**
@@ -449,7 +653,9 @@ class TenagaKerjaController extends Controller
         $abaikan = array_merge(
             config('tenaga_kerja.kolom_tersembunyi'),
             array_filter([$kolom['bulan'], $kolom['tahun'], $kolom['periode'], $kolom['total']]),
-            (array) config('tenaga_kerja.kolom.id_karyawan')
+            (array) config('tenaga_kerja.kolom.id_karyawan'),
+            // bpjs_nilai bisa berupa persen; ditampilkan sebagai satu baris "Aturan BPJS" di bawah, bukan sebagai rupiah.
+            ['bpjs_metode', 'bpjs_nilai']
         );
 
         $hasil = ['penghasilan' => [], 'potongan' => [], 'info' => [], 'total' => null];
@@ -465,6 +671,11 @@ class TenagaKerjaController extends Controller
             } else {
                 $hasil['info'][] = $item;
             }
+        }
+
+        if (($slip->bpjs_metode ?? null) !== null) {
+            $aturan = LabelBpjs::aturan($slip->bpjs_metode, $slip->bpjs_nilai ?? null);
+            $hasil['info'][] = ['label' => 'Aturan BPJS', 'nilai' => $aturan, 'kolom' => 'bpjs_metode', 'mentah' => $aturan];
         }
 
         if ($kolom['total']) {

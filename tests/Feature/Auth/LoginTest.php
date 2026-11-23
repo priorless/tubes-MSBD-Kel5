@@ -19,6 +19,14 @@ class LoginTest extends TestCase
         $this->get('/login')->assertOk()->assertSee('Masuk');
     }
 
+    public function test_login_page_links_back_to_landing_page(): void
+    {
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('href="'.route('landing').'"', false)
+            ->assertSeeText('Kembali ke Beranda');
+    }
+
     public function test_ceo_is_redirected_to_ceo_dashboard_after_login(): void
     {
         $user = User::factory()->withRole(Role::Ceo)->create(['username' => 'direktur']);
@@ -53,7 +61,7 @@ class LoginTest extends TestCase
     {
         return [
             'HRD' => [Role::Hrd, 'hrd.dashboard'],
-            'Operasional' => [Role::Operasional, 'operasional.monitoring'],
+            'Operasional' => [Role::Operasional, 'operasional.beranda'],
             'Keuangan' => [Role::Keuangan, 'keuangan.payroll.index'],
         ];
     }

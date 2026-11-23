@@ -29,6 +29,7 @@ class FormatKolom
         'tgl_lahir' => 'Tanggal Lahir', 'tgl_masuk' => 'Tanggal Masuk', 'email' => 'Email',
         'jam_masuk' => 'Jam Masuk', 'jam_keluar' => 'Jam Keluar', 'thr' => 'THR',
         'nip' => 'NIP', 'no_ktp' => 'No. KTP',
+        'potongan_bpjs' => 'Potongan BPJS', 'nama_klien_bpjs' => 'Klien BPJS',
         'total_baris' => 'Hari Tercatat', 'total_jam_lembur' => 'Indikasi Lembur (Jam)',
         'hari_tidak_hadir' => 'Hari Tidak Hadir', 'total_menit_terlambat' => 'Total Menit Terlambat',
     ];

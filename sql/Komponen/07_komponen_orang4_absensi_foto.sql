@@ -43,8 +43,8 @@ ALTER TABLE tbl_absensi
   ADD COLUMN foto_keluar VARCHAR(255) NULL;
 
 ALTER TABLE tbl_klien
-  DROP CHECK chk_klien_koordinat,
-  DROP CHECK chk_klien_radius,
+  DROP CONSTRAINT chk_klien_koordinat,
+  DROP CONSTRAINT chk_klien_radius,
   DROP COLUMN latitude, DROP COLUMN longitude, DROP COLUMN radius_meter;
 
 ALTER TABLE tbl_jenis_layanan

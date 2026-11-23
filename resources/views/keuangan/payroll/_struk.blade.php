@@ -1,21 +1,22 @@
 @php
     use Illuminate\Support\Carbon;
 
-    $sudahDibayar = $payroll->status_bayar === 'Sudah Dibayar';
+    $sudahDibayar = $payroll->status_bayar === 'Sudah Lunas';
     $rupiah = fn ($nilai): string => 'Rp '.number_format((float) $nilai, 0, ',', '.');
+    $pph21 = (float) ($payroll->pph21 ?? 0);
     $tanggalIndonesia = fn ($tanggal): string => Carbon::parse($tanggal)->locale('id')->translatedFormat('d F Y');
 @endphp
-<article class="struk-dokumen overflow-hidden rounded-lg bg-white text-gray-800" data-judul="Slip Gaji {{ $payroll->nama }} - {{ $labelPeriode }}">
+<article class="struk-dokumen overflow-hidden rounded-lg bg-white text-gray-800" data-judul="Rincian Gaji {{ $payroll->nama }} - {{ $labelPeriode }}">
     <div class="flex flex-wrap items-center justify-between gap-6 bg-sji-biru-tua px-8 py-6 text-white">
         <div class="flex items-center gap-4">
             <img src="{{ asset('images/logo-sji.png') }}" alt="Logo PT Satu Jaya Indonesia" class="size-16 rounded-md bg-white object-contain p-1.5">
             <div>
                 <p class="text-xl font-bold tracking-wide">PT SATU JAYA INDONESIA</p>
-                <p class="text-sm text-blue-200">Slip pembayaran gaji karyawan</p>
+                <p class="text-sm text-blue-200">Rincian gaji karyawan</p>
             </div>
         </div>
         <div class="text-right">
-            <p class="text-2xl font-extrabold tracking-widest text-sji-emas">SLIP GAJI</p>
+            <p class="text-2xl font-extrabold tracking-widest text-sji-emas">RINCIAN GAJI</p>
             <p class="mt-1 text-sm text-blue-100">Periode {{ $labelPeriode }}</p>
         </div>
     </div>
@@ -29,7 +30,8 @@
             <p class="text-xs font-semibold tracking-widest text-gray-400 uppercase">Karyawan</p>
             <p class="mt-2 text-lg font-bold text-gray-900">{{ $payroll->nama }}</p>
             <p class="mt-1 font-mono text-sm text-gray-600">NIP {{ $payroll->nip }}</p>
-            <p class="text-sm text-gray-600">{{ $payroll->kategori }}</p>
+            <p class="text-sm text-gray-600">{{ $payroll->kategori }}@if (filled($payroll->jenis_pekerjaan ?? null)) &middot; {{ $payroll->jenis_pekerjaan }}@endif</p>
+            <p class="text-sm text-gray-600">Status PTKP {{ $payroll->status_ptkp ?? 'TK/0' }}</p>
         </div>
         <dl class="space-y-2 text-sm sm:justify-self-end sm:text-right">
             <div class="flex justify-between gap-6 sm:block">
@@ -40,7 +42,7 @@
                 <dt class="text-xs font-semibold tracking-widest text-gray-400 uppercase">Status</dt>
                 <dd class="mt-1">
                     @if ($sudahDibayar)
-                        <span class="inline-flex rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold tracking-wider text-white">SUDAH DIBAYAR</span>
+                        <span class="inline-flex rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold tracking-wider text-white">SUDAH LUNAS</span>
                     @else
                         <span class="inline-flex rounded-full bg-orange-500 px-3 py-1 text-xs font-bold tracking-wider text-white">BELUM DIBAYAR</span>
                     @endif
@@ -81,17 +83,45 @@
                         <td class="px-4 py-3 text-right tabular-nums">{{ $rupiah($payroll->gaji_pokok) }}</td>
                     </tr>
                     <tr>
-                        <td class="px-4 py-3 text-gray-700">Lembur</td>
+                        <td class="px-4 py-3 text-gray-700">Tunjangan</td>
+                        <td class="px-4 py-3 text-right tabular-nums">{{ $rupiah($payroll->komponen_tunjangan) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-4 py-3 text-gray-700">Upah Back-up</td>
+                        <td class="px-4 py-3 text-right tabular-nums">{{ $rupiah($payroll->upah_backup ?? 0) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-4 py-3 text-gray-700">Upah Lembur</td>
                         <td class="px-4 py-3 text-right tabular-nums">{{ $rupiah($payroll->total_lembur) }}</td>
                     </tr>
                     <tr>
                         <td class="px-4 py-3 text-red-600">Potongan Absensi</td>
                         <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_absen) }}</td>
                     </tr>
+                    <tr>
+                        <td class="px-4 py-3 text-red-600">
+                            Potongan BPJS
+                            @if (($payroll->bpjs_metode ?? null) !== null)
+                                <span class="block text-xs text-gray-500">{{ \App\Support\LabelBpjs::aturan($payroll->bpjs_metode, $payroll->bpjs_nilai) }}@if (filled($payroll->nama_klien_bpjs ?? null)) &middot; klien {{ $payroll->nama_klien_bpjs }}@endif</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_bpjs ?? 0) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="px-4 py-3 text-red-600">Potongan Pinjaman / Koperasi</td>
+                        <td class="px-4 py-3 text-right text-red-600 tabular-nums">&minus; {{ $rupiah($payroll->potongan_pinjaman) }}</td>
+                    </tr>
+                    <tr>
+                        <td @class(['px-4 py-3', 'text-red-600' => $pph21 >= 0, 'text-emerald-700' => $pph21 < 0])>
+                            PPh 21
+                            <span class="block text-xs text-gray-500">{{ $pph21 < 0 ? 'Lebih bayar PPh 21 setahun, dikembalikan' : 'PTKP '.($payroll->status_ptkp ?? 'TK/0') }}</span>
+                        </td>
+                        <td @class(['px-4 py-3 text-right tabular-nums', 'text-red-600' => $pph21 >= 0, 'text-emerald-700' => $pph21 < 0])>{{ $pph21 < 0 ? '+' : '−' }} {{ $rupiah(abs($pph21)) }}</td>
+                    </tr>
                 </tbody>
                 <tfoot class="border-t-2 border-gray-200 bg-gray-50">
                     <tr>
-                        <th class="px-4 py-4 text-left font-semibold text-gray-800">Total Gaji</th>
+                        <th class="px-4 py-4 text-left font-semibold text-gray-800">Total Gaji Bersih</th>
                         <td class="px-4 py-4 text-right text-lg font-extrabold text-sji-biru-tua tabular-nums">{{ $rupiah($payroll->total_gaji) }}</td>
                     </tr>
                 </tfoot>
@@ -100,7 +130,6 @@
     </section>
 
     <footer class="mt-6 border-t border-gray-200 bg-gray-50 px-8 py-5 text-center">
-        <p class="text-sm font-semibold text-sji-biru-tua">Slip gaji ini diterbitkan secara elektronik oleh sistem informasi PT Satu Jaya Indonesia.</p>
-        <p class="mt-1 text-xs text-gray-500">Dicetak {{ now()->locale('id')->translatedFormat('d F Y, H:i') }}</p>
+        <p class="text-sm font-semibold text-sji-biru-tua">Rincian gaji ini bersumber dari data payroll yang tersimpan di sistem informasi PT Satu Jaya Indonesia.</p>
     </footer>
 </article>

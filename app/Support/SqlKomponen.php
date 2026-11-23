@@ -52,8 +52,10 @@ class SqlKomponen
 
     /**
      * Pasang ulang role & GRANT dari file 10. Tidak menggagalkan migrasi bila user database tidak punya hak GRANT.
+     *
+     * @param bool $tundaGrantInputKetidakhadiran Lewati grant procedure sampai procedure tersedia.
      */
-    public static function pasangHakAkses(): void
+    public static function pasangHakAkses(bool $tundaGrantInputKetidakhadiran = false): void
     {
         $isi = preg_replace('/^\s*--.*$/m', '', file_get_contents(base_path(self::FILE_HAK_AKSES)));
         $pernyataan = array_values(array_filter(
@@ -62,6 +64,11 @@ class SqlKomponen
         ));
 
         foreach ($pernyataan as $sql) {
+            if ($tundaGrantInputKetidakhadiran
+                && str_starts_with(strtoupper($sql), 'GRANT EXECUTE ON PROCEDURE SP_INPUT_KETIDAKHADIRAN ')) {
+                continue;
+            }
+
             try {
                 DB::unprepared($sql);
             } catch (QueryException $exception) {

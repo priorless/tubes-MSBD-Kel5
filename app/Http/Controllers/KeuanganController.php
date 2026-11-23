@@ -2,16 +2,26 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Keuangan\KirimInvoiceEmailRequest;
+use App\Http\Requests\Keuangan\UpdateInvoiceDokumenRequest;
+use App\Mail\InvoiceKlienMail;
+use App\Services\InvoiceKlienService;
+use App\Support\DokumenInvoiceDitolak;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as DokumenPdf;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
+use Throwable;
 
 /**
- * Modul Keuangan: seluruh logika bisnis (perhitungan payroll, invoice,
- * pencatatan mutasi kas) berada di database. Controller ini hanya
- * memanggil stored procedure dan membaca view/tabel.
+ * Modul Keuangan: seluruh logika bisnis (perhitungan payroll dan invoice)
+ * berada di database. Controller ini hanya memanggil stored procedure dan membaca view/tabel.
  */
 class KeuanganController extends Controller
 {
@@ -44,10 +54,21 @@ class KeuanganController extends Controller
         ]);
     }
 
-    public function generatePayroll(): RedirectResponse
+    /**
+     * Generate payroll untuk periode yang dipilih. Seluruh perhitungan ada di sp_generate_payroll_bulanan
+     * (sql/Komponen/16): karyawan yang sudah punya payroll periode itu dilewati tanpa ditimpa, dan
+     * unique key (id_karyawan, periode) mencegah payroll ganda walau tombol diklik berulang.
+     */
+    public function generatePayroll(Request $request): RedirectResponse
     {
-        $bulan = now()->month;
-        $tahun = now()->year;
+        $validated = $request->validate([
+            'bulan' => ['required', 'integer', 'between:1,12'],
+            'tahun' => ['required', 'integer', 'between:2000,2100'],
+        ], $this->pesanValidasi());
+
+        $bulan = (int) $validated['bulan'];
+        $tahun = (int) $validated['tahun'];
+        $sudahAda = $this->jumlahPayroll($bulan, $tahun);
 
         $gagal = $this->jalankanProsedur('CALL sp_generate_payroll_bulanan(?, ?)', [$bulan, $tahun]);
 
@@ -55,11 +76,20 @@ class KeuanganController extends Controller
             return $gagal;
         }
 
+        $dibuat = $this->jumlahPayroll($bulan, $tahun) - $sudahAda;
+
         return redirect()
             ->route('keuangan.payroll.index', ['bulan' => $bulan, 'tahun' => $tahun])
-            ->with('success', 'Payroll periode '.self::DAFTAR_BULAN[$bulan].' '.$tahun.' berhasil di-generate.');
+            ->with('success', sprintf(
+                'Generate payroll %s %d selesai: %d payroll baru dibuat, %d dilewati karena sudah ada.',
+                self::DAFTAR_BULAN[$bulan], $tahun, $dibuat, $sudahAda,
+            ));
     }
 
+    /**
+     * Pencairan: status 'Belum Dibayar' -> 'Sudah Lunas' + tanggal hari ini (sp_update_status_bayar).
+     * Pencairan kedua ditolak database. Tidak ada pencatatan Mutasi Kas.
+     */
     public function tandaiPayrollCair(int $id): RedirectResponse
     {
         abort_unless(DB::table('tbl_payroll')->where('id', $id)->exists(), 404);
@@ -70,9 +100,13 @@ class KeuanganController extends Controller
             now()->toDateString(),
         ]);
 
-        return $gagal ?? back()->with('success', 'Status payroll berhasil ditandai cair.');
+        return $gagal ?? back()->with('success', 'Gaji berhasil dicairkan. Status payroll: Sudah Lunas.');
     }
 
+    /**
+     * Rincian gaji (hanya dilihat, tidak dicetak) dari data payroll tersimpan (v_slip_gaji_detail), tanpa hitung ulang.
+     * AJAX -> HTML untuk modal; selain itu kembali ke halaman payroll dengan modal terbuka.
+     */
     public function strukPayroll(Request $request, int $id): View|RedirectResponse
     {
         if (! $request->ajax()) {
@@ -86,17 +120,27 @@ class KeuanganController extends Controller
                 'nip',
                 'nama',
                 'kategori',
+                'jenis_pekerjaan',
+                'status_ptkp',
                 'periode_bulan',
                 'periode_tahun',
                 'gaji_pokok',
+                'komponen_tunjangan',
+                'upah_backup',
                 'total_lembur',
                 'potongan_absen',
+                'potongan_bpjs',
+                'potongan_pinjaman',
+                'pph21',
                 'total_gaji',
                 'status_bayar',
                 'tgl_bayar',
                 'hari_wajib',
                 'hari_masuk',
                 'hari_absen',
+                'bpjs_metode',
+                'bpjs_nilai',
+                'nama_klien_bpjs',
             ]);
 
         abort_if($payroll === null, 404);
@@ -107,7 +151,12 @@ class KeuanganController extends Controller
         ]);
     }
 
-    public function invoice(): View
+    private function jumlahPayroll(int $bulan, int $tahun): int
+    {
+        return DB::table('tbl_payroll')->where('periode_bulan', $bulan)->where('periode_tahun', $tahun)->count();
+    }
+
+    public function invoice(InvoiceKlienService $layanan): View
     {
         return view('keuangan.invoice.index', [
             'invoice' => DB::table('tbl_invoice as i')
@@ -121,20 +170,35 @@ class KeuanganController extends Controller
                     'i.periode_bulan',
                     'i.periode_tahun',
                     'i.jumlah_tenaga',
+                    'i.sub_total',
+                    'i.persen_fee',
+                    'i.management_fee',
+                    'i.ppn',
                     'i.total_tagihan',
                     'i.status',
                     'i.tgl_pembayaran',
                     'k.kode_klien',
                     'k.nama_perusahaan',
+                    'k.pic_nama',
+                    'k.pic_email',
+                    'k.pic_telp',
                 ])
-                ->paginate(15),
+                ->paginate(15)
+                // Isian awal form "Kirim via Email" (subjek & pesan bawaan, dapat diedit sebelum dikirim) dan
+                // tautan "Kirim via WhatsApp" (hanya untuk invoice yang punya PDF tagihan).
+                ->through(fn (object $item): object => (object) [
+                    ...(array) $item,
+                    'email' => $layanan->templateEmail($item),
+                    'whatsapp' => (float) $item->sub_total > 0 ? $layanan->tautanWhatsApp($item) : null,
+                ]),
             'invoiceBaru' => session()->has('invoice_baru')
                 ? DB::table('tbl_invoice')->where('id', session('invoice_baru'))->first(['id', 'nomor_invoice'])
                 : null,
             'klien' => DB::table('tbl_klien')
                 ->where('status', 'Aktif')
                 ->orderBy('nama_perusahaan')
-                ->get(['id', 'kode_klien', 'nama_perusahaan']),
+                // Management fee ditampilkan (tidak dapat diubah; diatur Operasional) saat Keuangan memilih klien.
+                ->get(['id', 'kode_klien', 'nama_perusahaan', 'management_fee']),
             'daftarBulan' => self::DAFTAR_BULAN,
             'bulanIni' => now()->month,
             'tahunIni' => now()->year,
@@ -172,45 +236,130 @@ class KeuanganController extends Controller
     }
 
     /**
-     * Isi struk invoice digital untuk modal di halaman Invoice. Data dan
-     * status selalu dibaca langsung dari tbl_invoice sehingga mengikuti
-     * kondisi terbaru. Akses langsung (bukan fetch) diarahkan ke halaman
-     * Invoice yang akan membuka modal struk tersebut.
+     * Invoice digital untuk modal (AJAX), atau dokumen PDF tagihan klien (?format=pdf): surat permohonan,
+     * invoice, dan lampiran daftar gaji. Semua nominal dibaca dari tbl_invoice & tbl_invoice_detail (tanpa hitung ulang).
+     * Akses langsung lain diarahkan ke halaman Invoice yang membuka modal tersebut.
      */
-    public function strukInvoice(Request $request, int $id): View|RedirectResponse
+    public function strukInvoice(Request $request, int $id, InvoiceKlienService $layanan): View|RedirectResponse|Response
     {
-        if (! $request->ajax()) {
+        $unduhPdf = $request->query('format') === 'pdf';
+
+        if (! $unduhPdf && ! $request->ajax()) {
             return redirect()->route('keuangan.invoice.index', ['struk' => $id]);
         }
 
-        $invoice = DB::table('tbl_invoice as i')
-            ->join('tbl_klien as k', 'k.id', '=', 'i.id_klien')
-            ->where('i.id', $id)
-            ->first([
-                'i.id',
-                'i.nomor_invoice',
-                'i.periode_bulan',
-                'i.periode_tahun',
-                'i.jumlah_tenaga',
-                'i.total_tagihan',
-                'i.status',
-                'i.tgl_pembayaran',
-                'i.created_at',
-                'k.kode_klien',
-                'k.nama_perusahaan',
-                'k.alamat',
-                'k.pic_nama',
-                'k.pic_jabatan',
-                'k.pic_telp',
-                'k.pic_email',
+        $dokumen = $layanan->dokumen($id);
+        abort_if($dokumen === null, 404);
+
+        if (! $unduhPdf) {
+            return view('keuangan.invoice._struk', $dokumen);
+        }
+
+        if (! $dokumen['punyaRincian']) {
+            return redirect()->route('keuangan.invoice.index')
+                ->with('error', 'Invoice '.$dokumen['invoice']->nomor_invoice.' dibuat sebelum invoice dihitung dari payroll, sehingga belum memiliki lampiran rincian gaji.');
+        }
+
+        return $this->pdfTagihan($dokumen)->stream($this->namaFilePdfTagihan($dokumen['invoice']));
+    }
+
+    /**
+     * Kirim dokumen tagihan (PDF yang sama dengan "Unduh PDF Tagihan") ke email klien.
+     * Data invoice, nominal, dan PDF dibaca dari database berdasarkan {id}; form hanya berisi alamat, subjek, dan pesan.
+     */
+    public function kirimInvoiceEmail(KirimInvoiceEmailRequest $request, int $id, InvoiceKlienService $layanan): RedirectResponse
+    {
+        $dokumen = $layanan->dokumen($id);
+        abort_if($dokumen === null, 404);
+        $invoice = $dokumen['invoice'];
+
+        if (! $dokumen['punyaRincian']) {
+            return redirect()->route('keuangan.invoice.index')
+                ->with('error', 'Invoice '.$invoice->nomor_invoice.' belum memiliki lampiran rincian gaji sehingga tidak dapat dikirim via email.');
+        }
+
+        $data = $request->validated();
+        $email = new InvoiceKlienMail(
+            subjek: $data['subjek'],
+            pesan: $data['pesan'],
+            nomorInvoice: $invoice->nomor_invoice,
+            namaFilePdf: $this->namaFilePdfTagihan($invoice),
+            isiPdf: $this->pdfTagihan($dokumen)->output(),
+        );
+
+        try {
+            Mail::to($data['email_tujuan'])->cc($data['daftar_cc'] ?? [])->send($email);
+        } catch (Throwable $exception) {
+            // Detail SMTP hanya dicatat di log server, tidak ditampilkan ke pengguna.
+            Log::error('Gagal mengirim invoice via email.', [
+                'id_invoice' => $invoice->id,
+                'nomor_invoice' => $invoice->nomor_invoice,
+                'id_user' => $request->user()->getAuthIdentifier(),
+                'galat' => $exception::class.': '.$exception->getMessage(),
             ]);
 
-        abort_if($invoice === null, 404);
+            return redirect()->route('keuangan.invoice.index')->withInput()
+                ->with('error', 'Invoice '.$invoice->nomor_invoice.' gagal dikirim via email. Silakan coba lagi atau hubungi admin sistem untuk memeriksa pengaturan email.');
+        }
 
-        return view('keuangan.invoice._struk', [
-            'invoice' => $invoice,
-            'labelPeriode' => (self::DAFTAR_BULAN[(int) $invoice->periode_bulan] ?? $invoice->periode_bulan).' '.$invoice->periode_tahun,
+        Log::info('Invoice dikirim via email.', [
+            'id_invoice' => $invoice->id,
+            'nomor_invoice' => $invoice->nomor_invoice,
+            'id_user' => $request->user()->getAuthIdentifier(),
+            'jumlah_penerima' => 1 + count($data['daftar_cc'] ?? []),
         ]);
+
+        return redirect()->route('keuangan.invoice.index')
+            ->with('success', 'Invoice '.$invoice->nomor_invoice.' berhasil dikirim ke '.$data['email_tujuan']
+                .(($data['daftar_cc'] ?? []) !== [] ? ' (CC '.count($data['daftar_cc']).' alamat)' : '').'.');
+    }
+
+    /**
+     * PDF tagihan untuk penerima tautan WhatsApp (tanpa login). Hanya dapat diakses lewat signed URL yang dibuat
+     * InvoiceKlienService::tautanWhatsApp() untuk invoice {id}; tanda tangan tidak valid/kedaluwarsa ditolak middleware
+     * "signed" (403). Tidak membuka daftar invoice maupun data klien lain.
+     */
+    public function pdfInvoicePublik(int $id, InvoiceKlienService $layanan): Response
+    {
+        $dokumen = $layanan->dokumen($id);
+        abort_if($dokumen === null || ! $dokumen['punyaRincian'], 404);
+
+        return $this->pdfTagihan($dokumen)->stream($this->namaFilePdfTagihan($dokumen['invoice']));
+    }
+
+    /**
+     * PDF tagihan klien (surat permohonan, invoice, lampiran) dari data InvoiceKlienService::dokumen().
+     *
+     * @param  array<string, mixed>  $dokumen
+     */
+    private function pdfTagihan(array $dokumen): DokumenPdf
+    {
+        return Pdf::loadView('keuangan.invoice.pdf', $dokumen)
+            ->setPaper('a4')
+            ->setOption('defaultFont', 'DejaVu Sans');
+    }
+
+    private function namaFilePdfTagihan(object $invoice): string
+    {
+        return sprintf('tagihan-%s.pdf', $invoice->nomor_invoice);
+    }
+
+    /**
+     * Simpan mode edit dokumen tagihan (teks surat & catatan manual) untuk invoice {id} saja.
+     * Nominal tidak diterima dari form; versi mencegah simpanan bersamaan saling menimpa.
+     */
+    public function simpanDokumenInvoice(UpdateInvoiceDokumenRequest $request, int $id, InvoiceKlienService $layanan): RedirectResponse
+    {
+        abort_unless(DB::table('tbl_invoice')->where('id', $id)->exists(), 404);
+
+        try {
+            $berubah = $layanan->simpanDokumen($id, $request->validated(), (int) $request->user()->getAuthIdentifier());
+        } catch (DokumenInvoiceDitolak $exception) {
+            return redirect()->route('keuangan.invoice.index')->with('error', $exception->getMessage());
+        }
+
+        return redirect()->route('keuangan.invoice.index', ['struk' => $id])
+            ->with('success', $berubah ? 'Perubahan dokumen invoice berhasil disimpan.' : 'Tidak ada perubahan pada dokumen invoice.');
     }
 
     public function tandaiInvoiceLunas(Request $request, int $id): RedirectResponse
@@ -228,33 +377,6 @@ class KeuanganController extends Controller
         ]);
 
         return $gagal ?? back()->with('success', 'Invoice berhasil ditandai lunas.');
-    }
-
-    public function mutasi(Request $request): View
-    {
-        $periode = $this->periodeDariRequest($request);
-        $jenis = in_array($request->query('jenis'), ['Pemasukan', 'Pengeluaran'], true)
-            ? $request->query('jenis')
-            : null;
-
-        return view('keuangan.mutasi.index', [
-            'mutasi' => DB::table('tbl_mutasi_keuangan')
-                ->whereMonth('tgl_mutasi', $periode['bulan'])
-                ->whereYear('tgl_mutasi', $periode['tahun'])
-                ->when($jenis, fn ($query, string $jenis) => $query->where('jenis', $jenis))
-                ->orderByDesc('tgl_mutasi')
-                ->orderByDesc('id')
-                ->paginate(20)
-                ->withQueryString(),
-            'ringkasan' => DB::table('v_arus_kas_bulanan')
-                ->where('bulan', $periode['bulan'])
-                ->where('tahun', $periode['tahun'])
-                ->first(),
-            'bulan' => $periode['bulan'],
-            'tahun' => $periode['tahun'],
-            'jenis' => $jenis,
-            'daftarBulan' => self::DAFTAR_BULAN,
-        ]);
     }
 
     /**

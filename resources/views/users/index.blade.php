@@ -3,16 +3,14 @@
 @section('title', 'Manajemen User')
 
 @section('content')
-    <div class="card">
-        <div class="card-header">
-            <div>
-                <h2 class="card-title">Akun Staff Internal</h2>
-                <p class="text-sm text-gray-500">Akun karyawan lapangan dibuat otomatis oleh sistem dan tidak tampil di sini.</p>
-            </div>
-            @can('create', \App\Models\User::class)
-                <a href="{{ route('users.create') }}" class="btn-primary">+ Tambah User</a>
-            @endcan
-        </div>
+    <x-ui.page-header title="Akun Staff Internal"
+        description="Akun karyawan lapangan dibuat otomatis oleh sistem dan tidak tampil di sini.">
+        @can('create', \App\Models\User::class)
+            <a href="{{ route('users.create') }}" class="btn-primary">+ Tambah User</a>
+        @endcan
+    </x-ui.page-header>
+
+    <div class="card overflow-hidden">
 
         <form method="GET" action="{{ route('users.index') }}" class="grid grid-cols-1 gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4 md:grid-cols-12">
             <input type="search" name="cari" value="{{ $filters['cari'] ?? '' }}" class="form-input md:col-span-5" placeholder="Cari nama atau username..." aria-label="Cari">

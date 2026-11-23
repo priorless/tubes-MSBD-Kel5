@@ -73,9 +73,6 @@ class DatabaseService
     }
 
     /**
-     * Function fn_sisa_hari_dokumen: sisa hari sebelum dokumen kadaluarsa (minimal 0).
-     */
-    /**
      * Procedure sp_input_ketidakhadiran: HRD mencatat Izin/Sakit/Alpha.
      *
      * @throws QueryException SQLSTATE 45000 jika status/tanggal tidak valid, karyawan Nonaktif,
@@ -96,6 +93,9 @@ class DatabaseService
         DB::statement('CALL sp_putuskan_lembur(?, ?)', [$idAbsensi, $keputusan]);
     }
 
+    /**
+     * Function fn_sisa_hari_dokumen: sisa hari sebelum dokumen kadaluarsa (minimal 0).
+     */
     public static function getSisaHariDokumen(string $tglKadaluarsa): int
     {
         $result = DB::selectOne('SELECT fn_sisa_hari_dokumen(?) AS sisa_hari', [$tglKadaluarsa]);
@@ -131,22 +131,25 @@ class DatabaseService
     }
 
     /**
-     * Procedure sp_rotasi_karyawan (7 parameter, sama dengan OperasionalController::storeRotasi).
+     * Procedure sp_rotasi_karyawan (8 parameter).
+     * Tanggal selesai baru null berarti kontrak baru tidak memiliki batas akhir.
      * Jam datang/pulang null = tetap memakai jadwal penempatan lama.
      *
-     * @throws QueryException SQLSTATE 45000 jika penempatan lama tidak ada/bukan Aktif atau klien baru Nonaktif.
+     * @throws QueryException SQLSTATE 45000 jika data rotasi tidak memenuhi aturan database.
      */
     public static function callRotasiKaryawan(
         int $idPenempatanLama,
         int $idKlienBaru,
         string $tglMulaiBaru,
+        ?string $tglSelesaiBaru,
         string $lokasiBaru,
         ?string $jamDatangBaru,
         ?string $jamPulangBaru,
         int $idUserPembuat,
     ): void {
-        DB::statement('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?, ?, ?)', [
-            $idPenempatanLama, $idKlienBaru, $tglMulaiBaru, $lokasiBaru, $jamDatangBaru, $jamPulangBaru, $idUserPembuat,
+        DB::statement('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?, ?, ?, ?)', [
+            $idPenempatanLama, $idKlienBaru, $tglMulaiBaru, $tglSelesaiBaru, $lokasiBaru,
+            $jamDatangBaru, $jamPulangBaru, $idUserPembuat,
         ]);
     }
 

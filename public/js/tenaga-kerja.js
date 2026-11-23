@@ -345,6 +345,8 @@
                 e.preventDefault();
                 const tombol = $('button[type="submit"]', form);
                 if (tombol.classList.contains('memuat')) return;
+                // Isian tambahan (P2H & foto kendaraan Driver) terhubung lewat atribut form=; server tetap memvalidasi ulang.
+                if (!form.reportValidity()) return;
                 if (form.dataset.konfirmasi && !window.confirm(form.dataset.konfirmasi)) return;
 
                 tombol.classList.add('memuat');
@@ -389,6 +391,8 @@
                     TK.toast(data.ok ? 'sukses' : 'gagal', data.pesan || (data.ok ? 'Berhasil.' : 'Terjadi kesalahan. Silakan coba lagi.'), data.ok ? 6000 : 5000);
                     if (data.ok) konfeti(tombol);
                     gantiStatus(data);
+                    // Halaman dengan monitoring/P2H dimuat ulang agar periode & formulir laporan sesuai sesi baru.
+                    if (data.ok && kartu.dataset.muatUlang) setTimeout(() => location.reload(), 1800);
                 } catch (_) {
                     await minimal;
                     TK.toast('gagal', 'Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.');
@@ -398,6 +402,73 @@
                 }
             });
         });
+    }
+
+    /* ------------------------------------------------------------------
+     * 6b. Pratinjau foto sebelum diunggah (laporan aktivitas, foto kendaraan)
+     * ------------------------------------------------------------------ */
+    $$('input[type="file"][data-tk-pratinjau]').forEach((input) => {
+        const gambar = document.getElementById(input.dataset.tkPratinjau);
+        const wadah = document.getElementById(input.dataset.tkPratinjau + 'Wadah');
+        const status = document.getElementById(input.id + 'Status');
+        const teksAwal = status?.textContent ?? '';
+        const maksKb = Number(input.dataset.ukuranMaksKb) || 15360;
+        let url = null;
+
+        input.addEventListener('change', () => {
+            if (url) URL.revokeObjectURL(url);
+            url = null;
+            input.setCustomValidity('');
+            wadah?.classList.add('hidden');
+            status?.classList.remove('text-red-600');
+            if (status) status.textContent = teksAwal;
+
+            const berkas = input.files?.[0];
+            if (!berkas) return;
+            let galat = '';
+            if (!TIPE_FOTO.includes(berkas.type)) galat = 'Format file tidak didukung. Pilih foto JPG, PNG, atau WEBP.';
+            else if (berkas.size > maksKb * 1024) galat = 'Ukuran foto melebihi ' + Math.floor(maksKb / 1024) + ' MB. Pilih foto lain.';
+            if (galat) {
+                input.setCustomValidity(galat);
+                if (status) { status.textContent = galat; status.classList.add('text-red-600'); }
+                return;
+            }
+            url = URL.createObjectURL(berkas);
+            if (gambar) gambar.src = url;
+            wadah?.classList.remove('hidden');
+        });
+    });
+
+    /* ------------------------------------------------------------------
+     * 6c. P2H: progres pemeriksaan & keterangan wajib bila kondisi tidak "Baik"
+     * ------------------------------------------------------------------ */
+    const progresP2h = $('#tkP2hProgres');
+    if (progresP2h) {
+        const item = $$('[data-p2h-item]');
+        const perbaruiP2h = () => {
+            let selesai = 0;
+            item.forEach((fs) => {
+                const dipilih = $('[data-p2h-kondisi]:checked', fs);
+                const keterangan = $('[data-p2h-keterangan]', fs);
+                if (dipilih) selesai++;
+                if (keterangan) keterangan.required = !!dipilih && dipilih.value !== 'Baik';
+            });
+            progresP2h.textContent = selesai + '/' + progresP2h.dataset.total + ' diperiksa';
+            progresP2h.classList.toggle('badge-success', selesai === item.length);
+            progresP2h.classList.toggle('badge-warning', selesai !== item.length);
+        };
+        item.forEach((fs) => fs.addEventListener('change', perbaruiP2h));
+        perbaruiP2h();
+    }
+
+    /* ------------------------------------------------------------------
+     * 6d. Muat ulang otomatis saat periode monitoring / jendela check-in berganti (waktu server)
+     * ------------------------------------------------------------------ */
+    const muatUlang = $('[data-tk-muat-ulang-pada]');
+    const batasMuatUlang = muatUlang ? parseWaktu(muatUlang.dataset.tkMuatUlangPada) : null;
+    if (batasMuatUlang) {
+        const tunda = batasMuatUlang.getTime() - sekarang().getTime() + 2000;
+        if (tunda > 0 && tunda < 6 * 3600 * 1000) setTimeout(() => location.reload(), tunda);
     }
 
     /* ------------------------------------------------------------------

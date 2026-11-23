@@ -17,6 +17,8 @@
 @endphp
 
 @section('content')
+<x-ui.page-header title="Riwayat Absensi" description="Rekap kehadiran dan catatan check-in / check-out Anda per periode." />
+
 {{-- ===================== Ringkasan ===================== --}}
 <div class="mb-6 grid grid-cols-2 gap-6 lg:grid-cols-4">
     @foreach ($kartuRekap as $kunci => $kartu)
@@ -155,6 +157,8 @@
                                 <td class="whitespace-nowrap">
                                     @if ($hari->jadwal_datang || $hari->jadwal_pulang)
                                         <span class="font-mono">{{ FormatKolom::jam($hari->jadwal_datang) }}&ndash;{{ FormatKolom::jam($hari->jadwal_pulang) }}</span>
+                                    @elseif (($hari->sumber_jadwal ?? null) === 'Libur')
+                                        <span class="tk-badge-netral">Libur</span>
                                     @else
                                         <span class="text-xs text-gray-500">Jadwal belum ditentukan</span>
                                     @endif
