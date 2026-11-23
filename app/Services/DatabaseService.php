@@ -84,16 +84,6 @@ class DatabaseService
     }
 
     /**
-     * Procedure sp_putuskan_lembur: HRD menyetujui ('Disetujui') atau menolak ('Ditolak') lembur Menunggu.
-     *
-     * @throws QueryException SQLSTATE 45000 jika keputusan tidak valid, absensi tidak ada, atau lembur bukan Menunggu.
-     */
-    public static function callPutuskanLembur(int $idAbsensi, string $keputusan): void
-    {
-        DB::statement('CALL sp_putuskan_lembur(?, ?)', [$idAbsensi, $keputusan]);
-    }
-
-    /**
      * Function fn_sisa_hari_dokumen: sisa hari sebelum dokumen kadaluarsa (minimal 0).
      */
     public static function getSisaHariDokumen(string $tglKadaluarsa): int

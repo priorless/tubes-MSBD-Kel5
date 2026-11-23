@@ -10,7 +10,6 @@ use App\Http\Controllers\Hrd\AbsensiKaryawanController;
 use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
 use App\Http\Controllers\Hrd\KetidakhadiranController;
-use App\Http\Controllers\Hrd\PersetujuanLemburController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
 use App\Http\Controllers\Hrd\SertifikatController;
 use App\Http\Controllers\KeuanganController;
@@ -95,7 +94,6 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('absensi-karyawan/rekap/pdf', [AbsensiKaryawanController::class, 'exportPdf'])->name('absensi.rekap.pdf');
         Route::get('absensi-karyawan', AbsensiKaryawanController::class)->name('absensi');
         Route::post('absensi-karyawan/ketidakhadiran', KetidakhadiranController::class)->name('absensi.ketidakhadiran');
-        Route::post('absensi-karyawan/lembur/{absensi}', PersetujuanLemburController::class)->whereNumber('absensi')->name('absensi.lembur');
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
         // Data Klien: controller & tampilan yang sama dengan Operasional (satu sumber data tbl_klien).
         Route::resource('klien', KlienController::class);

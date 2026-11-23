@@ -50,9 +50,6 @@
                 @if (in_array('menit_terlambat', $kolomBelumAda, true))
                     <li>Menit keterlambatan belum dicatat; yang ditampilkan adalah jumlah hari berstatus Terlambat.</li>
                 @endif
-                @if (in_array('status_lembur', $kolomBelumAda, true))
-                    <li>Status persetujuan lembur belum dicatat, sehingga lembur yang diteruskan ke Keuangan belum dapat ditampilkan.</li>
-                @endif
             </ul>
         </div>
     @endif
@@ -111,11 +108,6 @@
                                 <td class="tabular-nums">{{ $baris->jam_kerja }} jam</td>
                                 <td class="whitespace-nowrap tabular-nums">
                                     {{ $baris->jam_lembur }} jam
-                                    @if ($rekap['kolom']['status_lembur'])
-                                        <p class="text-xs text-gray-500">{{ $baris->lembur_disetujui }} disetujui &middot; {{ $baris->lembur_menunggu }} menunggu</p>
-                                    @else
-                                        <p class="text-xs text-gray-400">Status persetujuan belum tersedia</p>
-                                    @endif
                                 </td>
                             </tr>
                         @endforeach

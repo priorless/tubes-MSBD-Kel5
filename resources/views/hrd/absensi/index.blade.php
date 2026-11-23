@@ -108,7 +108,7 @@
                                         {{ FormatKolom::jam($baris->jam_keluar) }}
                                     @endif
                                     @if ((int) $baris->jam_lembur > 0)
-                                        <span class="block font-sans text-xs text-gray-500" title="Bekerja melewati jadwal pulang penempatan; belum melalui persetujuan lembur">Indikasi lembur {{ (int) $baris->jam_lembur }} jam</span>
+                                        <span class="block font-sans text-xs text-gray-500" title="Bekerja melewati jadwal pulang penempatan">Lembur {{ (int) $baris->jam_lembur }} jam</span>
                                     @endif
                                 </td>
                                 <td>
@@ -236,7 +236,7 @@
     <div class="callout callout-info mt-6">
         Lokasi resmi dan jadwal diambil dari data <b>penempatan</b> (modul Operasional) yang berlaku pada tanggal absensi.
         Terlambat bila check-in lebih dari 30 menit setelah jam datang; indikasi lembur dihitung dari waktu kerja setelah jam pulang
-        dan baru masuk payroll setelah disetujui HRD. Bila jadwal penempatan kosong, keduanya tidak dihitung.
+        dan langsung dihitung di payroll. Bila jadwal penempatan kosong, keduanya tidak dihitung.
         Foto check-in/check-out diunggah karyawan dan seharusnya menampilkan wajah serta keterangan tanggal, jam, dan lokasi dari aplikasi kamera karyawan — periksa kesesuaiannya; sistem tidak membuat keterangan tersebut. Jam absensi resmi tetap jam server.
     </div>
     @endif

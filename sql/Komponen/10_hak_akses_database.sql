@@ -51,7 +51,6 @@ GRANT SELECT ON tbl_p2h_item TO 'sji_role_hrd';
 GRANT SELECT ON v_dashboard_eksekutif TO 'sji_role_hrd';
 GRANT EXECUTE ON FUNCTION fn_sisa_hari_dokumen TO 'sji_role_hrd';
 GRANT EXECUTE ON PROCEDURE sp_input_ketidakhadiran TO 'sji_role_hrd';
-GRANT EXECUTE ON PROCEDURE sp_putuskan_lembur TO 'sji_role_hrd';
 
 -- ------------------------------------------------------------
 -- Operasional — klien, penempatan, rotasi, monitoring lapangan
@@ -102,7 +101,7 @@ GRANT SELECT ON tbl_penempatan TO 'sji_role_keuangan';
 GRANT SELECT ON tbl_jenis_layanan TO 'sji_role_keuangan';
 GRANT SELECT (id, nip, nama, kategori, id_jenis_layanan, gaji_pokok, status)
   ON tbl_karyawan TO 'sji_role_keuangan';
-GRANT SELECT (id, id_karyawan, id_penempatan, tgl, status_kehadiran, menit_terlambat, jam_lembur, status_lembur)
+GRANT SELECT (id, id_karyawan, id_penempatan, tgl, status_kehadiran, menit_terlambat, jam_lembur)
   ON tbl_absensi TO 'sji_role_keuangan';
 GRANT SELECT ON v_slip_gaji_detail TO 'sji_role_keuangan';
 GRANT SELECT ON v_arus_kas_bulanan TO 'sji_role_keuangan';
