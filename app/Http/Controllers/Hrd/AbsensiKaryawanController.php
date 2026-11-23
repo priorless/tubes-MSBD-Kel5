@@ -56,7 +56,6 @@ class AbsensiKaryawanController extends Controller
                 'daftarLayanan' => $daftarLayanan,
                 'daftarTanda' => self::TANDA,
                 'daftarKaryawan' => $this->daftarKaryawan(),
-                'lemburMenunggu' => collect(),
             ]);
         }
 
@@ -88,7 +87,6 @@ class AbsensiKaryawanController extends Controller
             'daftarLayanan' => $daftarLayanan,
             'daftarTanda' => self::TANDA,
             'daftarKaryawan' => $this->daftarKaryawan(),
-            'lemburMenunggu' => $this->lemburMenunggu(),
         ]);
     }
 
@@ -163,7 +161,6 @@ class AbsensiKaryawanController extends Controller
             'belumAbsen' => collect(),
             'daftarLayanan' => collect(),
             'daftarTanda' => self::TANDA,
-            'lemburMenunggu' => collect(),
             'filterRekap' => $filter,
             'karyawanTerpilih' => $filter['id_karyawan']
                 ? DB::table('tbl_karyawan')->where('id', $filter['id_karyawan'])->first(['id', 'nama', 'nip'])
@@ -189,12 +186,8 @@ class AbsensiKaryawanController extends Controller
                 COUNT(CASE WHEN a.status_kehadiran = 'Sakit' THEN 1 END) AS sakit,
                 COUNT(CASE WHEN a.status_kehadiran = 'Alpha' THEN 1 END) AS alpha,
                 COUNT(CASE WHEN a.jam_masuk IS NOT NULL AND a.jam_keluar IS NULL THEN 1 END) AS belum_check_out,
-                COUNT(CASE WHEN a.status_lembur = 'Menunggu' THEN 1 END) AS lembur_menunggu,
-                COUNT(CASE WHEN a.status_lembur = 'Disetujui' THEN 1 END) AS lembur_disetujui,
-                COUNT(CASE WHEN a.status_lembur = 'Ditolak' THEN 1 END) AS lembur_ditolak,
-                COALESCE(SUM(CASE WHEN a.status_lembur = 'Menunggu' THEN a.jam_lembur ELSE 0 END), 0) AS jam_lembur_menunggu,
-                COALESCE(SUM(CASE WHEN a.status_lembur = 'Disetujui' THEN a.jam_lembur ELSE 0 END), 0) AS jam_lembur_disetujui,
-                COALESCE(SUM(CASE WHEN a.status_lembur = 'Ditolak' THEN a.jam_lembur ELSE 0 END), 0) AS jam_lembur_ditolak
+                COUNT(CASE WHEN a.jam_lembur > 0 THEN 1 END) AS lembur,
+                COALESCE(SUM(a.jam_lembur), 0) AS jam_lembur
                 SQL)->first();
 
         $ringkasan->tanpa_catatan = $this->jumlahHariTanpaCatatan($filter);
@@ -285,25 +278,6 @@ class AbsensiKaryawanController extends Controller
         }
 
         return count($hariTanpaCatatan);
-    }
-
-    /**
-     * Lembur yang menunggu persetujuan HRD (semua tanggal, terlama dulu).
-     *
-     * @return Collection<int, object>
-     */
-    private function lemburMenunggu(): Collection
-    {
-        if (! Schema::hasColumn('tbl_absensi', 'status_lembur')) {
-            return collect();
-        }
-
-        return DB::table('v_absensi_harian')
-            ->where('status_lembur', 'Menunggu')
-            ->orderBy('tgl')
-            ->orderBy('nama')
-            ->limit(100)
-            ->get(['id_absensi', 'tgl', 'nip', 'nama', 'nama_klien', 'jam_masuk', 'jam_keluar', 'jadwal_pulang', 'jam_lembur']);
     }
 
     private function queryHarian(string $tanggal): Builder

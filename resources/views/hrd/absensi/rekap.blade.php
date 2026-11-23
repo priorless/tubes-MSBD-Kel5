@@ -74,9 +74,7 @@
         <div class="card-header"><h2 class="card-title">Rekap lembur</h2></div>
         <div class="grid grid-cols-1 gap-4 p-6 md:grid-cols-3">
             @foreach ([
-                ['Menunggu', $ringkasanRekap->lembur_menunggu, $ringkasanRekap->jam_lembur_menunggu],
-                ['Disetujui', $ringkasanRekap->lembur_disetujui, $ringkasanRekap->jam_lembur_disetujui],
-                ['Ditolak', $ringkasanRekap->lembur_ditolak, $ringkasanRekap->jam_lembur_ditolak],
+                ['Lembur', $ringkasanRekap->lembur, $ringkasanRekap->jam_lembur],
             ] as [$status, $jumlah, $jam])
                 <div class="rounded-lg border border-gray-200 p-4">
                     <p class="text-sm text-gray-500">{{ $status }}</p>
@@ -105,7 +103,7 @@
                             <td>{{ (int) $baris->menit_terlambat > 0 ? $baris->menit_terlambat.' menit' : '—' }}</td>
                             <td class="font-mono">{{ FormatKolom::jam($baris->jam_masuk) }}</td>
                             <td class="font-mono">{{ FormatKolom::jam($baris->jam_keluar) }}</td>
-                            <td>{{ (int) $baris->jam_lembur > 0 ? $baris->jam_lembur.' jam · '.$baris->status_lembur : '—' }}</td>
+                            <td>{{ (int) $baris->jam_lembur > 0 ? $baris->jam_lembur.' jam' : '—' }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="8" class="table-empty">Tidak ada catatan absensi pada periode dan filter ini.</td></tr>

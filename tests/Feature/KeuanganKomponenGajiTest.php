@@ -53,7 +53,6 @@ class KeuanganKomponenGajiTest extends TestCase
             $table->time('jam_keluar')->nullable();
             $table->string('status_kehadiran');
             $table->integer('jam_lembur')->default(0);
-            $table->string('status_lembur')->default('Tidak Ada');
         });
         Schema::create('tbl_kontrak', function (Blueprint $table): void {
             $table->increments('id');
@@ -284,14 +283,14 @@ class KeuanganKomponenGajiTest extends TestCase
         $user = User::factory()->withRole(Role::Keuangan)->create();
         $karyawan = $this->buatKaryawanLapangan('TST-LEMBUR-001', 'Karyawan Lembur');
         DB::table('tbl_kontrak')->insert(['id_penempatan' => $karyawan['id_penempatan'], 'gaji_pokok' => 4000000, 'hari_kerja_per_bulan' => 25]);
-        $valid = ['id_karyawan' => $karyawan['id'], 'jam_masuk' => '08:00:00', 'status_kehadiran' => 'Hadir', 'status_lembur' => 'Menunggu'];
+        $valid = ['id_karyawan' => $karyawan['id'], 'jam_masuk' => '08:00:00', 'status_kehadiran' => 'Hadir'];
         DB::table('tbl_absensi')->insert([
             // Dihitung: 2 jam (1,5x + 2x), 1 jam (1,5x), 3 jam (1,5x + 2x + 2x) -> 10,5 x upah per jam.
             [...$valid, 'tgl' => '2026-11-02', 'jam_keluar' => '18:00:00', 'jam_lembur' => 2],
             [...$valid, 'tgl' => '2026-11-03', 'jam_keluar' => '17:00:00', 'jam_lembur' => 1, 'status_kehadiran' => 'Terlambat'],
             [...$valid, 'tgl' => '2026-11-05', 'jam_keluar' => '19:00:00', 'jam_lembur' => 3],
             // Tidak dihitung: kelebihan 59 menit (jam_lembur 0), tanpa check-out, tanpa check-in, status tidak valid.
-            [...$valid, 'tgl' => '2026-11-04', 'jam_keluar' => '16:59:00', 'jam_lembur' => 0, 'status_lembur' => 'Tidak Ada'],
+            [...$valid, 'tgl' => '2026-11-04', 'jam_keluar' => '16:59:00', 'jam_lembur' => 0],
             [...$valid, 'tgl' => '2026-11-06', 'jam_keluar' => null, 'jam_lembur' => 4],
             [...$valid, 'tgl' => '2026-11-08', 'jam_masuk' => null, 'jam_keluar' => '20:00:00', 'jam_lembur' => 4],
             [...$valid, 'tgl' => '2026-11-07', 'jam_keluar' => '20:00:00', 'jam_lembur' => 4, 'status_kehadiran' => 'Izin'],

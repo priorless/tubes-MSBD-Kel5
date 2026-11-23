@@ -177,6 +177,14 @@ class JadwalKerjaController extends Controller
                 ? DB::table('tbl_jenis_layanan')->orderBy('nama_layanan')->get(['id', 'nama_layanan'])
                 : collect(),
             'templateShift' => $templateShift,
+            'riwayatJadwal' => $karyawanTerpilih !== null && Schema::hasView('v_riwayat_jadwal_kerja')
+                ? DB::table('v_riwayat_jadwal_kerja')
+                    ->where('id_karyawan', $karyawanTerpilih->id)
+                    ->whereBetween('tanggal_kerja', [$awalBulan->toDateString(), $awalBulan->endOfMonth()->toDateString()])
+                    ->orderByDesc('id')
+                    ->limit(20)
+                    ->get()
+                : collect(),
             'awalBulan' => $awalBulan,
             'judulBulan' => self::NAMA_BULAN[$nomorBulan].' '.$awalBulan->format('Y'),
             'namaBulan' => self::NAMA_BULAN,
