@@ -72,6 +72,7 @@ GRANT EXECUTE ON PROCEDURE sp_selesai_penempatan TO 'sji_role_operasional';
 GRANT SELECT, INSERT, UPDATE ON tbl_template_shift TO 'sji_role_operasional';
 GRANT SELECT, INSERT, UPDATE ON tbl_jadwal_kerja TO 'sji_role_operasional';
 GRANT SELECT, INSERT ON tbl_jadwal_kerja_riwayat TO 'sji_role_operasional';
+-- sp_cek_jadwal_kerja sengaja tanpa GRANT: hanya dipanggil trigger trg_cek_jadwal_kerja_insert/_update (hak definer).
 -- Template Jadwal Bulanan: template dinonaktifkan (tanpa DELETE); DELETE pada detail diperlukan
 -- karena mengosongkan hari = menghapus baris pola (Belum Diatur); log penerapan hanya ditambah.
 GRANT SELECT, INSERT, UPDATE ON tbl_template_jadwal TO 'sji_role_operasional';

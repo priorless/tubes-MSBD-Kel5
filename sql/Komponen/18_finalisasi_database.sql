@@ -499,3 +499,79 @@ BEGIN
 END //
 
 DELIMITER ;
+
+-- [TAHAP 3]
+-- Aturan jadwal kerja di level database (BEFORE INSERT/UPDATE tbl_jadwal_kerja). Pesan sama dengan JadwalKerjaService.
+-- Riwayat tidak ditulis di sini: JadwalKerjaService sudah menulis tbl_jadwal_kerja_riwayat.
+DELIMITER //
+
+DROP PROCEDURE IF EXISTS sp_cek_jadwal_kerja //
+CREATE PROCEDURE sp_cek_jadwal_kerja(IN p_id INT, IN p_id_penempatan INT, IN p_tanggal DATE, IN p_status VARCHAR(5),
+                                     IN p_jam_masuk TIME, IN p_jam_pulang TIME)
+BEGIN
+  DECLARE v_id_karyawan INT;
+  DECLARE v_mulai DATE;
+  DECLARE v_selesai DATE;
+  DECLARE v_awal DATETIME;
+  DECLARE v_akhir DATETIME;
+  DECLARE v_bentrok DATE;
+  DECLARE v_pesan VARCHAR(255);
+
+  SELECT id_karyawan, tgl_mulai, tgl_selesai INTO v_id_karyawan, v_mulai, v_selesai
+  FROM tbl_penempatan WHERE id = p_id_penempatan;
+
+  IF v_id_karyawan IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Penempatan tidak ditemukan.';
+  END IF;
+  IF p_tanggal < v_mulai OR (v_selesai IS NOT NULL AND p_tanggal > v_selesai) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tanggal jadwal harus berada dalam masa penempatan.';
+  END IF;
+
+  IF p_status = 'Kerja' THEN
+    IF p_jam_masuk IS NULL OR p_jam_pulang IS NULL THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pilih jam tersimpan atau isi jam masuk dan jam pulang terlebih dahulu.';
+    END IF;
+
+    -- Shift lewat tengah malam (jam pulang <= jam masuk) berakhir keesokan harinya, jadi jadwal H-1 dan H+1 ikut diperiksa.
+    SET v_awal = TIMESTAMP(p_tanggal, p_jam_masuk);
+    SET v_akhir = TIMESTAMP(IF(p_jam_pulang <= p_jam_masuk, p_tanggal + INTERVAL 1 DAY, p_tanggal), p_jam_pulang);
+
+    SELECT j.tanggal_kerja INTO v_bentrok
+    FROM tbl_jadwal_kerja j
+    JOIN tbl_penempatan p ON p.id = j.id_penempatan
+    WHERE p.id_karyawan = v_id_karyawan
+      AND j.id_penempatan <> p_id_penempatan
+      AND (p_id IS NULL OR j.id <> p_id)
+      AND j.status = 'Kerja'
+      AND j.jam_masuk IS NOT NULL AND j.jam_pulang IS NOT NULL
+      AND j.tanggal_kerja BETWEEN p_tanggal - INTERVAL 1 DAY AND p_tanggal + INTERVAL 1 DAY
+      AND TIMESTAMP(j.tanggal_kerja, j.jam_masuk) < v_akhir
+      AND TIMESTAMP(IF(j.jam_pulang <= j.jam_masuk, j.tanggal_kerja + INTERVAL 1 DAY, j.tanggal_kerja), j.jam_pulang) > v_awal
+    ORDER BY j.tanggal_kerja
+    LIMIT 1;
+
+    IF v_bentrok IS NOT NULL THEN
+      SET v_pesan = CONCAT('Jam kerja bertabrakan dengan jadwal Kerja karyawan ini di penempatan lain pada ',
+                           DATE_FORMAT(v_bentrok, '%d-%m-%Y'), '.');
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_pesan;
+    END IF;
+  END IF;
+END //
+
+DROP TRIGGER IF EXISTS trg_cek_jadwal_kerja_insert //
+CREATE TRIGGER trg_cek_jadwal_kerja_insert
+BEFORE INSERT ON tbl_jadwal_kerja
+FOR EACH ROW
+BEGIN
+  CALL sp_cek_jadwal_kerja(NULL, NEW.id_penempatan, NEW.tanggal_kerja, NEW.status, NEW.jam_masuk, NEW.jam_pulang);
+END //
+
+DROP TRIGGER IF EXISTS trg_cek_jadwal_kerja_update //
+CREATE TRIGGER trg_cek_jadwal_kerja_update
+BEFORE UPDATE ON tbl_jadwal_kerja
+FOR EACH ROW
+BEGIN
+  CALL sp_cek_jadwal_kerja(OLD.id, NEW.id_penempatan, NEW.tanggal_kerja, NEW.status, NEW.jam_masuk, NEW.jam_pulang);
+END //
+
+DELIMITER ;

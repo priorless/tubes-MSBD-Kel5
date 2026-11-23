@@ -146,7 +146,7 @@
                                                     <div class="mt-2"><span class="badge badge-secondary">Libur</span></div>
                                                 @elseif ($hari['status'] === 'Belum Diatur')
                                                     <div class="mt-2 space-y-1">
-                                                        <span class="badge badge-warning">Belum Diatur</span>
+                                                        <span class="badge badge-warning max-w-full whitespace-normal leading-tight">Belum Diatur</span>
                                                         <p class="text-xs text-gray-500">Jadwal belum ditentukan</p>
                                                     </div>
                                                 @elseif ($hari['status'] === 'Di Luar Penempatan')

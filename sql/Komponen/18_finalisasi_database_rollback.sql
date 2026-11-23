@@ -389,3 +389,13 @@ DROP FUNCTION IF EXISTS fn_hari_kerja_roster //
 DROP FUNCTION IF EXISTS fn_hari_kerja_roster_klien //
 
 DELIMITER ;
+
+-- [TAHAP 3]
+-- Aturan jadwal kerja kembali hanya di PHP (JadwalKerjaService).
+DELIMITER //
+
+DROP TRIGGER IF EXISTS trg_cek_jadwal_kerja_update //
+DROP TRIGGER IF EXISTS trg_cek_jadwal_kerja_insert //
+DROP PROCEDURE IF EXISTS sp_cek_jadwal_kerja //
+
+DELIMITER ;
