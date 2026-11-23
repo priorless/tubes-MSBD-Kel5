@@ -15,6 +15,8 @@ Setiap file mencatat perubahan pada satu tahap pengerjaan. Isinya menimpa atau m
 - File diberi blok `-- [TAHAP n]` yang dibaca migration dengan `SqlKomponen::jalankanBlok()`.
 - `10_hak_akses_database.sql` adalah satu-satunya sumber hak akses (role dan GRANT). File ini dijalankan ulang di akhir setiap migration yang menambah atau menghapus objek.
 - `18_finalisasi_database.sql` berisi perubahan Finalisasi Tahap 1–8, dengan pasangan `18_finalisasi_database_rollback.sql`.
+- `19_log_append_only.sql` membuat `tbl_log_aktivitas` append-only: trigger `BEFORE UPDATE`/`BEFORE DELETE` menolak perubahan log dengan `SIGNAL 45000`, sedangkan INSERT tetap normal. Pasangannya `19_log_append_only_rollback.sql`. Tidak ada event purge log; bila log lama perlu dibuang, pakai `ALTER TABLE tbl_log_aktivitas TRUNCATE PARTITION p<tahun>` (DDL partisi tidak memicu trigger). Trigger ini juga sudah ada di `sql/final/05_trigger.sql`.
+- `20_perbaikan_jadwal_event_sertifikat.sql` mengembalikan jam mulai `ev_update_status_sertifikat` ke 00:05 (ekspor final sempat tercatat 06:05). Pasangannya `20_perbaikan_jadwal_event_sertifikat_rollback.sql`.
 - **Ada dua file bernomor 14** (`14_bpjs_klien.sql` dan `14_komponen_gaji.sql`). Keduanya sudah dipanggil migration dengan nama itu. Ini riwayat dan **tidak perlu di-rename**, karena mengganti nama akan memutus migration yang merujuknya.
 - File lama tidak boleh diubah. Perubahan baru selalu ditambahkan sebagai file atau blok baru.
 

@@ -7,11 +7,20 @@
     <x-ui.page-header title="Klien"
         description="Perusahaan mitra PT Satu Jaya Indonesia beserta karyawan yang sedang ditempatkan. Halaman ini hanya untuk dilihat." />
 
-    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <x-ui.stat-card label="Jumlah klien" :value="$jumlahKlien" hint="Seluruh klien yang tercatat" />
         <x-ui.stat-card label="Klien aktif" :value="$jumlahKlienAktif" hint="Kerja sama berstatus Aktif" tone="success" />
         <x-ui.stat-card label="Orang ditempatkan" :value="$jumlahDitempatkan" hint="Karyawan dengan penempatan berstatus Aktif" />
+        <x-ui.stat-card label="Total profit" :value="'Rp ' . number_format($totalProfit, 0, ',', '.')" :hint="'Klien aktif, ' . $periode->translatedFormat('F Y')" tone="success" />
     </div>
+
+    <form method="GET" action="{{ route('ceo.klien') }}" class="mb-4 flex flex-wrap items-end gap-2">
+        <div>
+            <label for="periode" class="form-label">Periode profit</label>
+            <input type="month" id="periode" name="periode" value="{{ $periode->format('Y-m') }}" class="form-input">
+        </div>
+        <button type="submit" class="btn-primary">Tampilkan</button>
+    </form>
 
     <div class="card">
         @if ($klien->isEmpty())
@@ -28,6 +37,7 @@
                             <th>Status</th>
                             <th class="text-right">Ditempatkan</th>
                             <th>Nama yang Ditempatkan</th>
+                            <th class="text-right">Profit {{ $periode->translatedFormat('M Y') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -53,6 +63,13 @@
                                     @empty
                                         <span class="text-xs text-gray-400">Belum ada yang ditempatkan</span>
                                     @endforelse
+                                </td>
+                                <td class="text-right font-semibold tabular-nums">
+                                    @if ($profitPerKlien->has($item->id))
+                                        Rp {{ number_format($profitPerKlien->get($item->id), 0, ',', '.') }}
+                                    @else
+                                        <span class="text-xs text-gray-400">&mdash;</span>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

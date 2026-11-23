@@ -259,4 +259,17 @@ CREATE TRIGGER `trg_users_log_hapus` AFTER DELETE ON `tbl_users` FOR EACH ROW BE
           LEFT(CONCAT('Akun dihapus ', OLD.username), 255));
 END //
 
+-- Append-only tbl_log_aktivitas (sql/Komponen/19_log_append_only.sql)
+DROP TRIGGER IF EXISTS `trg_log_aktivitas_tolak_update` //
+CREATE TRIGGER `trg_log_aktivitas_tolak_update` BEFORE UPDATE ON `tbl_log_aktivitas` FOR EACH ROW BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Log aktivitas tidak boleh diubah karena merupakan jejak audit';
+END //
+
+DROP TRIGGER IF EXISTS `trg_log_aktivitas_tolak_delete` //
+CREATE TRIGGER `trg_log_aktivitas_tolak_delete` BEFORE DELETE ON `tbl_log_aktivitas` FOR EACH ROW BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Log aktivitas tidak boleh dihapus karena merupakan jejak audit';
+END //
+
 DELIMITER ;
