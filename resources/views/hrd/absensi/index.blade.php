@@ -9,6 +9,16 @@
 @endphp
 
 @section('content')
+    <x-ui.page-header title="Absensi Karyawan" description="Pantau absensi harian karyawan lapangan dan rekap per periode." />
+
+    <nav class="mb-6 flex gap-2 border-b border-gray-200" aria-label="Bagian absensi karyawan">
+        <a href="{{ route('hrd.absensi', ['tab' => 'harian']) }}" @class(['border-b-2 px-4 py-3 text-sm font-medium', 'border-sji-biru text-sji-biru' => $tab === 'harian', 'border-transparent text-gray-500 hover:text-gray-700' => $tab !== 'harian']) @if ($tab === 'harian') aria-current="page" @endif>Absensi Harian</a>
+        <a href="{{ route('hrd.absensi', ['tab' => 'rekap']) }}" @class(['border-b-2 px-4 py-3 text-sm font-medium', 'border-sji-biru text-sji-biru' => $tab === 'rekap', 'border-transparent text-gray-500 hover:text-gray-700' => $tab !== 'rekap']) @if ($tab === 'rekap') aria-current="page" @endif>Rekap Absensi</a>
+    </nav>
+
+    @if ($tab === 'rekap')
+        @include('hrd.absensi.rekap')
+    @else
     @if ($ringkasan)
         <div class="mb-6 grid grid-cols-2 gap-6 xl:grid-cols-4">
             @foreach ([
@@ -84,6 +94,8 @@
                                 <td class="whitespace-nowrap">
                                     @if ($baris->jadwal_datang || $baris->jadwal_pulang)
                                         <span class="font-mono">{{ FormatKolom::jam($baris->jadwal_datang) }}&ndash;{{ FormatKolom::jam($baris->jadwal_pulang) }}</span>
+                                    @elseif (($baris->sumber_jadwal ?? null) === 'Libur')
+                                        <span class="badge badge-warning" title="Masuk pada hari yang dijadwalkan Libur">Libur</span>
                                     @else
                                         <span class="badge badge-secondary">Jadwal belum ditentukan</span>
                                     @endif
@@ -171,62 +183,6 @@
         </div>
     @endif
 
-    {{-- Persetujuan lembur (sp_putuskan_lembur) --}}
-    <div class="card mt-6" id="lembur-menunggu">
-        <div class="card-header">
-            <div>
-                <h2 class="card-title">Lembur Menunggu Persetujuan</h2>
-                <p class="text-sm text-gray-500">Indikasi lembur dihitung dari waktu kerja setelah jam pulang penempatan. Hanya lembur yang disetujui yang masuk payroll.</p>
-            </div>
-            <span class="badge badge-warning">{{ $lemburMenunggu->count() }} menunggu</span>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Tanggal</th>
-                        <th>NIP</th>
-                        <th>Nama</th>
-                        <th>Klien</th>
-                        <th>Masuk &ndash; Keluar</th>
-                        <th>Jadwal Pulang</th>
-                        <th class="text-center">Jam Lembur</th>
-                        <th class="text-right">Keputusan</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($lemburMenunggu as $lembur)
-                        <tr>
-                            <td class="whitespace-nowrap">{{ FormatKolom::tanggal($lembur->tgl, 'd/m/Y') }}</td>
-                            <td class="font-mono text-gray-600">{{ $lembur->nip }}</td>
-                            <td class="font-medium text-gray-800">{{ $lembur->nama }}</td>
-                            <td>{{ $lembur->nama_klien ?? '—' }}</td>
-                            <td class="whitespace-nowrap font-mono">{{ substr((string) $lembur->jam_masuk, 0, 5) }} &ndash; {{ substr((string) $lembur->jam_keluar, 0, 5) }}</td>
-                            <td class="font-mono">{{ $lembur->jadwal_pulang ? substr($lembur->jadwal_pulang, 0, 5) : '—' }}</td>
-                            <td class="text-center font-semibold">{{ $lembur->jam_lembur }} jam</td>
-                            <td>
-                                <div class="flex justify-end gap-2">
-                                    @foreach (['Disetujui' => ['Setujui', 'btn-success'], 'Ditolak' => ['Tolak', 'btn-outline-danger']] as $keputusan => [$label, $kelas])
-                                        <form method="POST" action="{{ route('hrd.absensi.lembur', $lembur->id_absensi) }}"
-                                              onsubmit="return confirm(@js($label.' lembur '.$lembur->jam_lembur.' jam untuk '.$lembur->nama.'?'))">
-                                            @csrf
-                                            <input type="hidden" name="keputusan" value="{{ $keputusan }}">
-                                            <button type="submit" class="{{ $kelas }} btn-sm">{{ $label }}</button>
-                                        </form>
-                                    @endforeach
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8" class="table-empty">Tidak ada lembur yang menunggu persetujuan.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
-
     {{-- Input ketidakhadiran (sp_input_ketidakhadiran) --}}
     <form method="POST" action="{{ route('hrd.absensi.ketidakhadiran') }}" class="card mt-6" id="catat-ketidakhadiran">
         @csrf
@@ -283,4 +239,5 @@
         dan baru masuk payroll setelah disetujui HRD. Bila jadwal penempatan kosong, keduanya tidak dihitung.
         Foto check-in/check-out diunggah karyawan dan seharusnya menampilkan wajah serta keterangan tanggal, jam, dan lokasi dari aplikasi kamera karyawan — periksa kesesuaiannya; sistem tidak membuat keterangan tersebut. Jam absensi resmi tetap jam server.
     </div>
+    @endif
 @endsection

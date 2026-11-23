@@ -70,8 +70,8 @@ class OperasionalFeatureTest extends TestCase
             'jam_pulang' => '17:00',
         ]);
 
-        $response->assertRedirect(route('operasional.monitoring'));
-        $response->assertSessionHas('success', 'Penempatan karyawan berhasil dibuat.');
+        $response->assertRedirect(route('operasional.penempatan.index'));
+        $response->assertSessionHas('success', 'Penempatan karyawan berhasil dibuat. Langkah berikutnya: atur jadwal kerjanya di menu Jadwal Kerja.');
     }
 
     public function test_database_signal_message_is_shown_as_a_friendly_notification(): void
@@ -198,7 +198,7 @@ class OperasionalFeatureTest extends TestCase
         ]);
     }
 
-    public function test_rotasi_passes_new_work_schedule_to_database_procedure(): void
+    public function test_rotasi_passes_contract_end_location_and_new_work_schedule_to_database_procedure(): void
     {
         $this->createReferenceTables();
         $this->loginOperasional(56);
@@ -209,13 +209,16 @@ class OperasionalFeatureTest extends TestCase
         DB::shouldReceive('connection')->andReturn($connection)->byDefault();
         DB::shouldReceive('statement')
             ->once()
-            ->with('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?, ?, ?)', [7, 34, '2026-12-01', 'Bekasi', '22:00', '06:00', 56])
+            ->with('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?, ?, ?, ?)', [
+                7, 34, '2026-12-01', '2026-12-31', 'Bekasi', '22:00', '06:00', 56,
+            ])
             ->andReturn(true);
 
         $response = $this->post(route('operasional.rotasi.store'), [
             'id_penempatan_lama' => 7,
             'id_klien_baru' => 34,
             'tgl_mulai_baru' => '2026-12-01',
+            'tgl_selesai_baru' => '2026-12-31',
             'lokasi_baru' => 'Bekasi',
             'jam_datang_baru' => '22:00',
             'jam_pulang_baru' => '06:00',
@@ -236,17 +239,60 @@ class OperasionalFeatureTest extends TestCase
         DB::shouldReceive('connection')->andReturn($connection)->byDefault();
         DB::shouldReceive('statement')
             ->once()
-            ->with('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?, ?, ?)', [7, 34, '2026-12-01', 'Bekasi', null, null, 56])
+            ->with('CALL sp_rotasi_karyawan(?, ?, ?, ?, ?, ?, ?, ?)', [
+                7, 34, '2026-12-01', null, 'Bekasi', null, null, 56,
+            ])
             ->andReturn(true);
 
         $this->post(route('operasional.rotasi.store'), [
             'id_penempatan_lama' => 7,
             'id_klien_baru' => 34,
             'tgl_mulai_baru' => '2026-12-01',
+            'tgl_selesai_baru' => '',
             'lokasi_baru' => 'Bekasi',
             'jam_datang_baru' => '',
             'jam_pulang_baru' => '',
         ])->assertRedirect(route('operasional.monitoring'));
+    }
+
+    public function test_rotasi_rejects_contract_end_date_before_new_placement_start(): void
+    {
+        $this->createReferenceTables();
+        $this->loginOperasional(56);
+        DB::table('tbl_klien')->insert(['id' => 34]);
+        DB::table('tbl_penempatan')->insert(['id' => 7]);
+
+        $this->from(route('operasional.rotasi.create'))
+            ->post(route('operasional.rotasi.store'), [
+                'id_penempatan_lama' => 7,
+                'id_klien_baru' => 34,
+                'tgl_mulai_baru' => '2026-12-01',
+                'tgl_selesai_baru' => '2026-11-30',
+                'lokasi_baru' => 'Bekasi',
+            ])
+            ->assertRedirect(route('operasional.rotasi.create'))
+            ->assertSessionHasErrors([
+                'tgl_selesai_baru' => 'Tanggal Selesai Kontrak tidak boleh lebih awal daripada Tanggal Mulai Penempatan.',
+            ]);
+    }
+
+    public function test_rotasi_form_displays_optional_contract_end_date(): void
+    {
+        $this->withViewErrors([]);
+
+        $html = view('operasional.rotasi.create', [
+            'penempatan' => collect(),
+            'klien' => collect(),
+        ])->render();
+
+        $this->assertStringContainsString('Klien', $html);
+        $this->assertStringContainsString('Tanggal Mulai Penempatan', $html);
+        $this->assertStringContainsString('Tanggal Selesai Kontrak', $html);
+        $this->assertStringContainsString('Lokasi Penempatan', $html);
+        $this->assertStringContainsString('Jam Datang', $html);
+        $this->assertStringContainsString('Jam Pulang', $html);
+        $this->assertStringNotContainsString('Baru', $html);
+        $this->assertStringContainsString('id="tgl_selesai_baru" name="tgl_selesai_baru" type="date"', $html);
     }
 
     public function test_rotasi_rejects_half_filled_work_schedule(): void
@@ -263,7 +309,7 @@ class OperasionalFeatureTest extends TestCase
             'lokasi_baru' => 'Bekasi',
             'jam_datang_baru' => '08:00',
         ])->assertSessionHasErrors([
-            'jam_pulang_baru' => 'Jam pulang baru wajib diisi bila jam datang baru diisi.',
+            'jam_pulang_baru' => 'Jam Pulang wajib diisi bila Jam Datang diisi.',
         ]);
     }
 
@@ -279,6 +325,9 @@ class OperasionalFeatureTest extends TestCase
 
         Schema::create('tbl_penempatan', function (Blueprint $table): void {
             $table->unsignedInteger('id')->primary();
+            $table->unsignedInteger('id_karyawan')->nullable();
+            $table->date('tgl_selesai')->nullable();
+            $table->string('status')->default('Aktif');
         });
     }
 }

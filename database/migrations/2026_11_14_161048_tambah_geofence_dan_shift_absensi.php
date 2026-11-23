@@ -126,7 +126,7 @@ return new class extends Migration
         }
 
         if (Schema::hasColumn('tbl_klien', 'latitude')) {
-            DB::statement('ALTER TABLE tbl_klien DROP CHECK chk_klien_koordinat, DROP CHECK chk_klien_radius');
+            DB::statement('ALTER TABLE tbl_klien DROP CONSTRAINT chk_klien_koordinat, DROP CONSTRAINT chk_klien_radius');
             Schema::table('tbl_klien', fn (Blueprint $table) => $table->dropColumn(['latitude', 'longitude', 'radius_meter']));
         }
 

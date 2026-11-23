@@ -4,7 +4,11 @@ namespace Tests\Feature\TenagaKerja;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Services\JadwalAbsensiService;
 use App\Services\TenagaKerjaService;
+use App\Support\JamServer;
+use App\Support\ShiftAbsensi;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Mockery\MockInterface;
@@ -15,7 +19,8 @@ use Tests\TestCase;
 /**
  * Absensi foto unggahan: foto wajib, sistem hanya menerima foto (lokasi resmi tetap penempatan;
  * keterangan tanggal/jam/lokasi pada foto dibuat aplikasi kamera karyawan, data lokasi tidak diproses).
- * TenagaKerjaService di-mock karena trigger absensi hanya ada di MySQL db_sji.
+ * TenagaKerjaService di-mock karena trigger absensi hanya ada di MySQL db_sji; jadwal shift dianggap
+ * sudah membuka check-in (aturan shift diuji di AbsensiBerbasisShiftTest pada MySQL).
  */
 class LokasiAbsensiTest extends TestCase
 {
@@ -28,6 +33,12 @@ class LokasiAbsensiTest extends TestCase
         parent::setUp();
 
         $this->actingAs(User::factory()->withRole(Role::KaryawanLapangan)->create(['id_karyawan' => 7]));
+
+        $jamServer = new JamServer;
+        $jamServer->tetapkan(CarbonImmutable::parse('2026-11-15 07:45:12'));
+        $this->app->instance(JamServer::class, $jamServer);
+        $this->mock(JadwalAbsensiService::class, fn (MockInterface $mock) => $mock->shouldReceive('shiftUntukCheckIn')
+            ->andReturn(new ShiftAbsensi('2026-11-15', CarbonImmutable::parse('2026-11-15 07:00:00'), CarbonImmutable::parse('2026-11-15 15:00:00'), 'Penempatan', null, 3)));
     }
 
     /**
@@ -42,6 +53,7 @@ class LokasiAbsensiTest extends TestCase
             $mock->shouldReceive('kolom')->andReturn(null)->byDefault();
             $mock->shouldReceive('waktuServer')->andReturn('2026-11-15 08:00:00')->byDefault();
             $mock->shouldReceive('penugasanAktif')->andReturn(null)->byDefault();
+            $mock->shouldReceive('namaLayanan')->andReturn(null)->byDefault();
         });
     }
 
@@ -80,7 +92,7 @@ class LokasiAbsensiTest extends TestCase
         ];
 
         $this->mockLayanan(function (MockInterface $mock) use ($baris): void {
-            $mock->shouldReceive('checkIn')->once()->with(7, \Mockery::type('string'));
+            $mock->shouldReceive('checkIn')->once()->with(7, \Mockery::type('string'), '2026-11-15', null);
             // Seperti TenagaKerjaService::kolom(): kandidat pertama yang BENAR-BENAR ada di tabel.
             $mock->shouldReceive('kolom')->andReturnUsing(fn (string $tabel, string $kunci) => collect(config("tenaga_kerja.kolom.$kunci", []))
                 ->first(fn (string $kandidat) => property_exists($baris, $kandidat)));

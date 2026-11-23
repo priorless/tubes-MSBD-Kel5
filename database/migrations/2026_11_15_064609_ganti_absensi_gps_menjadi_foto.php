@@ -61,7 +61,8 @@ return new class extends Migration
         if (Schema::hasColumn('tbl_klien', 'latitude')) {
             foreach (['chk_klien_koordinat', 'chk_klien_radius'] as $constraint) {
                 if ($this->checkConstraintAda($constraint)) {
-                    DB::statement("ALTER TABLE tbl_klien DROP CHECK $constraint");
+                    // DROP CONSTRAINT: didukung MariaDB (>= 10.2.1) dan MySQL (>= 8.0.19); DROP CHECK hanya MySQL.
+                    DB::statement("ALTER TABLE tbl_klien DROP CONSTRAINT $constraint");
                 }
             }
             Schema::table('tbl_klien', fn (Blueprint $table) => $table->dropColumn(['latitude', 'longitude', 'radius_meter']));

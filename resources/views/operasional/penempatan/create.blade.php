@@ -1,49 +1,68 @@
 @extends('layouts.app')
 
-@section('title', 'Penempatan Karyawan')
+@section('title', 'Penempatan Baru')
+
+@php
+    $idKlienTerpilih = (string) old('id_klien', $idKlienAwal);
+    $bisaDisimpan = $karyawan->isNotEmpty() && $klien->isNotEmpty();
+@endphp
 
 @section('content')
+    <x-ui.page-header title="Penempatan Baru" description="Tempatkan karyawan lapangan ke klien aktif.">
+        <a href="{{ route('operasional.penempatan.index') }}" class="btn-secondary">Batal</a>
+    </x-ui.page-header>
+
     <form action="{{ route('operasional.penempatan.store') }}" method="POST" class="card max-w-3xl">
         @csrf
 
-        <div class="card-header">
-            <div>
-                <h2 class="card-title">Buat penempatan baru</h2>
-                <p class="text-sm text-gray-500">Penempatan diproses oleh prosedur database sesuai aturan operasional.</p>
-            </div>
-        </div>
-
-        <div class="card-body space-y-4">
+        <section class="card-body space-y-4">
+            <h3 class="font-semibold text-gray-800">Karyawan</h3>
             <div>
                 <label for="id_karyawan" class="form-label">Karyawan Lapangan</label>
                 <select id="id_karyawan" name="id_karyawan" @class(['form-input', 'form-input-error' => $errors->has('id_karyawan')]) required>
                     <option value="">Pilih karyawan</option>
                     @foreach ($karyawan as $item)
-                        <option value="{{ $item->id }}" @selected((string) old('id_karyawan') === (string) $item->id)>
+                        <option value="{{ $item->id }}" data-layanan="{{ $item->nama_layanan ?? 'Belum diisi HRD' }}"
+                                @selected((string) old('id_karyawan') === (string) $item->id)>
                             {{ $item->nip }} &mdash; {{ $item->nama }}
                         </option>
                     @endforeach
                 </select>
                 @error('id_karyawan') <p class="form-error">{{ $message }}</p> @enderror
                 @if ($karyawan->isEmpty())
-                    <p class="form-hint">Tidak ada karyawan lapangan berstatus tersedia.</p>
+                    <p class="form-hint">Tidak ada karyawan lapangan berstatus Tersedia. Minta HRD menambahkan karyawan, atau akhiri penempatan lama terlebih dahulu.</p>
                 @endif
+                <p id="info-layanan" class="form-hint" hidden>Jenis layanan: <strong id="nama-layanan"></strong></p>
             </div>
+        </section>
+
+        <section class="card-body space-y-4 border-t border-gray-200">
+            <h3 class="font-semibold text-gray-800">Klien &amp; lokasi</h3>
             <div>
                 <label for="id_klien" class="form-label">Klien</label>
                 <select id="id_klien" name="id_klien" @class(['form-input', 'form-input-error' => $errors->has('id_klien')]) required>
                     <option value="">Pilih klien</option>
                     @foreach ($klien as $item)
-                        <option value="{{ $item->id }}" @selected((string) old('id_klien') === (string) $item->id)>
+                        <option value="{{ $item->id }}" @selected($idKlienTerpilih === (string) $item->id)>
                             {{ $item->kode_klien }} &mdash; {{ $item->nama_perusahaan }}
                         </option>
                     @endforeach
                 </select>
                 @error('id_klien') <p class="form-error">{{ $message }}</p> @enderror
                 @if ($klien->isEmpty())
-                    <p class="form-hint">Belum ada klien aktif. Tambahkan atau aktifkan data klien terlebih dahulu.</p>
+                    <p class="form-hint">Belum ada klien aktif. <a href="{{ route('operasional.klien.create') }}" class="text-sji-biru hover:underline">Tambah klien</a></p>
                 @endif
             </div>
+            <div>
+                <label for="lokasi" class="form-label">Lokasi Kerja</label>
+                <input id="lokasi" name="lokasi" type="text" maxlength="255" required placeholder="Contoh: Gedung A lantai 3"
+                    @class(['form-input', 'form-input-error' => $errors->has('lokasi')]) value="{{ old('lokasi') }}">
+                @error('lokasi') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+        </section>
+
+        <section class="card-body space-y-4 border-t border-gray-200">
+            <h3 class="font-semibold text-gray-800">Periode &amp; jam kerja</h3>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                     <label for="tgl_mulai" class="form-label">Tanggal Mulai</label>
@@ -52,17 +71,12 @@
                     @error('tgl_mulai') <p class="form-error">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label for="tgl_selesai" class="form-label">Tanggal Selesai Kontrak</label>
+                    <label for="tgl_selesai" class="form-label">Tanggal Selesai (opsional)</label>
                     <input id="tgl_selesai" name="tgl_selesai" type="date"
                         @class(['form-input', 'form-input-error' => $errors->has('tgl_selesai')]) value="{{ old('tgl_selesai') }}">
                     @error('tgl_selesai') <p class="form-error">{{ $message }}</p> @enderror
+                    <p class="form-hint">Kosongkan bila kontrak belum punya batas akhir.</p>
                 </div>
-            </div>
-            <div>
-                <label for="lokasi" class="form-label">Lokasi Kerja</label>
-                <input id="lokasi" name="lokasi" type="text" maxlength="255" required
-                    @class(['form-input', 'form-input-error' => $errors->has('lokasi')]) value="{{ old('lokasi') }}">
-                @error('lokasi') <p class="form-error">{{ $message }}</p> @enderror
             </div>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
@@ -78,11 +92,28 @@
                     @error('jam_pulang') <p class="form-error">{{ $message }}</p> @enderror
                 </div>
             </div>
-        </div>
+            <p class="form-hint">
+                Jam ini menjadi patokan keterlambatan absensi foto karyawan.
+                Untuk shift malam, isi jam pulang lebih awal dari jam datang (artinya pulang keesokan hari).
+            </p>
+        </section>
 
         <div class="card-footer justify-start">
-            <button type="submit" class="btn-primary" @disabled($karyawan->isEmpty() || $klien->isEmpty())>Proses Penempatan</button>
-            <a href="{{ route('operasional.monitoring') }}" class="btn-secondary">Batal</a>
+            <button type="submit" class="btn-primary" @disabled(! $bisaDisimpan)>Simpan Penempatan</button>
+            <a href="{{ route('operasional.penempatan.index') }}" class="btn-secondary">Batal</a>
         </div>
     </form>
+
+    <script>
+        (() => {
+            const pilihKaryawan = document.getElementById('id_karyawan');
+            const perbaruiLayanan = () => {
+                const layanan = pilihKaryawan.selectedOptions[0]?.dataset.layanan;
+                document.getElementById('info-layanan').hidden = !layanan;
+                document.getElementById('nama-layanan').textContent = layanan ?? '';
+            };
+            pilihKaryawan.addEventListener('change', perbaruiLayanan);
+            perbaruiLayanan();
+        })();
+    </script>
 @endsection

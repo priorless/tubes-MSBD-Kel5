@@ -134,6 +134,107 @@ class HrdModulTest extends TestCase
         ]);
     }
 
+    public function test_status_pernikahan_dan_nama_ibu_kandung_bisa_disimpan_dan_data_lama_tetap_kosong(): void
+    {
+        $idLama = $this->buatKaryawanLangsung();
+        $this->assertNull(DB::table('tbl_karyawan')->where('id', $idLama)->value('status_pernikahan'));
+        $this->assertNull(DB::table('tbl_karyawan')->where('id', $idLama)->value('nama_ibu_kandung'));
+
+        $halamanEdit = $this->get(route('hrd.karyawan.edit', $idLama))->assertOk();
+        $halamanEdit->assertSee('Belum diisi');
+        $halamanEdit->assertDontSee('placeholder="Belum diisi"', false);
+        $halamanEdit->assertSee('Belum Menikah');
+
+        $this->post(route('hrd.karyawan.store'), $this->dataKaryawan([
+            'nip' => 'TST-EMPTY',
+            'no_ktp' => '6666666666666666',
+            'kategori' => 'Lapangan',
+            'id_jenis_layanan' => $this->idLayanan('Driver'),
+            'status_pernikahan' => '',
+            'nama_ibu_kandung' => '',
+        ]))->assertRedirect(route('hrd.karyawan.index'));
+        $this->assertDatabaseHas('tbl_karyawan', [
+            'nip' => 'TST-EMPTY',
+            'status_pernikahan' => null,
+            'nama_ibu_kandung' => null,
+        ]);
+
+        $this->post(route('hrd.karyawan.store'), $this->dataKaryawan([
+            'nip' => 'TST-NEW',
+            'no_ktp' => '8888888888888888',
+            'kategori' => 'Lapangan',
+            'id_jenis_layanan' => $this->idLayanan('Driver'),
+            'status_pernikahan' => 'Menikah',
+            'nama_ibu_kandung' => 'Siti Aminah',
+        ]))->assertRedirect(route('hrd.karyawan.index'));
+
+        $idBaru = DB::table('tbl_karyawan')->where('nip', 'TST-NEW')->value('id');
+        $this->assertDatabaseHas('tbl_karyawan', [
+            'id' => $idBaru,
+            'status_pernikahan' => 'Menikah',
+            'nama_ibu_kandung' => 'Siti Aminah',
+        ]);
+
+        $dataEdit = $this->dataKaryawan([
+            'nama' => 'Karyawan Uji Diperbarui',
+            'no_ktp' => '7777777777777777',
+            'id_jenis_layanan' => $this->idLayanan('Driver'),
+            'status_pernikahan' => 'Belum Menikah',
+            'nama_ibu_kandung' => 'Aminah',
+        ]);
+        $this->put(route('hrd.karyawan.update', $idBaru), $dataEdit)
+            ->assertRedirect(route('hrd.karyawan.index'));
+
+        $this->assertDatabaseHas('tbl_karyawan', [
+            'id' => $idBaru,
+            'status_pernikahan' => 'Belum Menikah',
+            'nama_ibu_kandung' => 'Aminah',
+        ]);
+    }
+
+    public function test_jenis_jaminan_kesehatan_disimpan_diubah_dan_tampil_di_daftar_karyawan(): void
+    {
+        $idLama = $this->buatKaryawanLangsung(['nip' => 'TST-LAMA', 'no_ktp' => '5555555555555555', 'nama' => 'Karyawan Lama Uji']);
+        $this->assertNull(DB::table('tbl_karyawan')->where('id', $idLama)->value('jenis_jaminan_kesehatan'));
+
+        $this->get(route('hrd.karyawan.create'))
+            ->assertOk()
+            ->assertSee('Jenis Jaminan Kesehatan')
+            ->assertSee('<option value="BPJS"', false)
+            ->assertSee('<option value="Asuransi Kesehatan Swasta"', false);
+
+        $this->post(route('hrd.karyawan.store'), $this->dataKaryawan([
+            'kategori' => 'Lapangan',
+            'id_jenis_layanan' => $this->idLayanan('Satpam'),
+            'jenis_jaminan_kesehatan' => 'BPJS',
+        ]))->assertRedirect(route('hrd.karyawan.index'));
+
+        $idBaru = DB::table('tbl_karyawan')->where('nip', 'TST-001')->value('id');
+        $this->assertSame('BPJS', DB::table('tbl_karyawan')->where('id', $idBaru)->value('jenis_jaminan_kesehatan'));
+
+        $this->get(route('hrd.karyawan.edit', $idBaru))
+            ->assertOk()
+            ->assertSee('<option value="BPJS" selected', false);
+
+        $this->put(route('hrd.karyawan.update', $idBaru), $this->dataKaryawan([
+            'id_jenis_layanan' => $this->idLayanan('Satpam'),
+            'jenis_jaminan_kesehatan' => 'Asuransi Kesehatan Swasta',
+        ]))->assertRedirect(route('hrd.karyawan.index'));
+        $this->assertSame('Asuransi Kesehatan Swasta', DB::table('tbl_karyawan')->where('id', $idBaru)->value('jenis_jaminan_kesehatan'));
+
+        $this->put(route('hrd.karyawan.update', $idBaru), $this->dataKaryawan([
+            'id_jenis_layanan' => $this->idLayanan('Satpam'),
+            'jenis_jaminan_kesehatan' => 'Jamsostek',
+        ]))->assertSessionHasErrors(['jenis_jaminan_kesehatan' => 'Jenis jaminan kesehatan yang dipilih tidak valid.']);
+        $this->assertSame('Asuransi Kesehatan Swasta', DB::table('tbl_karyawan')->where('id', $idBaru)->value('jenis_jaminan_kesehatan'));
+
+        $this->get(route('hrd.karyawan.index', ['q' => 'TST']))
+            ->assertOk()
+            ->assertSee('Jaminan Kesehatan')
+            ->assertSeeInOrder(['Karyawan Lama Uji', 'Belum diisi'])
+            ->assertSeeInOrder(['Karyawan Uji', 'Asuransi Kesehatan Swasta']);
+    }
+
     public function test_ubah_karyawan_internal_tidak_boleh_mengosongkan_gaji_dan_nip_tetap(): void
     {
         $id = $this->buatKaryawanLangsung(['kategori' => 'Internal', 'gaji_pokok' => 5000000]);

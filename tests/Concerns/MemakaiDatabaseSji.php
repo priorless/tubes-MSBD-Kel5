@@ -34,9 +34,10 @@ trait MemakaiDatabaseSji
 
     protected function setUpDatabaseSji(): void
     {
+        // DB_SJI_TEST_DATABASE: jalankan test pada salinan db_sji (mis. db_sji_uji) tanpa menyentuh data asli.
         config([
             'database.default' => 'mysql',
-            'database.connections.mysql.database' => 'db_sji',
+            'database.connections.mysql.database' => env('DB_SJI_TEST_DATABASE', 'db_sji'),
         ]);
         DB::purge('mysql');
 

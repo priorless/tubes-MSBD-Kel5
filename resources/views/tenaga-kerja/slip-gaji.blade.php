@@ -3,6 +3,8 @@
 @section('title', 'Slip Gaji')
 
 @section('content')
+<x-ui.page-header class="tk-no-print" title="Slip Gaji" description="Lihat rincian gaji per periode, lalu cetak atau simpan sebagai PDF." />
+
 @if ($periode->isEmpty())
     <section class="tk-reveal card px-6 py-12 text-center">
         <p class="font-semibold text-gray-800">Belum ada slip gaji</p>

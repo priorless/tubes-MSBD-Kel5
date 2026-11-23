@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ auth()->check() ? 'Akun Belum Terhubung' : 'Sesi Tidak Dikenali' }} - SJI</title>
     <link rel="icon" type="image/png" href="{{ asset('images/logo-sji.png') }}">
+    @include('layouts.partials.font-tema')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="flex min-h-screen items-center justify-center bg-gray-50 px-4 font-sans text-gray-800 antialiased">
+<body class="tema-operasional flex min-h-screen items-center justify-center bg-gray-50 px-4 font-sans text-gray-800 antialiased">
     <section class="card w-full max-w-md p-8 text-center">
         <img src="{{ asset('images/logo-sji.png') }}" alt="Logo PT Satu Jaya Indonesia" class="mx-auto w-24">
         @auth
