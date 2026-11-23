@@ -575,3 +575,67 @@ BEGIN
 END //
 
 DELIMITER ;
+
+-- [TAHAP 4]
+-- Konsistensi struktur.
+-- 1) Collation: database + tabel yang masih utf8mb4_general_ci diseragamkan ke utf8mb4_unicode_ci (sama dengan
+--    koneksi Laravel). View/routine/trigger dibuat ulang oleh migration agar ikut collation baru.
+--    Migration mematikan FOREIGN_KEY_CHECKS selama CONVERT (kolom FK antar-tabel berubah bersamaan).
+-- 2) Kolom audit -> FOREIGN KEY ke tbl_users(id): nullable ON DELETE SET NULL, NOT NULL ON DELETE RESTRICT.
+--    tbl_log_aktivitas.id_user sengaja TANPA FK: log aktivitas adalah jejak audit yang harus tetap ada
+--    walau akunnya dihapus (FK SET NULL menghapus pelakunya, RESTRICT menghalangi penghapusan user).
+--    Tabel ini juga akan dipartisi (Tahap 7) dan MySQL tidak mendukung FK pada tabel berpartisi.
+-- 3) CHECK: semua CHECK dari migration sudah ada; chk_klien_koordinat/chk_klien_radius/chk_rating
+--    sengaja dihapus bersama kolom/tabelnya, jadi tidak ditambahkan lagi.
+-- Pengecualian: tbl_pertukaran_shift.diproses_oleh memakai RESTRICT walau nullable, karena chk_pertukaran_diproses
+--    mewajibkan kolom ini terisi setelah diproses (MySQL error 3823 menolak SET NULL pada kolom yang dipakai CHECK).
+DELIMITER //
+
+-- Nilai balik fn_sumber_jadwal_absensi ditulis eksplisit dengan collation; samakan agar kolom view ikut seragam.
+DROP FUNCTION IF EXISTS fn_sumber_jadwal_absensi //
+CREATE FUNCTION `fn_sumber_jadwal_absensi`(p_id_penempatan INT, p_tgl DATE) RETURNS varchar(15) CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci
+    READS SQL DATA
+BEGIN
+  DECLARE v_status VARCHAR(10) DEFAULT NULL;
+
+  IF p_id_penempatan IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SET v_status = (SELECT j.status FROM tbl_jadwal_kerja j
+                  WHERE j.id_penempatan = p_id_penempatan AND j.tanggal_kerja = p_tgl);
+
+  RETURN CASE v_status WHEN 'Kerja' THEN 'Jadwal Harian' WHEN 'Libur' THEN 'Libur' ELSE 'Penempatan' END;
+END //
+
+ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+
+ALTER TABLE tbl_absensi CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_invoice CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_jenis_layanan CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_karyawan CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_klien CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_kontrak CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_log_aktivitas CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_mutasi_keuangan CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_payroll CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_penempatan CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_roles CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_sertifikat CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+ALTER TABLE tbl_users CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci //
+
+ALTER TABLE tbl_invoice_catatan ADD CONSTRAINT fk_invoice_catatan_dibuat_oleh FOREIGN KEY (dibuat_oleh) REFERENCES tbl_users (id) ON DELETE RESTRICT //
+ALTER TABLE tbl_invoice_catatan ADD CONSTRAINT fk_invoice_catatan_diubah_oleh FOREIGN KEY (diubah_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+ALTER TABLE tbl_invoice_dokumen ADD CONSTRAINT fk_invoice_dokumen_diubah_oleh FOREIGN KEY (diubah_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+ALTER TABLE tbl_invoice_dokumen_riwayat ADD CONSTRAINT fk_invoice_dokumen_riwayat_diubah_oleh FOREIGN KEY (diubah_oleh) REFERENCES tbl_users (id) ON DELETE RESTRICT //
+ALTER TABLE tbl_jadwal_kerja ADD CONSTRAINT fk_jadwal_kerja_dibuat_oleh FOREIGN KEY (dibuat_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+ALTER TABLE tbl_jadwal_kerja ADD CONSTRAINT fk_jadwal_kerja_diubah_oleh FOREIGN KEY (diubah_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+ALTER TABLE tbl_jadwal_kerja_riwayat ADD CONSTRAINT fk_jadwal_kerja_riwayat_diubah_oleh FOREIGN KEY (diubah_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+ALTER TABLE tbl_pertukaran_shift ADD CONSTRAINT fk_pertukaran_shift_diproses_oleh FOREIGN KEY (diproses_oleh) REFERENCES tbl_users (id) ON DELETE RESTRICT //
+ALTER TABLE tbl_template_jadwal ADD CONSTRAINT fk_template_jadwal_dibuat_oleh FOREIGN KEY (dibuat_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+ALTER TABLE tbl_template_jadwal ADD CONSTRAINT fk_template_jadwal_diubah_oleh FOREIGN KEY (diubah_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+ALTER TABLE tbl_template_jadwal_penerapan ADD CONSTRAINT fk_template_jadwal_penerapan_diterapkan_oleh FOREIGN KEY (diterapkan_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+ALTER TABLE tbl_template_shift ADD CONSTRAINT fk_template_shift_dibuat_oleh FOREIGN KEY (dibuat_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+ALTER TABLE tbl_template_shift ADD CONSTRAINT fk_template_shift_diubah_oleh FOREIGN KEY (diubah_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
+
+DELIMITER ;

@@ -399,3 +399,56 @@ DROP TRIGGER IF EXISTS trg_cek_jadwal_kerja_insert //
 DROP PROCEDURE IF EXISTS sp_cek_jadwal_kerja //
 
 DELIMITER ;
+
+-- [TAHAP 4]
+-- Kembalikan collation lama dan lepas FK kolom audit (indeksnya dibiarkan; dipakai ulang bila FK dipasang lagi).
+DELIMITER //
+
+-- Nilai balik fn_sumber_jadwal_absensi ditulis eksplisit dengan collation; samakan agar kolom view ikut seragam.
+DROP FUNCTION IF EXISTS fn_sumber_jadwal_absensi //
+CREATE FUNCTION `fn_sumber_jadwal_absensi`(p_id_penempatan INT, p_tgl DATE) RETURNS varchar(15) CHARSET utf8mb4 COLLATE utf8mb4_general_ci
+    READS SQL DATA
+BEGIN
+  DECLARE v_status VARCHAR(10) DEFAULT NULL;
+
+  IF p_id_penempatan IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SET v_status = (SELECT j.status FROM tbl_jadwal_kerja j
+                  WHERE j.id_penempatan = p_id_penempatan AND j.tanggal_kerja = p_tgl);
+
+  RETURN CASE v_status WHEN 'Kerja' THEN 'Jadwal Harian' WHEN 'Libur' THEN 'Libur' ELSE 'Penempatan' END;
+END //
+
+ALTER TABLE tbl_invoice_catatan DROP FOREIGN KEY fk_invoice_catatan_dibuat_oleh //
+ALTER TABLE tbl_invoice_catatan DROP FOREIGN KEY fk_invoice_catatan_diubah_oleh //
+ALTER TABLE tbl_invoice_dokumen DROP FOREIGN KEY fk_invoice_dokumen_diubah_oleh //
+ALTER TABLE tbl_invoice_dokumen_riwayat DROP FOREIGN KEY fk_invoice_dokumen_riwayat_diubah_oleh //
+ALTER TABLE tbl_jadwal_kerja DROP FOREIGN KEY fk_jadwal_kerja_dibuat_oleh //
+ALTER TABLE tbl_jadwal_kerja DROP FOREIGN KEY fk_jadwal_kerja_diubah_oleh //
+ALTER TABLE tbl_jadwal_kerja_riwayat DROP FOREIGN KEY fk_jadwal_kerja_riwayat_diubah_oleh //
+ALTER TABLE tbl_pertukaran_shift DROP FOREIGN KEY fk_pertukaran_shift_diproses_oleh //
+ALTER TABLE tbl_template_jadwal DROP FOREIGN KEY fk_template_jadwal_dibuat_oleh //
+ALTER TABLE tbl_template_jadwal DROP FOREIGN KEY fk_template_jadwal_diubah_oleh //
+ALTER TABLE tbl_template_jadwal_penerapan DROP FOREIGN KEY fk_template_jadwal_penerapan_diterapkan_oleh //
+ALTER TABLE tbl_template_shift DROP FOREIGN KEY fk_template_shift_dibuat_oleh //
+ALTER TABLE tbl_template_shift DROP FOREIGN KEY fk_template_shift_diubah_oleh //
+
+ALTER TABLE tbl_absensi CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_invoice CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_jenis_layanan CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_karyawan CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_klien CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_kontrak CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_log_aktivitas CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_mutasi_keuangan CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_payroll CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_penempatan CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_roles CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_sertifikat CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+ALTER TABLE tbl_users CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+
+ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
+
+DELIMITER ;
