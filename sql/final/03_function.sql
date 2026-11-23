@@ -1,6 +1,6 @@
 -- ============================================================
 -- sql/final/03_function.sql — Function
--- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–8. DEFINER dihapus agar bisa diimpor
+-- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–10. DEFINER dihapus agar bisa diimpor
 -- di komputer lain. Urutan impor: lihat sql/README.md.
 -- ============================================================
 
@@ -79,7 +79,8 @@ DROP FUNCTION IF EXISTS `fn_hari_tanpa_jadwal_klien` //
 CREATE FUNCTION `fn_hari_tanpa_jadwal_klien`(p_id_karyawan INT, p_id_klien INT, p_awal DATE, p_akhir DATE) RETURNS int
     READS SQL DATA
 BEGIN
-  -- Hari dalam masa penempatan yang belum punya baris jadwal (Kerja maupun Libur).
+  -- Hari dalam masa penempatan yang belum punya baris jadwal (Kerja maupun Libur). Baris jadwal di luar masa
+  -- penempatannya (sisa sebelum penempatan diperpendek oleh rotasi) tidak dihitung, sama dengan fn_hari_kerja_roster.
   RETURN (
     WITH RECURSIVE hari AS (
       SELECT p_awal AS tgl
@@ -100,6 +101,8 @@ BEGIN
       WHERE p.id_karyawan = p_id_karyawan
         AND (p_id_klien IS NULL OR p.id_klien = p_id_klien)
         AND j.tanggal_kerja = h.tgl
+        AND j.tanggal_kerja >= p.tgl_mulai
+        AND (p.tgl_selesai IS NULL OR j.tanggal_kerja <= p.tgl_selesai)
     )
   );
 END //

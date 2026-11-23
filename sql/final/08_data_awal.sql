@@ -1,6 +1,6 @@
 -- ============================================================
 -- sql/final/08_data_awal.sql — Data awal: tbl_roles, tbl_jenis_layanan, migrations (agar php artisan migrate tidak mengulang migrasi)
--- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–8. DEFINER dihapus agar bisa diimpor
+-- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–10. DEFINER dihapus agar bisa diimpor
 -- di komputer lain. Urutan impor: lihat sql/README.md.
 -- ============================================================
 
@@ -65,4 +65,5 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (52,'2026_11_23_054
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (54,'2026_11_23_060544_finalisasi_tahap5_indeks_optimasi',22);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (56,'2026_11_23_062404_finalisasi_tahap7_teknologi_lanjutan',23);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (58,'2026_11_23_063356_finalisasi_tahap8_role_aplikasi',24);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (60,'2026_11_23_064517_finalisasi_tahap10_perbaikan_hari_tanpa_jadwal',25);
 UNLOCK TABLES;

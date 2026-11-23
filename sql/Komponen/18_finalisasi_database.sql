@@ -660,7 +660,7 @@ DELIMITER ;
 --    fungsi partisi (MySQL error 1486); dipakai RANGE (UNIX_TIMESTAMP(waktu)) dengan batas tiap 1 Januari.
 --    Syarat partisi: setiap PRIMARY/UNIQUE KEY memuat kolom partisi -> PRIMARY KEY menjadi (id, waktu).
 --    Tidak ada FOREIGN KEY yang merujuk/berasal dari tabel ini (FK tidak didukung tabel berpartisi).
--- 3) FULLTEXT untuk pencarian nama karyawan dan nama perusahaan klien (App\Support\PencarianTeks).
+-- 3) FULLTEXT pada nama karyawan dan nama perusahaan klien (MATCH ... AGAINST); pencarian di aplikasi tetap LIKE.
 DELIMITER //
 
 ALTER TABLE tbl_jadwal_kerja_riwayat
@@ -723,5 +723,47 @@ DELIMITER ;
 DELIMITER //
 
 CREATE ROLE IF NOT EXISTS 'sji_role_app' //
+
+DELIMITER ;
+
+-- [TAHAP 10]
+-- Perbaikan hasil uji akhir: fn_hari_tanpa_jadwal_klien menganggap tanggal sudah dijadwalkan walau baris jadwalnya
+-- berada di luar masa penempatannya (mis. penempatan diperpendek oleh rotasi setelah roster dibuat). Akibatnya
+-- hari_wajib payroll terlalu kecil dan tidak sama dengan pembagi invoice. Sekarang batas masa penempatan dipakai
+-- seperti di fn_hari_kerja_roster_klien.
+DELIMITER //
+
+DROP FUNCTION IF EXISTS fn_hari_tanpa_jadwal_klien //
+CREATE FUNCTION fn_hari_tanpa_jadwal_klien(p_id_karyawan INT, p_id_klien INT, p_awal DATE, p_akhir DATE)
+RETURNS INT
+READS SQL DATA
+BEGIN
+  -- Hari dalam masa penempatan yang belum punya baris jadwal (Kerja maupun Libur). Baris jadwal di luar masa
+  -- penempatannya (sisa sebelum penempatan diperpendek oleh rotasi) tidak dihitung, sama dengan fn_hari_kerja_roster.
+  RETURN (
+    WITH RECURSIVE hari AS (
+      SELECT p_awal AS tgl
+      UNION ALL
+      SELECT DATE_ADD(tgl, INTERVAL 1 DAY) FROM hari WHERE tgl < p_akhir
+    )
+    SELECT COUNT(*) FROM hari h
+    WHERE EXISTS (
+      SELECT 1 FROM tbl_penempatan p
+      WHERE p.id_karyawan = p_id_karyawan
+        AND (p_id_klien IS NULL OR p.id_klien = p_id_klien)
+        AND p.tgl_mulai <= h.tgl
+        AND (p.tgl_selesai IS NULL OR p.tgl_selesai >= h.tgl)
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM tbl_jadwal_kerja j
+      JOIN tbl_penempatan p ON p.id = j.id_penempatan
+      WHERE p.id_karyawan = p_id_karyawan
+        AND (p_id_klien IS NULL OR p.id_klien = p_id_klien)
+        AND j.tanggal_kerja = h.tgl
+        AND j.tanggal_kerja >= p.tgl_mulai
+        AND (p.tgl_selesai IS NULL OR j.tanggal_kerja <= p.tgl_selesai)
+    )
+  );
+END //
 
 DELIMITER ;

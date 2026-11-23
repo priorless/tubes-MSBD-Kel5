@@ -143,36 +143,41 @@ ALTER TABLE tbl_klien    ADD FULLTEXT INDEX ft_klien_nama_perusahaan (nama_perus
 
 `LIKE '%kata%'` selalu memindai seluruh tabel, karena B-Tree index tidak bisa dipakai kalau pola diawali `%`. Pencarian nama karyawan (HRD → Data Karyawan) dan nama klien (Data Klien di Operasional dan HRD) adalah pencarian yang paling sering diketik pengguna.
 
-### Penerapan di aplikasi
+### Penerapan
 
-Aturan pencarian ada di `App\Support\PencarianTeks` dan dipakai oleh `Hrd\KaryawanController` dan `Operasional\KlienController`:
-
-| Kondisi | Query |
-|---|---|
-| MySQL dan setiap kata ≥ 3 huruf | `MATCH (nama) AGAINST ('+kata1* +kata2*' IN BOOLEAN MODE)`, artinya semua kata wajib ada dan dicocokkan dari awal kata |
-| Ada kata < 3 huruf, atau bukan MySQL (SQLite saat tes) | `nama LIKE '%kata%'`, seperti sebelumnya |
-| Selalu | NIP / kode klien tetap dicari dengan `LIKE`, karena berupa kode, bukan teks bebas |
-
-Contoh query yang dibuat untuk input `"fulltext zulkar"`:
+Indeks FULLTEXT terpasang di database dan bisa dipakai dengan `MATCH ... AGAINST`:
 
 ```sql
-SELECT ... FROM tbl_karyawan k
-WHERE (MATCH (k.nama) AGAINST ('+fulltext* +zulkar*' IN BOOLEAN MODE) OR k.nip LIKE '%fulltext zulkar%');
+-- Mode boolean: semua kata wajib ada (+), dicocokkan dari awal kata (*).
+SELECT id, nip, nama FROM tbl_karyawan
+WHERE MATCH (nama) AGAINST ('+zulkar* +fulltext*' IN BOOLEAN MODE);
+
+-- Mode natural language: diurutkan menurut relevansi.
+SELECT id, nama_perusahaan, MATCH (nama_perusahaan) AGAINST ('samudra') AS skor
+FROM tbl_klien WHERE MATCH (nama_perusahaan) AGAINST ('samudra') ORDER BY skor DESC;
 ```
 
-Beberapa catatan:
-- **Batas 3 huruf** mengikuti `innodb_ft_min_token_size = 3`. Kata yang lebih pendek tidak diindeks InnoDB, sehingga untuk kata seperti itu tetap dipakai LIKE supaya hasilnya tidak hilang.
-- **Operator boolean dari pengguna dibuang.** Karakter selain huruf, angka, dan spasi dihapus sebelum disusun menjadi `+kata*`. Nilainya juga dikirim lewat binding `?`.
-- **Perubahan perilaku yang disengaja.** FULLTEXT mencocokkan dari **awal kata**: "zulkar" dan "fulltext" menemukan "Zulkarnain Fulltextuji", tetapi potongan di tengah kata seperti "karnain" tidak. Hal ini diuji secara eksplisit. Bagi pencarian nama orang dan perusahaan, perilaku ini wajar, karena pengguna mengetik awal nama.
-- **Data baru langsung bisa dicari setelah di-commit.** Di aplikasi setiap simpan langsung di-commit, jadi tidak terasa. Di tes, data harus di-commit dulu, karena FULLTEXT InnoDB tidak melihat baris yang belum di-commit.
+**Pencarian di halaman aplikasi tetap memakai `LIKE '%kata%'`.** FULLTEXT sempat diterapkan ke pencarian Data Karyawan dan Data Klien, lalu dikembalikan ke LIKE atas keputusan tim. Alasannya, FULLTEXT hanya mencocokkan dari **awal kata**, sehingga potongan di tengah kata seperti "karnain" tidak lagi menemukan "Zulkarnain". Pengguna terbiasa mengetik potongan nama apa saja.
+
+Perbandingan keduanya:
+
+| | `LIKE '%kata%'` (dipakai aplikasi) | `MATCH ... AGAINST` (FULLTEXT) |
+|---|---|---|
+| Potongan di tengah kata ("karnain") | Ketemu | Tidak ketemu |
+| Kata < 3 huruf | Ketemu | Tidak diindeks (`innodb_ft_min_token_size = 3`) |
+| Memakai indeks | Tidak (pola diawali `%`, full scan) | Ya |
+| Urutan relevansi | Tidak ada | Ada (mode natural language) |
+| Baris yang belum di-commit | Terlihat | Belum terlihat sampai di-commit |
+
+Dengan jumlah karyawan dan klien saat ini, full scan dari `LIKE` tidak terasa lambat. Kalau data membesar, FULLTEXT sudah siap dipakai.
 
 ### Hasil
 
-Tes `test_pencarian_karyawan_dan_klien_memakai_fulltext_dari_awal_kata` memeriksa empat kasus:
-- `q=fulltext zulkar` menemukan karyawan;
-- `q=karnain` (tengah kata) tidak menemukan karyawan;
-- `q=samudra fulltextuji` menemukan klien;
-- `q=PT` (2 huruf) tetap menemukan klien lewat LIKE.
+Tes `test_fulltext_index_mencocokkan_awal_kata_sedangkan_like_juga_tengah_kata` memeriksa beberapa hal:
+- `MATCH` menemukan "Zulkarnain Fulltextuji" untuk `+zulkar* +fulltext*`, dan "PT Samudra Fulltextuji" untuk `+samudra*`;
+- `MATCH` tidak menemukan apa pun untuk potongan tengah kata `karnain*`;
+- `EXPLAIN` memakai indeks `ft_karyawan_nama` (type `fulltext`);
+- halaman HRD → Data Karyawan dengan `q=karnain` tetap menemukan karyawan itu, karena aplikasi memakai LIKE.
 
 ---
 
@@ -184,4 +189,4 @@ Tes `test_pencarian_karyawan_dan_klien_memakai_fulltext_dari_awal_kata` memeriks
 | `v_riwayat_jadwal_kerja` | View (JSON_EXTRACT/JSON_UNQUOTE). GRANT SELECT ke `sji_role_operasional` |
 | `v_pertukaran_shift_snapshot` | View (operator `->>`). GRANT SELECT ke `sji_role_operasional` |
 | `tbl_log_aktivitas` | Dipartisi RANGE per tahun (p2025–p2028, pmax). PRIMARY KEY (id, waktu) |
-| `ft_karyawan_nama`, `ft_klien_nama_perusahaan` | FULLTEXT index |
+| `ft_karyawan_nama`, `ft_klien_nama_perusahaan` | FULLTEXT index (tersedia untuk `MATCH ... AGAINST`; pencarian aplikasi tetap LIKE) |

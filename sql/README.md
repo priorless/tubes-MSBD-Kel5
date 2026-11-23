@@ -31,7 +31,9 @@ Setiap file mencatat perubahan pada satu tahap pengerjaan. Isinya menimpa atau m
 | `07_hak_akses.sql` | Salinan `Komponen/10_hak_akses_database.sql` (role per bagian + `sji_role_app`) |
 | `08_data_awal.sql` | Data wajib: `tbl_roles`, `tbl_jenis_layanan`, dan isi tabel `migrations` |
 
-Semua file diekspor dari database setelah Finalisasi Tahap 1–8 dengan `mysqldump --no-data --skip-comments` dan `SHOW CREATE ...`. Klausa `DEFINER=` dan nilai `AUTO_INCREMENT=` dihapus supaya bisa diimpor oleh user MySQL mana pun di komputer lain. Teks `SQL SECURITY DEFINER` pada view dan routine tetap ada. Itu mode keamanan, bukan nama user.
+Semua file diekspor dari database setelah Finalisasi Tahap 1–10 dengan `mysqldump --no-data --skip-comments` dan `SHOW CREATE ...`. Klausa `DEFINER=` dan nilai `AUTO_INCREMENT=` dihapus supaya bisa diimpor oleh user MySQL mana pun di komputer lain. Teks `SQL SECURITY DEFINER` pada view dan routine tetap ada. Itu mode keamanan, bukan nama user.
+
+> **Perhatian untuk `07_hak_akses.sql`:** role MySQL berlaku untuk seluruh server, dan file ini diawali `REVOKE ALL PRIVILEGES FROM` setiap role. Jalankan file ini **hanya pada database yang dipakai aplikasi**. Kalau dijalankan pada database lain di server yang sama, misalnya database uji, hak role atas `db_sji` ikut tercabut. Untuk memulihkannya, jalankan ulang file ini pada `db_sji`, atau `php artisan tinker --execute 'App\Support\SqlKomponen::pasangHakAkses();'`.
 
 `08_data_awal.sql` sengaja menyertakan isi tabel `migrations`. Dengan begitu `php artisan migrate` setelah impor tidak menjalankan ulang migration yang perubahannya sudah ada di `final/`.
 

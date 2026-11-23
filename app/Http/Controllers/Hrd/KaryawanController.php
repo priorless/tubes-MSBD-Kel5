@@ -6,7 +6,6 @@ use App\Http\Controllers\Concerns\MenanganiSignalDatabase;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hrd\StoreKaryawanRequest;
 use App\Http\Requests\Hrd\UpdateKaryawanRequest;
-use App\Support\PencarianTeks;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +27,10 @@ class KaryawanController extends Controller
         $karyawan = DB::table('tbl_karyawan as k')
             ->leftJoin('tbl_jenis_layanan as jl', 'jl.id', '=', 'k.id_jenis_layanan')
             ->leftJoin('tbl_users as u', 'u.id_karyawan', '=', 'k.id')
-            ->when($request->filled('q'), fn ($query) => PencarianTeks::terapkan($query, 'k.nama', ['k.nip'], (string) $request->string('q')))
+            ->when($request->filled('q'), function ($query) use ($request): void {
+                $kataKunci = '%'.$request->string('q').'%';
+                $query->where(fn ($sub) => $sub->where('k.nama', 'like', $kataKunci)->orWhere('k.nip', 'like', $kataKunci));
+            })
             ->when($request->filled('kategori'), fn ($query) => $query->where('k.kategori', $request->string('kategori')))
             ->when($request->filled('status'), fn ($query) => $query->where('k.status', $request->string('status')))
             ->orderByDesc('k.id')

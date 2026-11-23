@@ -66,20 +66,25 @@ class TeknologiLanjutanDatabaseTest extends TestCase
         )->partitions, 'Partition pruning: hanya partisi tahun itu yang dibaca');
     }
 
-    public function test_pencarian_karyawan_dan_klien_memakai_fulltext_dari_awal_kata(): void
+    public function test_fulltext_index_mencocokkan_awal_kata_sedangkan_like_juga_tengah_kata(): void
     {
         $karyawan = $this->buatKaryawan('Lapangan', ['nama' => 'Zulkarnain Fulltextuji']);
         $klien = $this->buatKlien(['nama_perusahaan' => 'PT Samudra Fulltextuji']);
         // FULLTEXT InnoDB hanya melihat baris yang sudah di-commit; data uji dihapus lagi di tearDown.
         DB::commit();
+        $cocokKaryawan = fn (string $kata): array => DB::table('tbl_karyawan')
+            ->whereRaw('MATCH (nama) AGAINST (? IN BOOLEAN MODE)', [$kata])->pluck('id')->all();
 
+        $this->assertSame([$karyawan], $cocokKaryawan('+zulkar* +fulltext*'));
+        $this->assertSame([], $cocokKaryawan('karnain*'), 'FULLTEXT tidak mencocokkan potongan di tengah kata');
+        $this->assertSame([$klien], DB::table('tbl_klien')
+            ->whereRaw('MATCH (nama_perusahaan) AGAINST (? IN BOOLEAN MODE)', ['+samudra* +fulltextuji'])->pluck('id')->all());
+        $rencana = DB::selectOne("EXPLAIN SELECT id FROM tbl_karyawan WHERE MATCH (nama) AGAINST ('+zulkar*' IN BOOLEAN MODE)");
+        $this->assertSame(['fulltext', 'ft_karyawan_nama'], [$rencana->type, $rencana->key]);
+
+        // Pencarian di aplikasi tetap LIKE: potongan di tengah kata tetap ketemu.
         $this->loginSebagai(Role::Hrd);
-        $this->get(route('hrd.karyawan.index', ['q' => 'fulltext zulkar']))->assertOk()->assertSeeText('Zulkarnain Fulltextuji');
-        $this->get(route('hrd.karyawan.index', ['q' => 'karnain']))->assertOk()->assertDontSeeText('Zulkarnain Fulltextuji');
-        $this->get(route('hrd.klien.index', ['q' => 'samudra fulltextuji']))->assertOk()->assertSeeText('PT Samudra Fulltextuji');
-        $this->get(route('hrd.klien.index', ['q' => 'PT']))->assertOk()->assertSeeText('PT Samudra Fulltextuji', 'Kata < 3 huruf memakai LIKE');
-
-        $this->assertNotNull(DB::table('tbl_karyawan')->find($karyawan));
-        $this->assertNotNull(DB::table('tbl_klien')->find($klien));
+        $this->get(route('hrd.karyawan.index', ['q' => 'karnain']))->assertOk()->assertSeeText('Zulkarnain Fulltextuji');
+        $this->get(route('hrd.klien.index', ['q' => 'amudra']))->assertOk()->assertSeeText('PT Samudra Fulltextuji');
     }
 }

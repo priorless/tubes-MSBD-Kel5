@@ -490,3 +490,38 @@ DELIMITER //
 DROP ROLE IF EXISTS 'sji_role_app' //
 
 DELIMITER ;
+
+-- [TAHAP 10]
+DELIMITER //
+
+DROP FUNCTION IF EXISTS fn_hari_tanpa_jadwal_klien //
+CREATE FUNCTION fn_hari_tanpa_jadwal_klien(p_id_karyawan INT, p_id_klien INT, p_awal DATE, p_akhir DATE)
+RETURNS INT
+READS SQL DATA
+BEGIN
+  -- Hari dalam masa penempatan yang belum punya baris jadwal (Kerja maupun Libur).
+  RETURN (
+    WITH RECURSIVE hari AS (
+      SELECT p_awal AS tgl
+      UNION ALL
+      SELECT DATE_ADD(tgl, INTERVAL 1 DAY) FROM hari WHERE tgl < p_akhir
+    )
+    SELECT COUNT(*) FROM hari h
+    WHERE EXISTS (
+      SELECT 1 FROM tbl_penempatan p
+      WHERE p.id_karyawan = p_id_karyawan
+        AND (p_id_klien IS NULL OR p.id_klien = p_id_klien)
+        AND p.tgl_mulai <= h.tgl
+        AND (p.tgl_selesai IS NULL OR p.tgl_selesai >= h.tgl)
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM tbl_jadwal_kerja j
+      JOIN tbl_penempatan p ON p.id = j.id_penempatan
+      WHERE p.id_karyawan = p_id_karyawan
+        AND (p_id_klien IS NULL OR p.id_klien = p_id_klien)
+        AND j.tanggal_kerja = h.tgl
+    )
+  );
+END //
+
+DELIMITER ;

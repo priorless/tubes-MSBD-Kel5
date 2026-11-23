@@ -140,7 +140,14 @@ Tes otomatis ada di `tests/Feature/BackupRestoreDatabaseTest.php` dan mencakup:
 
 ## 6. Mengapa mysqldump, bukan Export phpMyAdmin
 
-1. **CHECK constraint hilang.** Dalam pengujian tim, hasil export phpMyAdmin tidak menyertakan CHECK constraint, misalnya `chk_pertukaran_diproses`, `chk_klien_management_fee`, dan `chk_template_jadwal_detail_jam`. Database hasil impor tetap jalan, tetapi aturan validasi di level database hilang tanpa peringatan. `mysqldump` dari MySQL 8 menuliskan CHECK sebagai bagian dari `CREATE TABLE`. Hasil di atas menunjukkan 11 dari 11 CHECK ikut terpulihkan.
-2. **Routine, trigger, dan event tidak boleh tertinggal.** Opsi ini harus dicentang manual di phpMyAdmin. Dengan `sji:backup-db` opsinya selalu dipakai.
+1. **CHECK constraint hilang.** Ini sudah dibuktikan pada 23 November 2026. File export db_sji dari phpMyAdmin 5.2.1 (server MySQL 8.0.30) berisi **0** CHECK constraint, padahal db_sji punya 11, misalnya `chk_pertukaran_diproses`, `chk_klien_management_fee`, dan `chk_template_jadwal_detail_jam`. Trigger (19), routine (31), event (1), dan partisi ikut ter-export, jadi yang hilang khusus CHECK. Database hasil impor file itu tetap jalan, tetapi aturan validasi di level database hilang tanpa peringatan. `mysqldump` menuliskan CHECK sebagai bagian dari `CREATE TABLE`: `sql/final/01_tabel.sql` memuat 11 dari 11, dan uji restore di atas juga memulihkan 11 dari 11.
+
+   | Hasil ekspor | Jumlah CHECK constraint |
+   |---|---|
+   | Database db_sji | 11 |
+   | Export phpMyAdmin 5.2.1 | **0** |
+   | `mysqldump` (`sji:backup-db`, `sql/final/01_tabel.sql`) | 11 |
+
+2. **Routine, trigger, dan event bergantung pada centangan manual.** Pada export di atas ketiganya ikut, tetapi di phpMyAdmin opsinya harus dicentang setiap kali export. Dengan `sji:backup-db` opsinya selalu dipakai.
 3. **Konsistensi.** `--single-transaction` menghasilkan snapshot satu titik waktu tanpa mengunci tabel.
 4. **Bisa dijadwalkan dan diuji otomatis.** Export phpMyAdmin harus dilakukan manual lewat browser, dan untuk data besar bisa terputus karena batas waktu PHP atau ukuran unduhan.

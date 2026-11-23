@@ -1,6 +1,6 @@
 -- ============================================================
 -- sql/final/04_procedure.sql — Stored procedure
--- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–8. DEFINER dihapus agar bisa diimpor
+-- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–10. DEFINER dihapus agar bisa diimpor
 -- di komputer lain. Urutan impor: lihat sql/README.md.
 -- ============================================================
 

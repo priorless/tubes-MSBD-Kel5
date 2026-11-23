@@ -26,7 +26,7 @@ Semua nilai dari pengguna dikirim ke MySQL sebagai parameter `?`, tidak pernah d
 - **Query mentah** juga memakai binding, misalnya:
   - `DB::statement('CALL sp_generate_payroll_bulanan(?, ?)', [$bulan, $tahun])`
   - `whereRaw('fn_sisa_hari_dokumen(s.tgl_kadaluarsa) < ?', [$batasHari])`
-- **Pencarian FULLTEXT** (`App\Support\PencarianTeks`) membuang karakter operator boolean dari input sebelum menyusun `+kata*`, lalu mengirim hasilnya lewat binding.
+- **Pencarian nama** (karyawan, klien, absensi) memakai `LIKE` dengan pola `'%'.$kata.'%'` yang dikirim sebagai binding, sehingga tanda kutip dan karakter lain di input hanya menjadi bagian teks yang dicari.
 
 ### Lapis 3 — Hak akses minimum (ROLE + GRANT)
 

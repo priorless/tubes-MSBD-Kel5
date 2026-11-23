@@ -131,6 +131,21 @@ class PayrollInvoiceProrataTest extends TestCase
         $this->assertEquals(0, (float) $p->potongan_absen);
     }
 
+    public function test_jadwal_sisa_di_luar_masa_penempatan_tidak_mengurangi_hari_tanpa_jadwal(): void
+    {
+        $id = $this->buatKaryawan('Lapangan');
+        $penempatanA = $this->buatPenempatan($id, $this->buatKlien(), $this->tgl(1), $this->tgl(28), [], 2500000, 25);
+        $this->buatRoster($penempatanA, [1, 2, 3, 4, 5, 15, 16]);
+        // Rotasi memperpendek penempatan A setelah roster dibuat: jadwal 15-16 tertinggal di luar masa penempatan.
+        DB::table('tbl_penempatan')->where('id', $penempatanA)->update(['tgl_selesai' => $this->tgl(14), 'status' => 'Rotasi']);
+        $this->buatPenempatan($id, $this->buatKlien(), $this->tgl(15), null, [], 2500000, 25);
+
+        $this->generatePayroll();
+
+        // 5 hari Kerja + ROUND(25 x 23 hari tanpa jadwal (6-14 di A, 15-28 di B) / 28) = 5 + 21.
+        $this->assertSame(26, (int) $this->payroll($id)->hari_wajib);
+    }
+
     public function test_invoice_membagi_payroll_per_klien_sesuai_roster(): void
     {
         $klienA = $this->buatKlien(['management_fee' => 0]);
