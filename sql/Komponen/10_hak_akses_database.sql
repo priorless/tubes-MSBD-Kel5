@@ -80,6 +80,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON tbl_template_jadwal_detail TO 'sji_role_
 GRANT SELECT, INSERT ON tbl_template_jadwal_penerapan TO 'sji_role_operasional';
 -- Pertukaran Shift: Operasional hanya membaca dan memutuskan (UPDATE status); pengajuan dibuat karyawan.
 GRANT SELECT, UPDATE ON tbl_pertukaran_shift TO 'sji_role_operasional';
+-- JSON riwayat jadwal & snapshot tukar shift dalam bentuk kolom (Finalisasi Tahap 7).
+GRANT SELECT ON v_riwayat_jadwal_kerja TO 'sji_role_operasional';
+GRANT SELECT ON v_pertukaran_shift_snapshot TO 'sji_role_operasional';
 
 -- ------------------------------------------------------------
 -- Keuangan — payroll, invoice, buku kas

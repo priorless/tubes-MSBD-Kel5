@@ -376,6 +376,47 @@
                 @endif
             </div>
         </div>
+        @if ($riwayatJadwal->isNotEmpty())
+            {{-- Riwayat dari view v_riwayat_jadwal_kerja (isi JSON data_sebelum/data_sesudah dibaca di database). --}}
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Riwayat Perubahan Jadwal <span class="text-sm font-normal text-gray-400">{{ $judulBulan }} &middot; 20 terbaru</span></h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Waktu</th>
+                                <th>Tanggal Kerja</th>
+                                <th>Aksi</th>
+                                <th>Sebelum</th>
+                                <th>Sesudah</th>
+                                <th>Oleh</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($riwayatJadwal as $riwayat)
+                                @php
+                                    $ringkas = static fn (?string $status, ?string $masuk, ?string $pulang): string => match (true) {
+                                        $status === null => '—',
+                                        $status === 'Kerja' && $masuk !== null => 'Kerja '.substr($masuk, 0, 5).'–'.substr((string) $pulang, 0, 5),
+                                        default => $status,
+                                    };
+                                @endphp
+                                <tr>
+                                    <td class="whitespace-nowrap text-gray-500 tabular-nums">{{ \Illuminate\Support\Carbon::parse($riwayat->created_at)->format('d/m/Y H:i') }}</td>
+                                    <td class="whitespace-nowrap tabular-nums">{{ \Illuminate\Support\Carbon::parse($riwayat->tanggal_kerja)->format('d/m/Y') }}</td>
+                                    <td>{{ $riwayat->aksi }}</td>
+                                    <td class="whitespace-nowrap">{{ $ringkas($riwayat->status_sebelum, $riwayat->jam_masuk_sebelum, $riwayat->jam_pulang_sebelum) }}</td>
+                                    <td class="whitespace-nowrap">{{ $ringkas($riwayat->status_sesudah, $riwayat->jam_masuk_sesudah, $riwayat->jam_pulang_sesudah) }}</td>
+                                    <td>{{ $riwayat->nama_pengubah ?? '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
     </div>
 
     @if ($karyawanTerpilih !== null && $penempatanAktif !== null && $rosterTersedia)

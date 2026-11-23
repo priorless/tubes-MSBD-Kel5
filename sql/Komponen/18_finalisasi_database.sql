@@ -650,3 +650,69 @@ CREATE INDEX idx_penempatan_klien_status_mulai ON tbl_penempatan (id_klien, stat
 CREATE INDEX idx_sertifikat_kadaluarsa_status ON tbl_sertifikat (tgl_kadaluarsa, status) //
 
 DELIMITER ;
+
+-- [TAHAP 7]
+-- Teknologi basis data lanjutan (penjelasan: docs/teknologi-lanjutan.md).
+-- 1) JSON / model dokumen: riwayat jadwal (data_sebelum/data_sesudah) dan snapshot tukar shift disimpan sebagai
+--    dokumen JSON; view di bawah membacanya kembali sebagai kolom relasional dengan JSON_EXTRACT/JSON_UNQUOTE.
+--    Kolom generated STORED status_sesudah (+ indeks) agar pencarian "riwayat yang menjadikan Libur/Kerja" memakai indeks.
+-- 2) Partisi tbl_log_aktivitas per tahun. Kolom waktu bertipe TIMESTAMP sehingga YEAR(waktu) tidak diizinkan sebagai
+--    fungsi partisi (MySQL error 1486); dipakai RANGE (UNIX_TIMESTAMP(waktu)) dengan batas tiap 1 Januari.
+--    Syarat partisi: setiap PRIMARY/UNIQUE KEY memuat kolom partisi -> PRIMARY KEY menjadi (id, waktu).
+--    Tidak ada FOREIGN KEY yang merujuk/berasal dari tabel ini (FK tidak didukung tabel berpartisi).
+-- 3) FULLTEXT untuk pencarian nama karyawan dan nama perusahaan klien (App\Support\PencarianTeks).
+DELIMITER //
+
+ALTER TABLE tbl_jadwal_kerja_riwayat
+  ADD COLUMN status_sesudah VARCHAR(5) COLLATE utf8mb4_unicode_ci
+    GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(data_sesudah, '$.status'))) STORED AFTER data_sesudah //
+ALTER TABLE tbl_jadwal_kerja_riwayat ADD INDEX idx_riwayat_status_sesudah (status_sesudah, created_at) //
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW v_riwayat_jadwal_kerja AS
+SELECT r.id, r.id_jadwal_kerja, j.id_penempatan, p.id_karyawan, k.nip, k.nama, kl.nama_perusahaan AS nama_klien,
+       j.tanggal_kerja, r.aksi,
+       NULLIF(JSON_UNQUOTE(JSON_EXTRACT(r.data_sebelum, '$.status')), 'null') AS status_sebelum,
+       NULLIF(JSON_UNQUOTE(JSON_EXTRACT(r.data_sebelum, '$.jam_masuk')), 'null') AS jam_masuk_sebelum,
+       NULLIF(JSON_UNQUOTE(JSON_EXTRACT(r.data_sebelum, '$.jam_pulang')), 'null') AS jam_pulang_sebelum,
+       NULLIF(JSON_UNQUOTE(JSON_EXTRACT(r.data_sebelum, '$.nama_shift_snapshot')), 'null') AS shift_sebelum,
+       r.status_sesudah,
+       NULLIF(JSON_UNQUOTE(JSON_EXTRACT(r.data_sesudah, '$.jam_masuk')), 'null') AS jam_masuk_sesudah,
+       NULLIF(JSON_UNQUOTE(JSON_EXTRACT(r.data_sesudah, '$.jam_pulang')), 'null') AS jam_pulang_sesudah,
+       NULLIF(JSON_UNQUOTE(JSON_EXTRACT(r.data_sesudah, '$.nama_shift_snapshot')), 'null') AS shift_sesudah,
+       r.diubah_oleh, u.nama AS nama_pengubah, r.created_at
+FROM tbl_jadwal_kerja_riwayat r
+JOIN tbl_jadwal_kerja j ON j.id = r.id_jadwal_kerja
+JOIN tbl_penempatan p ON p.id = j.id_penempatan
+JOIN tbl_karyawan k ON k.id = p.id_karyawan
+JOIN tbl_klien kl ON kl.id = p.id_klien
+LEFT JOIN tbl_users u ON u.id = r.diubah_oleh //
+
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW v_pertukaran_shift_snapshot AS
+SELECT ps.id, ps.tanggal_kerja, ps.tanggal_kerja_rekan, ps.status, ps.status_rekan,
+       ps.id_karyawan_pengaju, kp.nama AS nama_pengaju, ps.id_karyawan_rekan, kr.nama AS nama_rekan,
+       ps.snapshot_pengaju ->> '$.status' AS status_jadwal_pengaju,
+       ps.snapshot_pengaju ->> '$.jam_masuk' AS jam_masuk_pengaju,
+       ps.snapshot_pengaju ->> '$.jam_pulang' AS jam_pulang_pengaju,
+       NULLIF(ps.snapshot_pengaju ->> '$.nama_shift_snapshot', 'null') AS shift_pengaju,
+       ps.snapshot_rekan ->> '$.status' AS status_jadwal_rekan,
+       ps.snapshot_rekan ->> '$.jam_masuk' AS jam_masuk_rekan,
+       ps.snapshot_rekan ->> '$.jam_pulang' AS jam_pulang_rekan,
+       NULLIF(ps.snapshot_rekan ->> '$.nama_shift_snapshot', 'null') AS shift_rekan,
+       ps.created_at
+FROM tbl_pertukaran_shift ps
+JOIN tbl_karyawan kp ON kp.id = ps.id_karyawan_pengaju
+JOIN tbl_karyawan kr ON kr.id = ps.id_karyawan_rekan //
+
+ALTER TABLE tbl_log_aktivitas DROP PRIMARY KEY, ADD PRIMARY KEY (id, waktu) //
+ALTER TABLE tbl_log_aktivitas PARTITION BY RANGE (UNIX_TIMESTAMP(waktu)) (
+  PARTITION p2025 VALUES LESS THAN (UNIX_TIMESTAMP('2026-01-01 00:00:00')),
+  PARTITION p2026 VALUES LESS THAN (UNIX_TIMESTAMP('2027-01-01 00:00:00')),
+  PARTITION p2027 VALUES LESS THAN (UNIX_TIMESTAMP('2028-01-01 00:00:00')),
+  PARTITION p2028 VALUES LESS THAN (UNIX_TIMESTAMP('2029-01-01 00:00:00')),
+  PARTITION pmax VALUES LESS THAN MAXVALUE
+) //
+
+ALTER TABLE tbl_karyawan ADD FULLTEXT INDEX ft_karyawan_nama (nama) //
+ALTER TABLE tbl_klien ADD FULLTEXT INDEX ft_klien_nama_perusahaan (nama_perusahaan) //
+
+DELIMITER ;

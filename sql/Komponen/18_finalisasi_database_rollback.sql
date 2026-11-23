@@ -465,3 +465,20 @@ DROP INDEX idx_penempatan_klien_status_mulai ON tbl_penempatan //
 DROP INDEX idx_penempatan_karyawan_status ON tbl_penempatan //
 
 DELIMITER ;
+
+-- [TAHAP 7]
+DELIMITER //
+
+ALTER TABLE tbl_klien DROP INDEX ft_klien_nama_perusahaan //
+ALTER TABLE tbl_karyawan DROP INDEX ft_karyawan_nama //
+
+ALTER TABLE tbl_log_aktivitas REMOVE PARTITIONING //
+ALTER TABLE tbl_log_aktivitas DROP PRIMARY KEY, ADD PRIMARY KEY (id) //
+
+DROP VIEW IF EXISTS v_pertukaran_shift_snapshot //
+DROP VIEW IF EXISTS v_riwayat_jadwal_kerja //
+
+ALTER TABLE tbl_jadwal_kerja_riwayat DROP INDEX idx_riwayat_status_sesudah //
+ALTER TABLE tbl_jadwal_kerja_riwayat DROP COLUMN status_sesudah //
+
+DELIMITER ;

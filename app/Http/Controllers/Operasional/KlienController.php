@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Operasional;
 
 use App\Http\Controllers\Controller;
+use App\Support\PencarianTeks;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,9 +28,7 @@ class KlienController extends Controller
         $status = $validated['status'] ?? null;
 
         $klien = DB::table('tbl_klien')
-            ->when($kataKunci !== '', fn ($query) => $query->where(fn ($cari) => $cari
-                ->where('nama_perusahaan', 'like', '%'.$kataKunci.'%')
-                ->orWhere('kode_klien', 'like', '%'.$kataKunci.'%')))
+            ->when($kataKunci !== '', fn ($query) => PencarianTeks::terapkan($query, 'nama_perusahaan', ['kode_klien'], $kataKunci))
             ->when($status !== null, fn ($query) => $query->where('status', $status))
             ->orderBy('nama_perusahaan')
             ->paginate(15)
