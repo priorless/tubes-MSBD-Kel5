@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
  * Rekap kerja bulanan: membandingkan jadwal Operasional (tbl_jadwal_kerja) dengan realisasi Absensi (tbl_absensi).
  * Hanya membaca data. Rumus absensi dan payroll tidak diubah:
  * - jam kerja tercatat mengikuti fn_hitung_jam_kerja (GREATEST(0, TIMESTAMPDIFF(HOUR, masuk, keluar))),
- * - lembur yang diteruskan ke Keuangan hanya yang berstatus Disetujui (bila kolom status_lembur tersedia).
+ * - semua jam lembur tercatat diteruskan ke Keuangan (tanpa persetujuan terpisah).
  * Absensi dihitung hanya pada tanggal yang berada dalam masa penempatan yang direkap.
  */
 class RekapOperasionalService
@@ -19,7 +19,7 @@ class RekapOperasionalService
     /**
      * @return array{
      *     bulan: CarbonImmutable,
-     *     kolom: array{menit_terlambat: bool, status_lembur: bool},
+     *     kolom: array{menit_terlambat: bool},
      *     baris: Collection<int, object>,
      *     total: array<string, int>,
      *     catatan: Collection<int, object>
@@ -32,7 +32,6 @@ class RekapOperasionalService
         $hariIni = CarbonImmutable::now()->toDateString();
         $kolom = [
             'menit_terlambat' => Schema::hasColumn('tbl_absensi', 'menit_terlambat'),
-            'status_lembur' => Schema::hasColumn('tbl_absensi', 'status_lembur'),
         ];
 
         $penempatan = DB::table('tbl_penempatan as p')
@@ -58,7 +57,6 @@ class RekapOperasionalService
             ->get(array_values(array_filter([
                 'id_karyawan', 'tgl', 'jam_masuk', 'jam_keluar', 'status_kehadiran', 'jam_lembur',
                 $kolom['menit_terlambat'] ? 'menit_terlambat' : null,
-                $kolom['status_lembur'] ? 'status_lembur' : null,
             ])))
             ->groupBy('id_karyawan');
 
@@ -104,15 +102,6 @@ class RekapOperasionalService
                 $data->menit_terlambat += $kolom['menit_terlambat'] ? (int) $hari->menit_terlambat : 0;
                 $data->jam_kerja += $this->jamKerjaTercatat($hari->jam_masuk, $hari->jam_keluar);
                 $data->jam_lembur += (int) $hari->jam_lembur;
-
-                if ($kolom['status_lembur'] && (int) $hari->jam_lembur > 0) {
-                    $kunci = match ($hari->status_lembur) {
-                        'Disetujui' => 'lembur_disetujui',
-                        'Ditolak' => 'lembur_ditolak',
-                        default => 'lembur_menunggu',
-                    };
-                    $data->{$kunci} += (int) $hari->jam_lembur;
-                }
 
                 if ($hadir && $statusJadwal !== 'Kerja') {
                     $data->tanggal_hadir_tanpa_jadwal_kerja[] = $tanggal;
@@ -187,9 +176,6 @@ class RekapOperasionalService
             'tidak_hadir' => 0,
             'jam_kerja' => 0,
             'jam_lembur' => 0,
-            'lembur_disetujui' => 0,
-            'lembur_menunggu' => 0,
-            'lembur_ditolak' => 0,
             'tanggal_tanpa_absensi' => [],
             'tanggal_hadir_tanpa_jadwal_kerja' => [],
             'tanggal_tanpa_jam_keluar' => [],

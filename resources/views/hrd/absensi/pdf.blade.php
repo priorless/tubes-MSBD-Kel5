@@ -60,8 +60,8 @@
         <tr>
             <td><div class="summary-label">Tanpa catatan</div><div class="summary-value">{{ $ringkasanRekap->tanpa_catatan }}</div></td>
             <td><div class="summary-label">Belum check-out</div><div class="summary-value">{{ $ringkasanRekap->belum_check_out }}</div></td>
-            <td><div class="summary-label">Lembur menunggu / disetujui / ditolak</div><div class="summary-value">{{ $ringkasanRekap->lembur_menunggu }} / {{ $ringkasanRekap->lembur_disetujui }} / {{ $ringkasanRekap->lembur_ditolak }}</div></td>
-            <td><div class="summary-label">Jam lembur menunggu / disetujui / ditolak</div><div class="summary-value">{{ $ringkasanRekap->jam_lembur_menunggu }} / {{ $ringkasanRekap->jam_lembur_disetujui }} / {{ $ringkasanRekap->jam_lembur_ditolak }} jam</div></td>
+            <td><div class="summary-label">Lembur</div><div class="summary-value">{{ $ringkasanRekap->lembur }} kali</div></td>
+            <td><div class="summary-label">Jam lembur</div><div class="summary-value">{{ $ringkasanRekap->jam_lembur }} jam</div></td>
         </tr>
     </table>
 
@@ -94,7 +94,7 @@
                         <td class="center">{{ (int) $baris->menit_terlambat > 0 ? $baris->menit_terlambat.' mnt' : '—' }}</td>
                         <td class="center">{{ \App\Support\FormatKolom::jam($baris->jam_masuk) }}</td>
                         <td class="center">{{ \App\Support\FormatKolom::jam($baris->jam_keluar) }}</td>
-                        <td>{{ (int) $baris->jam_lembur > 0 ? $baris->jam_lembur.' jam · '.$baris->status_lembur : '—' }}</td>
+                        <td>{{ (int) $baris->jam_lembur > 0 ? $baris->jam_lembur.' jam' : '—' }}</td>
                     </tr>
                 @endforeach
             </tbody>

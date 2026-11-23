@@ -32,7 +32,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'username' => ['required', 'string', 'max:50'],
+            'username' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/'],
             'password' => ['required', 'string'],
         ];
     }
@@ -44,6 +44,8 @@ class LoginRequest extends FormRequest
     {
         return [
             'username.required' => 'Username wajib diisi.',
+            'username.max' => 'Username maksimal 50 karakter.',
+            'username.regex' => 'Username hanya boleh berisi huruf, angka, titik, garis bawah, dan tanda hubung.',
             'password.required' => 'Password wajib diisi.',
         ];
     }

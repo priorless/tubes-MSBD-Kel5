@@ -102,6 +102,7 @@ trait MemakaiDatabaseSji
         DB::table('tbl_payroll')->whereIn('id_karyawan', $karyawan ?: [0])->delete();
         DB::table('tbl_invoice')->whereIn('id_klien', $klien ?: [0])->delete();
         DB::table('tbl_sertifikat')->whereIn('id_karyawan', $karyawan ?: [0])->delete();
+        DB::table('tbl_jadwal_kerja')->whereIn('id_penempatan', $penempatan ?: [0])->delete();
         DB::table('tbl_kontrak')->whereIn('id_penempatan', $penempatan ?: [0])->delete();
         DB::table('tbl_penempatan')->whereIn('id', $penempatan ?: [0])->delete();
         DB::table('tbl_users')->whereIn('id_karyawan', $karyawan ?: [0])->orWhereIn('id', $user ?: [0])->delete();
