@@ -452,3 +452,16 @@ ALTER TABLE tbl_users CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_c
 ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci //
 
 DELIMITER ;
+
+-- [TAHAP 5]
+-- Indeks komposit menggantikan indeks FK otomatis fk_pen_karyawan/fk_pen_klien (MySQL membuangnya saat indeks
+-- komposit dibuat). Buat kembali dulu agar FK tetap punya indeks sebelum indeks komposit dihapus.
+DELIMITER //
+
+CREATE INDEX fk_pen_karyawan ON tbl_penempatan (id_karyawan) //
+CREATE INDEX fk_pen_klien ON tbl_penempatan (id_klien) //
+DROP INDEX idx_sertifikat_kadaluarsa_status ON tbl_sertifikat //
+DROP INDEX idx_penempatan_klien_status_mulai ON tbl_penempatan //
+DROP INDEX idx_penempatan_karyawan_status ON tbl_penempatan //
+
+DELIMITER ;

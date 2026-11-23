@@ -639,3 +639,14 @@ ALTER TABLE tbl_template_shift ADD CONSTRAINT fk_template_shift_dibuat_oleh FORE
 ALTER TABLE tbl_template_shift ADD CONSTRAINT fk_template_shift_diubah_oleh FOREIGN KEY (diubah_oleh) REFERENCES tbl_users (id) ON DELETE SET NULL //
 
 DELIMITER ;
+
+-- [TAHAP 5]
+-- Optimasi: indeks komposit untuk query yang sering dipakai (bukti EXPLAIN: docs/optimasi-database.md).
+-- Migration melewati indeks yang sudah ada, sehingga tidak ganda.
+DELIMITER //
+
+CREATE INDEX idx_penempatan_karyawan_status ON tbl_penempatan (id_karyawan, status) //
+CREATE INDEX idx_penempatan_klien_status_mulai ON tbl_penempatan (id_klien, status, tgl_mulai) //
+CREATE INDEX idx_sertifikat_kadaluarsa_status ON tbl_sertifikat (tgl_kadaluarsa, status) //
+
+DELIMITER ;
