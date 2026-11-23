@@ -83,6 +83,9 @@ GRANT SELECT, UPDATE ON tbl_pertukaran_shift TO 'sji_role_operasional';
 -- ------------------------------------------------------------
 -- Keuangan — payroll, invoice, buku kas
 -- Payroll, invoice, dan mutasi kas TIDAK bisa diubah langsung: wajib lewat procedure/trigger.
+-- Fungsi hari roster (fn_hari_kerja_roster[_klien], fn_hari_tanpa_jadwal[_klien], fn_status_roster,
+-- fn_hari_kerja_kontrak, fn_hari_wajib_roster, fn_total_hari_wajib_roster) sengaja tanpa GRANT:
+-- hanya dipanggil dari sp_generate_payroll_bulanan/sp_generate_invoice_klien (SQL SECURITY DEFINER).
 -- ------------------------------------------------------------
 GRANT SELECT ON tbl_payroll TO 'sji_role_keuangan';
 GRANT SELECT, INSERT, UPDATE ON tbl_komponen_gaji TO 'sji_role_keuangan';

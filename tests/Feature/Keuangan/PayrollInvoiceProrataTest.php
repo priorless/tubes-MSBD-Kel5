@@ -63,6 +63,100 @@ class PayrollInvoiceProrataTest extends TestCase
         }
     }
 
+    /**
+     * @param  list<int>  $kerja
+     * @param  list<int>  $libur
+     */
+    private function buatRoster(int $idPenempatan, array $kerja, array $libur = []): void
+    {
+        foreach ($kerja as $h) {
+            DB::table('tbl_jadwal_kerja')->insert([
+                'id_penempatan' => $idPenempatan, 'tanggal_kerja' => $this->tgl($h), 'status' => 'Kerja',
+                'jam_masuk' => '08:00:00', 'jam_pulang' => '16:00:00', 'durasi_menit' => 480,
+            ]);
+        }
+        foreach ($libur as $h) {
+            DB::table('tbl_jadwal_kerja')->insert(['id_penempatan' => $idPenempatan, 'tanggal_kerja' => $this->tgl($h), 'status' => 'Libur']);
+        }
+    }
+
+    public function test_hari_wajib_mengikuti_roster_20_hari_kerja(): void
+    {
+        $id = $this->buatKaryawan('Lapangan');
+        $penempatan = $this->buatPenempatan($id, $this->buatKlien(), $this->tgl(1), null, [], 2500000, 25);
+        $kerja = [...range(1, 5), ...range(8, 12), ...range(15, 19), ...range(22, 26)];
+        $this->buatRoster($penempatan, $kerja, [6, 7, 13, 14, 20, 21, 27, 28]);
+        $this->absensiBanyak($id, array_slice($kerja, 0, 18), 'Hadir');
+
+        $this->generatePayroll();
+        $p = $this->payroll($id);
+
+        $this->assertSame([20, 18, 2], [(int) $p->hari_wajib, (int) $p->hari_masuk, (int) $p->hari_absen]);
+        $this->assertEquals(2000000, (float) $p->gaji_pokok, '20 hari Kerja x tarif 100.000, bukan prorata 25 hari');
+        $this->assertEquals(200000, (float) $p->potongan_absen);
+        $this->assertEquals(0, (float) $p->upah_backup);
+    }
+
+    public function test_roster_sebagian_kosong_memakai_prorata_untuk_hari_tanpa_jadwal(): void
+    {
+        $id = $this->buatKaryawan('Lapangan');
+        $penempatan = $this->buatPenempatan($id, $this->buatKlien(), $this->tgl(1), null, [], 2500000, 25);
+        $this->buatRoster($penempatan, [...range(1, 5), ...range(8, 12)], [6, 7, 13, 14]);
+        $this->absensiBanyak($id, [...range(1, 5), ...range(8, 12), ...range(15, 27)], 'Hadir');
+
+        $this->generatePayroll();
+        $p = $this->payroll($id);
+
+        // 10 hari Kerja di roster + ROUND(25 x 14 hari tanpa jadwal / 28) = 10 + 13.
+        $this->assertSame([23, 23, 0], [(int) $p->hari_wajib, (int) $p->hari_masuk, (int) $p->hari_absen]);
+        $this->assertEquals(2300000, (float) $p->gaji_pokok);
+        $this->assertEquals(0, (float) $p->potongan_absen);
+    }
+
+    public function test_masuk_di_hari_libur_dibayar_sebagai_upah_backup(): void
+    {
+        $id = $this->buatKaryawan('Lapangan');
+        $penempatan = $this->buatPenempatan($id, $this->buatKlien(), $this->tgl(1), null, [], 2500000, 25);
+        $kerja = [...range(1, 5), ...range(8, 12), ...range(15, 19), ...range(22, 26)];
+        $this->buatRoster($penempatan, $kerja, [6, 7, 13, 14, 20, 21, 27, 28]);
+        $this->absensiBanyak($id, $kerja, 'Hadir');
+        $this->absensiBanyak($id, [6, 13], 'Hadir');
+        $this->absensiBanyak($id, [20], 'Alpha');
+
+        $this->generatePayroll();
+        $p = $this->payroll($id);
+
+        $this->assertSame([20, 20, 0], [(int) $p->hari_wajib, (int) $p->hari_masuk, (int) $p->hari_absen], 'Hari Libur tidak dihitung hari masuk dan Alpha di hari Libur tidak memotong');
+        $this->assertEquals(200000, (float) $p->upah_backup, '2 hari kerja di hari Libur x tarif 100.000');
+        $this->assertEquals(0, (float) $p->potongan_absen);
+    }
+
+    public function test_invoice_membagi_payroll_per_klien_sesuai_roster(): void
+    {
+        $klienA = $this->buatKlien(['management_fee' => 0]);
+        $klienB = $this->buatKlien(['management_fee' => 0]);
+        $id = $this->buatKaryawan('Lapangan');
+        $penempatanA = $this->buatPenempatan($id, $klienA, $this->tgl(1), $this->tgl(14), ['status' => 'Rotasi'], 2500000, 25);
+        $penempatanB = $this->buatPenempatan($id, $klienB, $this->tgl(15), null, [], 3000000, 25);
+        $this->buatRoster($penempatanA, [1, 2, 3, 4, 8, 9, 10, 11], [5, 6, 7, 12, 13, 14]);
+        $this->buatRoster($penempatanB, [...range(15, 20), ...range(22, 27)], [21, 28]);
+        $this->absensiBanyak($id, [1, 2, 3, 4, 8, 9, 10, 11, ...range(15, 20), ...range(22, 27)], 'Hadir');
+
+        $this->generatePayroll();
+        DatabaseService::callGenerateInvoiceKlien($klienA, self::BULAN, self::TAHUN);
+        DatabaseService::callGenerateInvoiceKlien($klienB, self::BULAN, self::TAHUN);
+        $detail = fn (int $klien): object => DB::table('tbl_invoice_detail as d')
+            ->join('tbl_invoice as i', 'i.id', '=', 'd.id_invoice')
+            ->where('i.id_klien', $klien)->where('d.id_karyawan', $id)->select('d.*')->sole();
+
+        $this->assertSame(20, (int) $this->payroll($id)->hari_wajib);
+        $this->assertSame([8, 20], [(int) $detail($klienA)->hari_klien, (int) $detail($klienA)->hari_total]);
+        $this->assertSame([12, 20], [(int) $detail($klienB)->hari_klien, (int) $detail($klienB)->hari_total]);
+        // Gaji payroll 20 x 120.000 = 2.400.000 dibagi 8/20 dan 12/20.
+        $this->assertEquals(960000, (float) $detail($klienA)->gaji_pokok);
+        $this->assertEquals(1440000, (float) $detail($klienB)->gaji_pokok);
+    }
+
     public function test_lapangan_mulai_tengah_bulan_hari_kosong_dan_sakit(): void
     {
         $id = $this->buatKaryawan('Lapangan');
