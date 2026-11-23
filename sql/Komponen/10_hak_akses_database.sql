@@ -23,12 +23,23 @@
 --      karyawan dan GRANT tidak bisa membatasi per baris. Pembatasan "data milik sendiri"
 --      dilakukan aplikasi (App\Support\KaryawanAktif).
 --   5. Tabel internal Laravel (users, sessions, cache, jobs, migrations, ...) tidak diberikan
---      ke role mana pun; hanya dipakai aplikasi lewat user root/aplikasi.
+--      ke role bagian; hanya dipakai aplikasi lewat sji_role_app (user sji_app).
 -- ============================================================
 
-CREATE ROLE IF NOT EXISTS 'sji_role_hrd', 'sji_role_operasional', 'sji_role_keuangan', 'sji_role_ceo';
+CREATE ROLE IF NOT EXISTS 'sji_role_hrd', 'sji_role_operasional', 'sji_role_keuangan', 'sji_role_ceo', 'sji_role_app';
 
-REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'sji_role_hrd', 'sji_role_operasional', 'sji_role_keuangan', 'sji_role_ceo';
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'sji_role_hrd', 'sji_role_operasional', 'sji_role_keuangan', 'sji_role_ceo', 'sji_role_app';
+
+-- ------------------------------------------------------------
+-- Aplikasi Laravel (user sji_app) — dipakai web saat berjalan, BUKAN untuk migration.
+-- DML pada semua tabel database aplikasi (termasuk tabel internal Laravel: users, sessions, cache, jobs),
+-- SELECT pada view, EXECUTE pada routine. Tanpa CREATE/DROP/ALTER/INDEX/TRIGGER/EVENT/GRANT, jadi bila
+-- terjadi SQL injection, penyerang tetap tidak bisa mengubah struktur, menghapus tabel, atau menaikkan hak.
+-- "ON *" = semua objek di database yang sedang dipakai (USE db_sji / koneksi migration).
+-- Pemakaian: php artisan sji:buat-user-db app, lalu isi DB_USERNAME=sji_app dan DB_PASSWORD di .env
+-- server; migration tetap dijalankan dengan user pemilik skema (root/admin).
+-- ------------------------------------------------------------
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON * TO 'sji_role_app';
 
 -- ------------------------------------------------------------
 -- HRD — rekrutmen, data karyawan, dokumen, akun login

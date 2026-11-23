@@ -716,3 +716,12 @@ ALTER TABLE tbl_karyawan ADD FULLTEXT INDEX ft_karyawan_nama (nama) //
 ALTER TABLE tbl_klien ADD FULLTEXT INDEX ft_klien_nama_perusahaan (nama_perusahaan) //
 
 DELIMITER ;
+
+-- [TAHAP 8]
+-- Role aplikasi sji_role_app (hak & alasannya di 10_hak_akses_database.sql; user dibuat dengan
+-- php artisan sji:buat-user-db app). GRANT-nya dipasang oleh SqlKomponen::pasangHakAkses().
+DELIMITER //
+
+CREATE ROLE IF NOT EXISTS 'sji_role_app' //
+
+DELIMITER ;

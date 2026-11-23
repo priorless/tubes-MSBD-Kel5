@@ -482,3 +482,11 @@ ALTER TABLE tbl_jadwal_kerja_riwayat DROP INDEX idx_riwayat_status_sesudah //
 ALTER TABLE tbl_jadwal_kerja_riwayat DROP COLUMN status_sesudah //
 
 DELIMITER ;
+
+-- [TAHAP 8]
+-- User yang memakai role ini (sji_app) kehilangan haknya; hapus usernya manual bila tidak dipakai lagi.
+DELIMITER //
+
+DROP ROLE IF EXISTS 'sji_role_app' //
+
+DELIMITER ;
