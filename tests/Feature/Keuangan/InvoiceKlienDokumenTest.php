@@ -84,7 +84,7 @@ class InvoiceKlienDokumenTest extends TestCase
         $html = view('keuangan.invoice.pdf', $dokumen)->render();
         foreach (['Tagihan Jasa Tenaga Kerja Bulan Mei 2099', $dokumen['nomorSurat'], 'SUB TOTAL', '8.843.803', 'MANAGEMENT FEE 6%',
             '530.628', '58.369', '9.432.800', 'INVOICE', 'DAFTAR GAJI', 'DI PT KLIEN DOKUMEN', 'PERIODE: 01 MEI 2099 S/D 31 MEI 2099',
-            'BPJS', '10112235428', '[Nama direktur belum tersedia]', 'Tidak ada pertukaran shift pada periode ini.'] as $teks) {
+            'BPJS', '10112235428', 'Djoned Djubaidi, S.T., M.H.', 'Gg. Aman No.26', 'Sitirejo II, Kec. Medan Amplas, Kota Medan, Sumatera Utara 20217', 'Tidak ada pertukaran shift pada periode ini.'] as $teks) {
             $this->assertStringContainsString($teks, $html);
         }
         $this->assertSame(3, substr_count($html, 'class="halaman'), 'Tiga bagian dokumen');

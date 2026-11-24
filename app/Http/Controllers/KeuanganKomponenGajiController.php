@@ -31,6 +31,7 @@ class KeuanganKomponenGajiController extends Controller
             'tahun' => ['nullable', 'integer', 'between:2000,2100'],
             'penempatan' => ['nullable', 'string', Rule::in($pilihanPenempatan)],
             'jenis_pekerjaan' => ['nullable', 'integer', Rule::in($jenisPekerjaan->pluck('id')->all())],
+            'q' => ['nullable', 'string', 'max:100'],
         ], [
             'bulan.between' => 'Bulan harus antara 1 sampai 12.',
             'tahun.between' => 'Tahun harus antara 2000 sampai 2100.',
@@ -41,7 +42,16 @@ class KeuanganKomponenGajiController extends Controller
         $tahun = (int) ($validated['tahun'] ?? now()->year);
         $penempatan = $validated['penempatan'] ?? 'eksternal';
         $idJenisPekerjaan = isset($validated['jenis_pekerjaan']) ? (int) $validated['jenis_pekerjaan'] : null;
+        $cari = trim((string) ($validated['q'] ?? ''));
         $karyawan = $this->karyawanPeriode($bulan, $tahun, $penempatan, $idJenisPekerjaan);
+        $jumlahSebelumCari = $karyawan->count();
+
+        // Pencarian NIP / nama karyawan (tanpa membedakan huruf besar-kecil) di antara karyawan periode & filter terpilih.
+        if ($cari !== '') {
+            $karyawan = $karyawan->filter(fn (object $item): bool => str_contains(mb_strtolower((string) $item->nip), mb_strtolower($cari))
+                || str_contains(mb_strtolower((string) $item->nama), mb_strtolower($cari)))->values();
+        }
+
         $manual = DB::table('tbl_komponen_gaji')
             ->where('periode_bulan', $bulan)
             ->where('periode_tahun', $tahun)
@@ -67,6 +77,8 @@ class KeuanganKomponenGajiController extends Controller
             'tahun' => $tahun,
             'penempatan' => $penempatan,
             'idJenisPekerjaan' => $idJenisPekerjaan,
+            'cari' => $cari,
+            'jumlahSebelumCari' => $jumlahSebelumCari,
             'daftarBulan' => self::DAFTAR_BULAN,
         ]);
     }
@@ -121,6 +133,7 @@ class KeuanganKomponenGajiController extends Controller
         return redirect()->route('keuangan.komponen-gaji.index', [
             'bulan' => $validated['bulan'], 'tahun' => $validated['tahun'], 'penempatan' => $validated['penempatan'],
             'jenis_pekerjaan' => $validated['jenis_pekerjaan'] ?? null,
+            'q' => filled($request->input('q')) ? mb_substr(trim((string) $request->input('q')), 0, 100) : null,
         ])->with('success', 'Komponen gaji berhasil disimpan. Payroll tidak dibuat atau diubah.');
     }
 

@@ -3,10 +3,17 @@
 @section('title', 'Invoice Klien')
 
 @section('content')
-    <x-ui.page-header title="Invoice Klien" description="Generate invoice tagihan klien per periode, lihat struk, kirim, dan catat pelunasan." />
+    @include('keuangan._gaya')
+    @php
+        $rupiah = fn ($nilai): string => 'Rp '.number_format((float) $nilai, 0, ',', '.');
+    @endphp
+
+    <div class="keu-halaman min-w-0 space-y-6">
+    <x-ui.page-header kicker="Keuangan · Tagihan klien" title="Invoice Klien"
+        description="Buat invoice tagihan klien per periode, periksa dokumennya, kirim ke klien, lalu catat pelunasannya." />
 
     @if ($invoiceBaru)
-        <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-sji-biru/20 bg-blue-50 px-5 py-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-sji-biru/20 bg-blue-50 px-5 py-4">
             <div class="flex items-center gap-3">
                 <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-sji-biru text-white" aria-hidden="true">
                     <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -24,166 +31,231 @@
         </div>
     @endif
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <form method="POST" action="{{ route('keuangan.invoice.generate') }}" class="card self-start">
-            @csrf
+    {{-- Generate invoice: satu baris di atas tabel agar tabel memakai lebar penuh. --}}
+    <form method="POST" action="{{ route('keuangan.invoice.generate') }}" class="keu-panel">
+        @csrf
 
-            <div class="card-header">
-                <h2 class="card-title">Generate Invoice</h2>
+        <div class="keu-panel-kepala">
+            <div>
+                <h2 class="keu-judul-panel">Generate invoice baru</h2>
+                <p class="keu-sub">Pastikan payroll periode yang dipilih sudah di-generate.</p>
             </div>
+        </div>
 
-            <div class="card-body space-y-4">
-                <div>
-                    <label for="id_klien" class="form-label">Klien</label>
-                    <select name="id_klien" id="id_klien" @class(['form-input', 'form-input-error' => $errors->has('id_klien')]) required>
-                        <option value="">&mdash; Pilih klien &mdash;</option>
-                        @foreach ($klien as $item)
-                            <option value="{{ $item->id }}" @selected((int) old('id_klien') === (int) $item->id)
-                                    data-fee="{{ $item->management_fee === null ? '' : \App\Support\LabelBpjs::persen($item->management_fee) }}">
-                                {{ $item->kode_klien }} &mdash; {{ $item->nama_perusahaan }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('id_klien') <p class="form-error">{{ $message }}</p> @enderror
+        <div class="grid grid-cols-1 items-start gap-4 px-5 py-5 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_8rem_auto]">
+            <div class="sm:col-span-2 lg:col-span-1">
+                <label for="id_klien" class="form-label">Klien</label>
+                <select name="id_klien" id="id_klien" @class(['form-input', 'form-input-error' => $errors->has('id_klien')]) required>
+                    <option value="">&mdash; Pilih klien &mdash;</option>
+                    @foreach ($klien as $item)
+                        <option value="{{ $item->id }}" @selected((int) old('id_klien') === (int) $item->id)
+                                data-fee="{{ $item->management_fee === null ? '' : \App\Support\LabelBpjs::persen($item->management_fee) }}">
+                            {{ $item->kode_klien }} &mdash; {{ $item->nama_perusahaan }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('id_klien') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label for="bulan" class="form-label">Bulan</label>
+                <select name="bulan" id="bulan" @class(['form-input', 'form-input-error' => $errors->has('bulan')]) data-batas-periode="tahun" required>
+                    @foreach ($daftarBulan as $angka => $nama)
+                        <option value="{{ $angka }}" @selected((int) old('bulan', $bulanIni) === $angka)>{{ $nama }}</option>
+                    @endforeach
+                </select>
+                @error('bulan') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label for="tahun" class="form-label">Tahun</label>
+                <input type="number" name="tahun" id="tahun" min="2000" max="2100" value="{{ old('tahun', $tahunIni) }}"
+                       @class(['form-input', 'form-input-error' => $errors->has('tahun')]) required>
+                @error('tahun') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+            <div class="sm:col-span-2 lg:col-span-1 lg:pt-[25px]">
+                <button type="submit" class="btn-primary w-full lg:w-auto">Generate Invoice</button>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-3 border-t border-dashed border-gray-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div id="info_fee_klien" class="hidden text-sm" aria-live="polite">
+                <div class="flex items-center gap-3">
+                <span class="rounded-md bg-sji-biru-tua px-2.5 py-1 font-mono text-sm font-semibold text-white" id="info_fee_nilai"></span>
+                <span>
+                    <span class="block text-xs font-semibold text-gray-700">Management fee klien (dari data klien Operasional)</span>
+                    <span class="block text-xs text-gray-500" id="info_fee_keterangan"></span>
+                </span>
                 </div>
-
-                <div id="info_fee_klien" class="hidden rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm" aria-live="polite">
-                    <p class="text-xs text-gray-500">Management fee klien (dari data klien Operasional)</p>
-                    <p class="font-semibold text-gray-800" id="info_fee_nilai"></p>
-                    <p class="mt-1 text-xs text-gray-500" id="info_fee_keterangan"></p>
-                </div>
-
-                <div class="grid grid-cols-12 gap-3">
-                    <div class="col-span-7">
-                        <label for="bulan" class="form-label">Bulan</label>
-                        <select name="bulan" id="bulan" @class(['form-input', 'form-input-error' => $errors->has('bulan')]) required>
-                            @foreach ($daftarBulan as $angka => $nama)
-                                <option value="{{ $angka }}" @selected((int) old('bulan', $bulanIni) === $angka)>{{ $nama }}</option>
-                            @endforeach
-                        </select>
-                        @error('bulan') <p class="form-error">{{ $message }}</p> @enderror
-                    </div>
-                    <div class="col-span-5">
-                        <label for="tahun" class="form-label">Tahun</label>
-                        <input type="number" name="tahun" id="tahun" min="2000" max="2100" value="{{ old('tahun', $tahunIni) }}"
-                               @class(['form-input', 'form-input-error' => $errors->has('tahun')]) required>
-                        @error('tahun') <p class="form-error">{{ $message }}</p> @enderror
-                    </div>
-                </div>
-
-                <p class="text-xs text-gray-500">
-                    Sub Total diambil dari payroll yang sudah di-generate untuk karyawan klien pada periode tersebut
-                    (gaji pokok + tunjangan + upah back-up + lembur &minus; potongan absensi; BPJS sudah termasuk).
-                    Management Fee = persentase klien &times; Sub Total, PPN = 11% &times; Management Fee.
-                    Generate payroll periode tersebut terlebih dahulu.
-                </p>
             </div>
+            <p class="order-first text-xs leading-5 text-gray-500 lg:max-w-3xl">
+                <span class="font-semibold text-gray-700">Rumus:</span>
+                Sub Total = gaji pokok + tunjangan + upah back-up + lembur &minus; potongan absensi (BPJS sudah termasuk) dari payroll karyawan klien.
+                Management Fee = persentase klien &times; Sub Total, PPN = 11% &times; Management Fee.
+            </p>
+        </div>
+    </form>
 
-            <div class="card-footer">
-                <button type="submit" class="btn-primary w-full">Generate Invoice</button>
+    <section class="keu-panel min-w-0 overflow-hidden" aria-labelledby="judul-daftar-invoice">
+        <div class="keu-panel-kepala">
+            <div>
+                <h2 class="keu-judul-panel" id="judul-daftar-invoice">Daftar invoice</h2>
+                <p class="keu-sub">Terbaru di atas. Gunakan Lihat Struk untuk memeriksa dan mengedit dokumen sebelum dikirim.</p>
             </div>
-        </form>
+            @include('keuangan._cari', [
+                'id' => 'cari_invoice',
+                'nilai' => $cari,
+                'placeholder' => 'Cari kode klien, nama klien, atau no. invoice',
+                'action' => route('keuangan.invoice.index'),
+                'urlReset' => route('keuangan.invoice.index'),
+            ])
+        </div>
 
-        <div class="card lg:col-span-2">
-            <div class="card-header">
-                <h2 class="card-title">Daftar invoice</h2>
-            </div>
+        @if ($cari !== '')
+            <p class="keu-hasil-cari" aria-live="polite">
+                <span><strong>{{ $invoice->total() }}</strong> invoice cocok dengan &ldquo;{{ $cari }}&rdquo;</span>
+                <a href="{{ route('keuangan.invoice.index') }}">Tampilkan semua invoice</a>
+            </p>
+        @endif
 
-            <div class="overflow-x-auto">
-                <table class="table">
-                    <thead>
+        <div class="relative overflow-x-auto">
+            <table class="table keu-tabel">
+                <thead>
+                    <tr>
+                        <th>No. Invoice</th>
+                        <th>Klien</th>
+                        <th class="text-right">Sub Total</th>
+                        <th class="text-right">Management Fee</th>
+                        <th class="text-right">PPN 11%</th>
+                        <th class="keu-kolom-total text-right">Grand Total</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($invoice as $item)
                         <tr>
-                            <th>No. Invoice</th>
-                            <th>Klien</th>
-                            <th>Periode</th>
-                            <th class="text-center">Tenaga</th>
-                            <th class="text-right">Sub Total</th>
-                            <th class="text-right">Management Fee</th>
-                            <th class="text-right">PPN 11%</th>
-                            <th class="text-right">Grand Total</th>
-                            <th>Status</th>
-                            <th class="text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($invoice as $item)
-                            <tr>
-                                <td class="font-mono whitespace-nowrap text-gray-600">{{ $item->nomor_invoice }}</td>
-                                <td>{{ $item->nama_perusahaan }}</td>
-                                <td class="whitespace-nowrap">{{ $daftarBulan[$item->periode_bulan] ?? $item->periode_bulan }} {{ $item->periode_tahun }}</td>
-                                <td class="text-center">{{ $item->jumlah_tenaga }}</td>
-                                @if ((float) $item->sub_total > 0)
-                                    <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->sub_total, 0, ',', '.') }}</td>
-                                    <td class="text-right whitespace-nowrap tabular-nums">
-                                        Rp {{ number_format((float) $item->management_fee, 0, ',', '.') }}
-                                        <p class="text-xs text-gray-400">{{ \App\Support\LabelBpjs::persen($item->persen_fee) }}</p>
-                                    </td>
-                                    <td class="text-right whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->ppn, 0, ',', '.') }}</td>
-                                @else
-                                    <td colspan="3" class="text-center text-xs text-gray-400">Invoice lama (sebelum rincian payroll)</td>
-                                @endif
-                                <td class="text-right font-semibold whitespace-nowrap tabular-nums">Rp {{ number_format((float) $item->total_tagihan, 0, ',', '.') }}</td>
-                                <td class="whitespace-nowrap">
-                                    @if ($item->status === 'Lunas')
-                                        <span class="badge badge-success">Lunas</span>
-                                        <p class="mt-0.5 text-xs text-gray-400">{{ \Illuminate\Support\Carbon::parse($item->tgl_pembayaran)->format('d/m/Y') }}</p>
-                                    @else
-                                        <span class="badge badge-danger">Belum Lunas</span>
-                                    @endif
+                            <td class="whitespace-nowrap">
+                                <span class="font-mono text-[13px] font-medium text-gray-800">{{ $item->nomor_invoice }}</span>
+                                <span class="keu-ket">{{ $daftarBulan[$item->periode_bulan] ?? $item->periode_bulan }} {{ $item->periode_tahun }}</span>
+                            </td>
+                            <td class="min-w-44">
+                                <span class="font-medium text-gray-800">{{ $item->nama_perusahaan }}</span>
+                                <span class="keu-ket">{{ $item->kode_klien }} &middot; {{ $item->jumlah_tenaga }} tenaga kerja</span>
+                            </td>
+                            @if ((float) $item->sub_total > 0)
+                                <td class="keu-angka">{{ $rupiah($item->sub_total) }}</td>
+                                <td class="keu-angka">
+                                    {{ $rupiah($item->management_fee) }}
+                                    <span class="keu-ket">{{ \App\Support\LabelBpjs::persen($item->persen_fee) }} dari sub total</span>
                                 </td>
-                                <td>
-                                    <div class="flex items-center justify-center gap-2">
+                                <td class="keu-angka">{{ $rupiah($item->ppn) }}</td>
+                            @else
+                                <td colspan="3" class="text-center text-xs text-gray-400">Invoice lama (sebelum rincian payroll)</td>
+                            @endif
+                            <td class="keu-angka keu-kolom-total font-bold text-gray-900">{{ $rupiah($item->total_tagihan) }}</td>
+                            <td class="whitespace-nowrap">
+                                @if ($item->status === 'Lunas')
+                                    <span class="badge badge-success">Lunas</span>
+                                    <span class="keu-ket">{{ \Illuminate\Support\Carbon::parse($item->tgl_pembayaran)->format('d/m/Y') }}</span>
+                                @else
+                                    <span class="badge badge-danger">Belum Lunas</span>
+                                @endif
+                            </td>
+                            <td>
+                                <div class="flex w-max flex-col gap-2">
+                                    <div class="flex items-center gap-2">
                                         <button type="button" class="btn-secondary btn-sm whitespace-nowrap"
                                                 data-struk-url="{{ route('keuangan.invoice.struk', $item->id) }}">Lihat Struk</button>
-                                        @if ((float) $item->sub_total > 0)
-                                            <button type="button" class="btn-primary btn-sm whitespace-nowrap"
+                                        @if ($item->status !== 'Lunas')
+                                            <button type="button" class="keu-btn-garis is-lunas"
+                                                    data-lunas-url="{{ route('keuangan.invoice.lunas', $item->id) }}"
+                                                    data-lunas-nomor="{{ $item->nomor_invoice }}"
+                                                    data-lunas-klien="{{ $item->nama_perusahaan }}"
+                                                    data-lunas-total="{{ $rupiah($item->total_tagihan) }}">Tandai Lunas</button>
+                                        @endif
+                                    </div>
+                                    @if ((float) $item->sub_total > 0)
+                                        <div class="flex items-center gap-2">
+                                            <button type="button" class="keu-btn-garis"
                                                     data-email-url="{{ route('keuangan.invoice.email', $item->id) }}"
                                                     data-email-id="{{ $item->id }}"
                                                     data-email-nomor="{{ $item->nomor_invoice }}"
                                                     data-email-klien="{{ $item->nama_perusahaan }}"
                                                     data-email-tujuan="{{ $item->pic_email }}"
                                                     data-email-subjek="{{ $item->email['subjek'] }}"
-                                                    data-email-pesan="{{ $item->email['pesan'] }}">Kirim via Email</button>
-                                        @endif
-                                        @if ($item->whatsapp !== null)
-                                            @if ($item->whatsapp['url'] !== null)
-                                                <a href="{{ $item->whatsapp['url'] }}" target="_blank" rel="noopener noreferrer"
-                                                   class="btn-success btn-sm whitespace-nowrap" style="background-color: #25D366; border-color: #25D366;"
-                                                   data-whatsapp-kirim>Kirim via WhatsApp</a>
-                                            @else
-                                                <button type="button" class="btn-success btn-sm whitespace-nowrap" style="background-color: #25D366; border-color: #25D366;"
-                                                        data-whatsapp-galat="{{ $item->whatsapp['galat'] }}">Kirim via WhatsApp</button>
+                                                    data-email-pesan="{{ $item->email['pesan'] }}">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                                                Kirim via Email
+                                            </button>
+                                            @if ($item->whatsapp !== null)
+                                                @if ($item->whatsapp['url'] !== null)
+                                                    <a href="{{ $item->whatsapp['url'] }}" target="_blank" rel="noopener noreferrer"
+                                                       class="keu-btn-garis is-wa" data-whatsapp-kirim>
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+                                                        Kirim via WhatsApp
+                                                    </a>
+                                                @else
+                                                    <button type="button" class="keu-btn-garis is-wa"
+                                                            data-whatsapp-galat="{{ $item->whatsapp['galat'] }}">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.4A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+                                                        Kirim via WhatsApp
+                                                    </button>
+                                                @endif
                                             @endif
-                                        @endif
-                                        @if ($item->status !== 'Lunas')
-                                            <form method="POST" action="{{ route('keuangan.invoice.lunas', $item->id) }}" class="flex items-center gap-2"
-                                                  onsubmit="return confirm(@js('Tandai invoice '.$item->nomor_invoice.' sebagai lunas?'));">
-                                                @csrf
-                                                @method('PATCH')
-                                                <label for="tgl_pembayaran_{{ $item->id }}" class="sr-only">Tanggal pembayaran</label>
-                                                <input type="date" name="tgl_pembayaran" id="tgl_pembayaran_{{ $item->id }}"
-                                                       value="{{ now()->toDateString() }}" class="form-input w-auto py-1.5" required>
-                                                <button type="submit" class="btn-success btn-sm whitespace-nowrap">Tandai Lunas</button>
-                                            </form>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="10" class="table-empty">Belum ada invoice.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="card-footer">
-                <span>Menampilkan {{ $invoice->firstItem() ?? 0 }}&ndash;{{ $invoice->lastItem() ?? 0 }} dari {{ $invoice->total() }} invoice</span>
-                @include('partials.pagination', ['paginator' => $invoice])
-            </div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="keu-kosong">
+                                @if ($cari !== '')
+                                    <p>Tidak ada invoice untuk &ldquo;{{ $cari }}&rdquo;</p>
+                                    <p>Periksa kembali kode atau nama klien, atau coba sebagian kata saja (mis. &ldquo;Maju&rdquo;).</p>
+                                @else
+                                    <p>Belum ada invoice</p>
+                                    <p>Pilih klien dan periode pada formulir di atas, lalu klik Generate Invoice.</p>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
+
+        <div class="card-footer">
+            <span>Menampilkan {{ $invoice->firstItem() ?? 0 }}&ndash;{{ $invoice->lastItem() ?? 0 }} dari {{ $invoice->total() }} invoice</span>
+            @include('partials.pagination', ['paginator' => $invoice])
+        </div>
+    </section>
     </div>
+
+    {{-- ===================== Modal tandai lunas ===================== --}}
+    <dialog id="lunasModal" aria-labelledby="lunasModalJudul"
+            class="m-auto w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-xl bg-white p-0 shadow-2xl backdrop:bg-gray-900/60">
+        <form method="POST" action="#" data-lunas-form>
+            @csrf
+            @method('PATCH')
+            <div class="border-b border-gray-200 px-5 py-4">
+                <h2 id="lunasModalJudul" class="text-sm font-semibold text-gray-800">Catat pelunasan invoice</h2>
+                <p class="mt-0.5 text-xs text-gray-500" data-lunas-info></p>
+            </div>
+            <div class="space-y-3 px-5 py-4">
+                <p class="text-sm text-gray-600">Total tagihan <span class="font-semibold text-gray-900" data-lunas-total></span></p>
+                <div>
+                    <label for="tgl_pembayaran" class="form-label">Tanggal pembayaran diterima</label>
+                    <input type="date" name="tgl_pembayaran" id="tgl_pembayaran" value="{{ now()->toDateString() }}"
+                           class="form-input" required>
+                </div>
+                <p class="text-xs text-gray-500">Setelah ditandai lunas, dokumen invoice terkunci dan tidak dapat diedit.</p>
+            </div>
+            <div class="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
+                <button type="button" class="btn-secondary" data-lunas-tutup>Batal</button>
+                <button type="submit" class="btn-success">Tandai Lunas</button>
+            </div>
+        </form>
+    </dialog>
+
 
     {{-- ===================== Modal struk invoice digital ===================== --}}
     <dialog id="strukModal" aria-labelledby="strukModalJudul"
@@ -371,6 +443,20 @@
                 if (e.target.matches('[data-mode-edit]') && !confirm('Simpan perubahan dokumen invoice ini?')) e.preventDefault();
             });
 
+
+            // ===== Tandai lunas: tanggal pembayaran diisi di modal kecil, bukan di baris tabel =====
+            const modalLunas = document.getElementById('lunasModal');
+            const formLunas = modalLunas.querySelector('[data-lunas-form]');
+            document.querySelectorAll('[data-lunas-url]').forEach((tombol) => {
+                tombol.addEventListener('click', () => {
+                    formLunas.action = tombol.dataset.lunasUrl;
+                    modalLunas.querySelector('[data-lunas-info]').textContent = tombol.dataset.lunasNomor + ' · ' + tombol.dataset.lunasKlien;
+                    modalLunas.querySelector('[data-lunas-total]').textContent = tombol.dataset.lunasTotal;
+                    modalLunas.showModal();
+                });
+            });
+            modalLunas.querySelector('[data-lunas-tutup]').addEventListener('click', () => modalLunas.close());
+            modalLunas.addEventListener('click', (e) => { if (e.target === modalLunas) modalLunas.close(); });
 
             // ===== Kirim invoice via WhatsApp: nomor/rekening tidak valid -> beri tahu, jangan buka WhatsApp =====
             document.querySelectorAll('[data-whatsapp-galat]').forEach((tombol) => {
