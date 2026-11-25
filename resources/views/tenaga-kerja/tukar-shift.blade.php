@@ -64,12 +64,7 @@
         {{-- ===================== Form pengajuan ===================== --}}
         <section class="tk-reveal card p-6" id="backup-shift">
             <h2 class="card-title text-lg font-bold text-gray-900">Minta Rekan Menggantikan Shift Anda</h2>
-            <p class="mt-1.5 text-sm text-gray-500">
-                Pilih jadwal Anda yang ingin digantikan, lalu pilih rekan pengganti. Rekan yang ditampilkan memiliki
-                <b>jabatan yang sama</b> (boleh dari klien/lokasi lain) dan <b>tidak memiliki jadwal kerja</b> pada waktu shift tersebut.
-                Ajukan paling lambat H-1. Rekan menanggapi lebih dulu, lalu Operasional memutuskan; shift baru berpindah ke rekan setelah disetujui.
-            </p>
-
+            
             <div class="mt-4">
                 @if ($jadwalSaya === [])
                     <x-ui.empty-state title="Belum ada jadwal yang dapat dimintakan backup."

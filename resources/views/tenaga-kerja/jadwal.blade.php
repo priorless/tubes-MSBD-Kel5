@@ -25,11 +25,11 @@
 @endphp
 
 @section('content')
-<x-ui.page-header title="Jadwal Saya" description="Roster kerja Anda untuk 30 hari ke depan, termasuk hari libur dan perubahan karena backup shift." />
+
 
 <div class="space-y-6">
     <section class="tk-reveal card p-6">
-        <h2 class="card-title text-lg font-bold text-gray-900">Roster 30 Hari ke Depan</h2>
+        <h2 class="card-title text-lg font-bold text-gray-900">Roster 7 Hari ke Depan</h2>
 
         @if ($roster === [])
             <x-ui.empty-state title="Roster belum tersedia." message="Jadwal akan tampil setelah Anda ditempatkan dan dijadwalkan Operasional." />

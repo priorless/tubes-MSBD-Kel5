@@ -13,10 +13,7 @@
 <section class="tk-reveal card p-6 xl:col-span-12" id="monitoring">
     <div class="mb-4">
         <h2 class="card-title">Laporan Perjalanan</h2>
-        <p class="mt-1 text-sm text-gray-500">
-            Tulis catatan aktivitas perjalanan kapan saja diperlukan. Tidak ada tahapan wajib maupun laporan per jam,
-            dan check-out tidak bergantung pada catatan ini. Waktu laporan dicatat otomatis oleh server.
-        </p>
+        
     </div>
 
     @if ($status === 'belum')

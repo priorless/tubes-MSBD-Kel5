@@ -37,11 +37,7 @@
             Hari Wajib Kerja vs Kehadiran
             <span class="font-normal text-gray-400">({{ FormatKolom::namaBulan($periodeHarian['bulan']) }} {{ $periodeHarian['tahun'] }})</span>
         </h2>
-        <p class="mt-1 text-sm text-gray-500">
-            Hari wajib dihitung dari roster Operasional (jadwal Kerja dan backup shift). Hari wajib yang sudah lewat tanpa absensi
-            dihitung <b>Alpha (tanpa keterangan)</b>. Toleransi terlambat 30 menit: telat 1–30 menit tetap Hadir; mulai 31 menit
-            tercatat Terlambat dengan seluruh menit telatnya.
-        </p>
+        
         <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-5">
             @foreach ([
                 ['Hari Wajib', $kehadiran['hari_wajib'], 'text-sji-biru'],

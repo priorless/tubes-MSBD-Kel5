@@ -24,7 +24,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -276,7 +275,7 @@ class TenagaKerjaController extends Controller
     }
 
     /** Jumlah hari roster yang ditampilkan di Jadwal Saya. */
-    private const int HARI_JADWAL_KE_DEPAN = 30;
+    private const int HARI_JADWAL_KE_DEPAN = 7;
 
     /** Primary key baris absensi (kolom sesuai config), atau null. */
     private function idBaris(?object $baris): ?int
