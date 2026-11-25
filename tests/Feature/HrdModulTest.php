@@ -6,7 +6,6 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 use Throwable;
@@ -89,38 +88,22 @@ class HrdModulTest extends TestCase
         $this->assertEmpty(Storage::disk('public')->allFiles(), 'Foto harus dihapus bila insert ditolak.');
     }
 
-    public function test_signal_trigger_internal_tanpa_gaji_tampil_sebagai_notifikasi(): void
+    public function test_tambah_karyawan_internal_ditolak_validasi_dan_tidak_membuat_akun_staf(): void
     {
-        $response = $this->post(route('hrd.karyawan.store'), $this->dataKaryawan(['kategori' => 'Internal']));
-
-        $response->assertSessionHas('error', 'Operasi ditolak oleh aturan database: Karyawan Internal wajib diisi gaji_pokoknya');
-        $this->assertDatabaseMissing('tbl_karyawan', ['nip' => 'TST-001']);
-    }
-
-    public function test_karyawan_internal_dengan_akun_staf_yang_dipilih_hrd(): void
-    {
-        $idRoleKeuangan = DB::table('tbl_roles')->where('nama_role', 'Keuangan')->value('id');
-
-        $response = $this->post(route('hrd.karyawan.store'), $this->dataKaryawan([
+        $response = $this->from(route('hrd.karyawan.create'))->post(route('hrd.karyawan.store'), $this->dataKaryawan([
             'kategori' => 'Internal',
             'gaji_pokok' => 6000000,
             'buat_akun' => '1',
-            'id_role' => $idRoleKeuangan,
+            'id_role' => DB::table('tbl_roles')->where('nama_role', 'Keuangan')->value('id'),
             'username' => 'staf.keuangan.tst',
             'password' => 'rahasia123',
             'password_confirmation' => 'rahasia123',
         ]));
 
-        $response->assertRedirect(route('hrd.karyawan.index'));
-
-        $karyawan = DB::table('tbl_karyawan')->where('nip', 'TST-001')->first();
-        $this->assertSame('Aktif', $karyawan->status);
-        $this->assertNull($karyawan->id_jenis_layanan);
-
-        $akun = DB::table('tbl_users')->where('id_karyawan', $karyawan->id)->first();
-        $this->assertSame('staf.keuangan.tst', $akun->username);
-        $this->assertSame($idRoleKeuangan, $akun->id_role);
-        $this->assertTrue(Hash::check('rahasia123', $akun->password));
+        $response->assertRedirect(route('hrd.karyawan.create'));
+        $response->assertSessionHasErrors(['kategori' => 'Karyawan baru hanya dapat didaftarkan dengan kategori Lapangan.']);
+        $this->assertDatabaseMissing('tbl_karyawan', ['nip' => 'TST-001']);
+        $this->assertDatabaseMissing('tbl_users', ['username' => 'staf.keuangan.tst']);
     }
 
     public function test_validasi_berbahasa_indonesia(): void

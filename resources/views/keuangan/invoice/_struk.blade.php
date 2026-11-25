@@ -19,6 +19,10 @@
             <div>
                 <p class="text-xl font-bold tracking-wide">PT SATU JAYA INDONESIA</p>
                 <p class="text-sm text-blue-200">Penyedia Jasa Tenaga Kerja Outsourcing</p>
+                @php $identitas = $perusahaan ?? config('perusahaan'); @endphp
+                <p class="mt-1 max-w-md text-xs leading-relaxed text-blue-100/80">
+                    {{ collect([$identitas['alamat_jalan'] ?? null, $identitas['alamat_wilayah'] ?? null])->filter()->implode(', ') }}
+                </p>
             </div>
         </div>
         <div class="text-right">

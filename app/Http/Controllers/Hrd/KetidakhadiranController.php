@@ -20,10 +20,11 @@ class KetidakhadiranController extends Controller
     public function __invoke(StoreKetidakhadiranRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $idKaryawan = $request->idKaryawan();
 
         try {
             DatabaseService::callInputKetidakhadiran(
-                (int) $data['id_karyawan'],
+                $idKaryawan,
                 $data['tgl'],
                 $data['status_kehadiran'],
                 $data['keterangan'] ?? null,
@@ -38,7 +39,7 @@ class KetidakhadiranController extends Controller
             return back()->withInput()->with('error', $pesan);
         }
 
-        $nama = DB::table('tbl_karyawan')->where('id', $data['id_karyawan'])->value('nama');
+        $nama = DB::table('tbl_karyawan')->where('id', $idKaryawan)->value('nama');
 
         return redirect()->route('hrd.absensi', ['tanggal' => $data['tgl']])
             ->with('success', "Ketidakhadiran {$nama} ({$data['status_kehadiran']}) berhasil dicatat.");

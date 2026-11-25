@@ -6,21 +6,20 @@ use App\Http\Controllers\Concerns\MenanganiSignalDatabase;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hrd\StoreKaryawanRequest;
 use App\Http\Requests\Hrd\UpdateKaryawanRequest;
+use App\Services\GajiPokokLapanganService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class KaryawanController extends Controller
 {
     use MenanganiSignalDatabase;
-
-    private const FIELD_AKUN = ['buat_akun', 'username', 'password', 'id_role'];
 
     public function index(Request $request): View
     {
@@ -41,37 +40,33 @@ class KaryawanController extends Controller
         return view('hrd.karyawan.index', ['karyawan' => $karyawan]);
     }
 
-    public function create(): View
+    public function create(GajiPokokLapanganService $gajiPokok): View
     {
         return view('hrd.karyawan.form', [
             'karyawan' => null,
             'jenisLayanan' => $this->daftarJenisLayanan(),
-            'roles' => DB::table('tbl_roles')
-                ->where('nama_role', '<>', 'Karyawan Lapangan')
-                ->orderBy('nama_role')
-                ->get(['id', 'nama_role']),
+            'gajiPokok' => ['tersedia' => $gajiPokok->tersedia(), 'nilai' => null, 'keterangan' => null],
         ]);
     }
 
-    public function store(StoreKaryawanRequest $request): RedirectResponse
+    /**
+     * Karyawan baru selalu kategori Lapangan (lihat StoreKaryawanRequest). Status awal dan akun login
+     * (username & password awal = NIP) dibuat trigger database. Gaji pokok (opsional) disimpan ke Komponen
+     * Gaji mulai bulan tanggal masuk, dalam transaksi yang sama dengan data karyawan.
+     */
+    public function store(StoreKaryawanRequest $request, GajiPokokLapanganService $gajiPokok): RedirectResponse
     {
         $validated = $request->validated();
-        $dataKaryawan = Arr::except($validated, [...self::FIELD_AKUN, 'foto']);
+        $dataKaryawan = Arr::except($validated, ['foto', 'gaji_pokok']);
         $pathFoto = $request->file('foto')?->store('foto-karyawan', 'public');
-        $buatAkunInternal = $validated['kategori'] === 'Internal' && (bool) ($validated['buat_akun'] ?? false);
 
         try {
-            DB::transaction(function () use ($dataKaryawan, $pathFoto, $buatAkunInternal, $validated): void {
-                // Status awal & akun login Lapangan diurus trigger; PHP hanya menyimpan data.
-                $idKaryawan = DB::table('tbl_karyawan')->insertGetId([...$dataKaryawan, 'foto' => $pathFoto]);
+            DB::transaction(function () use ($dataKaryawan, $pathFoto, $validated, $gajiPokok): void {
+                $idKaryawan = (int) DB::table('tbl_karyawan')->insertGetId([...$dataKaryawan, 'foto' => $pathFoto]);
 
-                if ($buatAkunInternal) {
-                    DB::table('tbl_users')->insert([
-                        'id_karyawan' => $idKaryawan,
-                        'username' => $validated['username'],
-                        'password' => Hash::make($validated['password']),
-                        'id_role' => $validated['id_role'],
-                    ]);
+                if (filled($validated['gaji_pokok'] ?? null)) {
+                    $mulai = Carbon::parse($validated['tgl_masuk']);
+                    $gajiPokok->simpan($idKaryawan, $mulai->month, $mulai->year, (string) $validated['gaji_pokok']);
                 }
             });
         } catch (QueryException $exception) {
@@ -80,30 +75,33 @@ class KaryawanController extends Controller
             return $this->kembaliDenganError($exception);
         }
 
-        $pesan = $validated['kategori'] === 'Lapangan'
-            ? 'Karyawan Lapangan berhasil ditambahkan. Akun login dibuat otomatis oleh sistem (username = NIP).'
-            : 'Karyawan Internal berhasil ditambahkan.'.($buatAkunInternal ? ' Akun login juga sudah dibuat.' : '');
-
-        return redirect()->route('hrd.karyawan.index')->with('success', $pesan);
+        return redirect()->route('hrd.karyawan.index')
+            ->with('success', 'Karyawan Lapangan berhasil ditambahkan. Akun login dibuat otomatis oleh sistem (username = NIP).');
     }
 
-    public function edit(int $karyawan): View
+    public function edit(int $karyawan, GajiPokokLapanganService $gajiPokok): View
     {
         $data = DB::table('tbl_karyawan')->where('id', $karyawan)->firstOrFail();
 
         return view('hrd.karyawan.form', [
             'karyawan' => $data,
             'jenisLayanan' => $this->daftarJenisLayanan(),
-            'roles' => collect(),
             'penempatanAktif' => UpdateKaryawanRequest::punyaPenempatanAktif($karyawan),
             'pilihanStatus' => UpdateKaryawanRequest::pilihanStatus($data->kategori, $data->status),
+            'gajiPokok' => $this->infoGajiPokok($data, $gajiPokok),
         ]);
     }
 
-    public function update(UpdateKaryawanRequest $request, int $karyawan): RedirectResponse
+    /**
+     * Internal: gaji pokok di tbl_karyawan (seperti sebelumnya). Lapangan: gaji pokok baru berlaku mulai
+     * periode bulan ini di Komponen Gaji; kosong = tidak diubah. Semua perubahan dalam satu transaksi.
+     */
+    public function update(UpdateKaryawanRequest $request, int $karyawan, GajiPokokLapanganService $gajiPokok): RedirectResponse
     {
         $dataLama = DB::table('tbl_karyawan')->where('id', $karyawan)->firstOrFail();
-        $dataBaru = Arr::except($request->validated(), ['foto']);
+        $validated = $request->validated();
+        $gajiLapangan = $dataLama->kategori === 'Lapangan' ? ($validated['gaji_pokok'] ?? null) : null;
+        $dataBaru = Arr::except($validated, $dataLama->kategori === 'Lapangan' ? ['foto', 'gaji_pokok'] : ['foto']);
         $pathFotoBaru = $request->file('foto')?->store('foto-karyawan', 'public');
 
         if ($pathFotoBaru !== null) {
@@ -111,7 +109,13 @@ class KaryawanController extends Controller
         }
 
         try {
-            DB::table('tbl_karyawan')->where('id', $karyawan)->update($dataBaru);
+            DB::transaction(function () use ($karyawan, $dataBaru, $gajiLapangan, $gajiPokok): void {
+                DB::table('tbl_karyawan')->where('id', $karyawan)->update($dataBaru);
+
+                if (filled($gajiLapangan)) {
+                    $gajiPokok->simpan($karyawan, now()->month, now()->year, (string) $gajiLapangan);
+                }
+            });
         } catch (QueryException $exception) {
             $this->hapusBerkas($pathFotoBaru);
 
@@ -145,6 +149,32 @@ class KaryawanController extends Controller
         $this->hapusBerkas($data->foto);
 
         return redirect()->route('hrd.karyawan.index')->with('success', "Karyawan {$data->nama} berhasil dihapus.");
+    }
+
+    /**
+     * Nilai & keterangan kolom Gaji Pokok pada form edit.
+     *
+     * @return array{tersedia: bool, nilai: float|string|null, keterangan: string|null}
+     */
+    private function infoGajiPokok(object $karyawan, GajiPokokLapanganService $gajiPokok): array
+    {
+        if ($karyawan->kategori === 'Internal') {
+            return ['tersedia' => true, 'nilai' => $karyawan->gaji_pokok, 'keterangan' => null];
+        }
+
+        if (! $gajiPokok->tersedia()) {
+            return ['tersedia' => false, 'nilai' => null, 'keterangan' => null];
+        }
+
+        $berlaku = $gajiPokok->berlaku((int) $karyawan->id, now()->month, now()->year);
+
+        return [
+            'tersedia' => true,
+            'nilai' => $berlaku['nominal'] ?? null,
+            'keterangan' => $berlaku === null
+                ? 'Belum diinput. Selama kosong, payroll memakai gaji pada kontrak penempatan.'
+                : 'Berlaku sejak '.$berlaku['label_periode'].'.',
+        ];
     }
 
     private function daftarJenisLayanan(): Collection

@@ -33,6 +33,8 @@ trait PesanValidasiKaryawan
             'in' => ':Attribute yang dipilih tidak valid.',
             'image' => ':Attribute harus berupa gambar.',
             'mimes' => ':Attribute harus berformat :values.',
+            'decimal' => ':Attribute maksimal dua angka di belakang koma.',
+            'gaji_pokok.gt' => 'Gaji pokok harus lebih dari Rp0.',
             'username.regex' => 'Username hanya boleh berisi huruf, angka, titik, tanda hubung, dan garis bawah.',
             'confirmed' => 'Konfirmasi :attribute tidak cocok.',
             'no_telp.regex' => 'Nomor telepon hanya boleh berisi angka (8–14 digit), boleh diawali tanda +.',
