@@ -4,57 +4,125 @@
 @section('page-title', 'Payroll Karyawan')
 
 @section('content')
+    @include('keuangan._gaya')
     @php
         $rupiah = fn ($nilai): string => ((float) $nilai < 0 ? '−' : '').'Rp '.number_format(abs((float) $nilai), 0, ',', '.');
         $sudahLunas = fn (object $item): bool => $item->status_bayar === 'Sudah Lunas';
+        $namaPeriode = $daftarBulan[$bulan].' '.$tahun;
+        $belumBerjalan = \App\Http\Controllers\KeuanganController::periodeBelumBerjalan($bulan, $tahun);
     @endphp
 
-    <x-ui.page-header :title="'Selamat datang, '.auth()->user()->namaTampilan()"
+    <div class="keu-halaman min-w-0 space-y-6">
+    <x-ui.page-header :kicker="now()->locale('id')->translatedFormat('l, j F Y').' · Payroll karyawan'"
+        :title="'Selamat datang, '.auth()->user()->namaTampilan()"
         description="Kelola payroll karyawan: generate gaji per periode, periksa rincian gaji, dan catat pencairan." />
 
-    <div class="callout callout-info mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="max-w-3xl">
-            <p class="font-semibold">Generate payroll</p>
-            <p class="mt-1">
-                Payroll periode yang dipilih dihitung otomatis oleh database untuk karyawan Internal berstatus Aktif/Cuti dan karyawan Lapangan
-                yang ditempatkan pada periode itu: lembur, potongan absensi, BPJS klien, tunjangan &amp; potongan pinjaman (Komponen Gaji), dan PPh 21.
-                Karyawan yang sudah memiliki payroll pada periode ini dilewati tanpa diubah.
-            </p>
-            <p class="mt-2 text-sm">
-                Gunakan <span class="font-semibold">Rincian Gaji</span> untuk melihat rincian pendapatan dan potongan setiap karyawan.
-                Gunakan <span class="font-semibold">Cair</span> setelah gaji benar-benar dibayarkan.
-            </p>
-        </div>
-        <form method="POST" action="{{ route('keuangan.payroll.generate') }}" class="w-full sm:w-auto"
-              onsubmit="return confirm(@js('Generate payroll untuk '.$daftarBulan[$bulan].' '.$tahun.'?'));">
-            @csrf
-            <input type="hidden" name="bulan" value="{{ $bulan }}">
-            <input type="hidden" name="tahun" value="{{ $tahun }}">
-            <button type="submit" class="btn-primary w-full whitespace-normal text-center leading-5 sm:w-auto sm:whitespace-nowrap">
-                Generate Payroll {{ $daftarBulan[$bulan] }} {{ $tahun }}
-            </button>
-        </form>
-    </div>
+    {{-- Periode aktif + generate payroll dalam satu bilah --}}
+    <section class="keu-panel" aria-label="Periode payroll">
+        <div class="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+            <form method="GET" action="{{ route('keuangan.payroll.index') }}" class="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+                @if ($cari !== '')
+                    <input type="hidden" name="q" value="{{ $cari }}">
+                @endif
+                <div class="col-span-2 sm:col-span-1">
+                    <span class="op-lab">Periode payroll</span>
+                    <p class="text-lg font-extrabold tracking-tight text-sji-biru-tua">{{ $namaPeriode }}</p>
+                </div>
+                <div class="hidden h-10 w-px bg-gray-200 sm:block" aria-hidden="true"></div>
+                <div>
+                    <label for="bulan" class="form-label">Bulan</label>
+                    <select name="bulan" id="bulan" class="form-input min-w-0 sm:w-40" data-batas-periode="tahun">
+                        @foreach ($daftarBulan as $angka => $nama)
+                            <option value="{{ $angka }}" @selected($angka === $bulan)>{{ $nama }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="tahun" class="form-label">Tahun</label>
+                    <input type="number" name="tahun" id="tahun" value="{{ $tahun }}" min="2000" max="2100" class="form-input min-w-0 sm:w-28">
+                </div>
+                <button type="submit" class="btn-secondary col-span-2 sm:col-span-1">Tampilkan</button>
+            </form>
 
-    <div class="card">
-        <div class="card-header flex-col items-stretch sm:flex-row sm:items-center">
-            <h2 class="card-title">Slip gaji periode {{ $daftarBulan[$bulan] }} {{ $tahun }}</h2>
-            <form method="GET" action="{{ route('keuangan.payroll.index') }}" class="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-                <label for="bulan" class="sr-only">Bulan</label>
-                <select name="bulan" id="bulan" class="form-input min-w-0 py-1.5 sm:w-auto">
-                    @foreach ($daftarBulan as $angka => $nama)
-                        <option value="{{ $angka }}" @selected($angka === $bulan)>{{ $nama }}</option>
-                    @endforeach
-                </select>
-                <label for="tahun" class="sr-only">Tahun</label>
-                <input type="number" name="tahun" id="tahun" value="{{ $tahun }}" min="2000" max="2100" class="form-input min-w-0 py-1.5 sm:w-24">
-                <button type="submit" class="btn-secondary btn-sm col-span-2 sm:col-span-1">Tampilkan</button>
+            <form method="POST" action="{{ route('keuangan.payroll.generate') }}" class="w-full lg:w-auto"
+                  onsubmit="return confirm(@js('Generate payroll untuk '.$namaPeriode.'?'));">
+                @csrf
+                <input type="hidden" name="bulan" value="{{ $bulan }}">
+                <input type="hidden" name="tahun" value="{{ $tahun }}">
+                <button type="submit" class="btn-primary w-full whitespace-normal text-center leading-5 lg:w-auto lg:whitespace-nowrap"
+                        @disabled($belumBerjalan)>
+                    Generate Payroll {{ $namaPeriode }}
+                </button>
             </form>
         </div>
 
-        <div class="hidden overflow-x-auto lg:block">
-            <table class="table">
+        @if ($belumBerjalan)
+            <p class="callout callout-warning mx-5 mb-4 text-sm">
+                <span class="font-semibold">Periode {{ $namaPeriode }} belum berjalan.</span>
+                Payroll baru dapat di-generate setelah periode dimulai dan absensinya tersedia, paling jauh sampai periode
+                {{ $daftarBulan[$bulanIni] }} {{ $tahunIni }}.
+            </p>
+        @endif
+
+        <details class="keu-catatan mx-5 mb-5">
+            <summary>
+                <svg class="size-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                Cara payroll dihitung
+            </summary>
+            <div class="keu-catatan-isi">
+                <div>
+                    <h3>Siapa yang dihitung</h3>
+                    <p>Karyawan Internal berstatus Aktif/Cuti dan karyawan Lapangan yang ditempatkan pada periode tersebut.
+                        Karyawan yang sudah memiliki payroll pada periode ini dilewati tanpa diubah.</p>
+                </div>
+                <div>
+                    <h3>Komponen</h3>
+                    <p>Lembur, potongan absensi, BPJS klien, tunjangan &amp; potongan pinjaman (Komponen Gaji), dan PPh 21 dihitung otomatis oleh database.</p>
+                </div>
+                <div>
+                    <h3>Rincian Gaji</h3>
+                    <p>Lihat rincian pendapatan dan potongan setiap karyawan. Rincian hanya untuk dilihat, tidak dicetak.</p>
+                </div>
+                <div>
+                    <h3>Cair</h3>
+                    <p>Tekan setelah gaji benar-benar dibayarkan. Status berubah menjadi Sudah Lunas dan tidak dapat dibatalkan.</p>
+                </div>
+            </div>
+        </details>
+    </section>
+
+    <section class="keu-panel min-w-0 overflow-hidden" aria-labelledby="judul-slip-gaji">
+        <div class="keu-panel-kepala">
+            <div>
+                <h2 class="keu-judul-panel" id="judul-slip-gaji">Slip gaji periode {{ $namaPeriode }}</h2>
+                <p class="keu-sub">Belum dibayar ditampilkan lebih dulu, lalu urut nama karyawan. <span class="text-(--op-green)">Hijau</span> = pendapatan, <span class="text-(--op-red)">merah</span> = potongan.</p>
+            </div>
+            @include('keuangan._cari', [
+                'id' => 'cari_payroll',
+                'nilai' => $cari,
+                'placeholder' => 'Cari NIP atau nama karyawan',
+                'action' => route('keuangan.payroll.index'),
+                'urlReset' => route('keuangan.payroll.index', ['bulan' => $bulan, 'tahun' => $tahun]),
+                'tersembunyi' => ['bulan' => $bulan, 'tahun' => $tahun],
+            ])
+        </div>
+
+        @if ($cari !== '')
+            <p class="keu-hasil-cari" aria-live="polite">
+                <span><strong>{{ $payroll->total() }}</strong> slip gaji {{ $namaPeriode }} cocok dengan &ldquo;{{ $cari }}&rdquo;</span>
+                <a href="{{ route('keuangan.payroll.index', ['bulan' => $bulan, 'tahun' => $tahun]) }}">Tampilkan semua karyawan</a>
+            </p>
+        @endif
+
+        <div class="relative hidden overflow-x-auto lg:block">
+            <table class="table keu-tabel">
                 <thead>
+                    <tr>
+                        <th colspan="4" class="keu-grup"><span>Karyawan</span></th>
+                        <th colspan="4" class="keu-grup is-masuk"><span>Pendapatan</span></th>
+                        <th colspan="4" class="keu-grup is-potong"><span>Potongan</span></th>
+                        <th colspan="3" class="keu-grup"><span>Pembayaran</span></th>
+                    </tr>
                     <tr>
                         <th>NIP</th>
                         <th>Nama Karyawan</th>
@@ -68,7 +136,7 @@
                         <th class="text-right">Potongan BPJS</th>
                         <th class="text-right">Potongan Pinjaman</th>
                         <th class="text-right">PPh 21</th>
-                        <th class="text-right">Total Gaji</th>
+                        <th class="keu-kolom-total text-right">Total Gaji</th>
                         <th>Status</th>
                         <th class="text-center">Aksi</th>
                     </tr>
@@ -76,49 +144,49 @@
                 <tbody>
                     @forelse ($payroll as $item)
                         <tr>
-                            <td class="font-mono text-gray-600">{{ $item->nip }}</td>
-                            <td class="whitespace-nowrap">{{ $item->nama }}</td>
+                            <td class="whitespace-nowrap font-mono text-gray-600">{{ $item->nip }}</td>
+                            <td class="whitespace-nowrap font-medium text-gray-800">{{ $item->nama }}</td>
                             <td class="whitespace-nowrap">
                                 <span @class(['badge', 'badge-info' => $item->kategori === 'Internal', 'badge-secondary' => $item->kategori !== 'Internal'])>
                                     {{ $item->jenis_pekerjaan ?? $item->kategori }}
                                 </span>
                             </td>
                             <td class="text-center whitespace-nowrap tabular-nums text-gray-600">{{ $item->hari_wajib ?? '—' }} / {{ $item->hari_masuk ?? '—' }} / {{ $item->hari_absen ?? '—' }}</td>
-                            <td class="text-right whitespace-nowrap tabular-nums">{{ $rupiah($item->gaji_pokok) }}</td>
-                            <td class="text-right whitespace-nowrap tabular-nums">{{ $rupiah($item->komponen_tunjangan) }}</td>
-                            <td class="text-right whitespace-nowrap tabular-nums">{{ $rupiah($item->upah_backup) }}</td>
-                            <td class="text-right whitespace-nowrap tabular-nums">{{ $rupiah($item->total_lembur) }}</td>
-                            <td class="text-right whitespace-nowrap text-red-600 tabular-nums">{{ $rupiah($item->potongan_absen) }}</td>
-                            <td class="text-right whitespace-nowrap text-red-600 tabular-nums">
+                            <td class="keu-angka">{{ $rupiah($item->gaji_pokok) }}</td>
+                            <td class="keu-angka">{{ $rupiah($item->komponen_tunjangan) }}</td>
+                            <td class="keu-angka">{{ $rupiah($item->upah_backup) }}</td>
+                            <td class="keu-angka">{{ $rupiah($item->total_lembur) }}</td>
+                            <td class="keu-angka keu-minus">{{ $rupiah($item->potongan_absen) }}</td>
+                            <td class="keu-angka keu-minus">
                                 {{ $rupiah($item->potongan_bpjs) }}
                                 @if ($item->bpjs_metode !== null)
-                                    <p class="text-xs text-gray-400">{{ \App\Support\LabelBpjs::aturan($item->bpjs_metode, $item->bpjs_nilai) }}</p>
+                                    <span class="keu-ket">{{ \App\Support\LabelBpjs::aturan($item->bpjs_metode, $item->bpjs_nilai) }}</span>
                                 @endif
                             </td>
-                            <td class="text-right whitespace-nowrap text-red-600 tabular-nums">{{ $rupiah($item->potongan_pinjaman) }}</td>
-                            <td class="text-right whitespace-nowrap text-red-600 tabular-nums">
+                            <td class="keu-angka keu-minus">{{ $rupiah($item->potongan_pinjaman) }}</td>
+                            <td class="keu-angka keu-minus">
                                 {{ $rupiah($item->pph21) }}
-                                <p class="text-xs text-gray-400">{{ (float) $item->pph21 < 0 ? 'Lebih bayar, dikembalikan' : 'PTKP '.$item->status_ptkp }}</p>
+                                <span class="keu-ket">{{ (float) $item->pph21 < 0 ? 'Lebih bayar, dikembalikan' : 'PTKP '.$item->status_ptkp }}</span>
                             </td>
-                            <td class="text-right font-semibold whitespace-nowrap text-gray-800 tabular-nums">{{ $rupiah($item->total_gaji) }}</td>
+                            <td class="keu-angka keu-kolom-total font-bold text-gray-900">{{ $rupiah($item->total_gaji) }}</td>
                             <td class="whitespace-nowrap">
                                 @if ($sudahLunas($item))
                                     <span class="badge badge-success">Sudah Lunas</span>
-                                    <p class="mt-0.5 text-xs text-gray-400">{{ \Illuminate\Support\Carbon::parse($item->tgl_bayar)->format('d/m/Y') }}</p>
+                                    <span class="keu-ket">{{ \Illuminate\Support\Carbon::parse($item->tgl_bayar)->format('d/m/Y') }}</span>
                                 @else
                                     <span class="badge badge-warning">Belum Dibayar</span>
                                 @endif
                             </td>
                             <td class="text-center">
-                                <div class="flex flex-wrap items-center justify-center gap-2">
-                                    <button type="button" class="btn-secondary btn-sm whitespace-nowrap"
+                                <div class="flex items-center justify-center gap-2">
+                                    <button type="button" class="keu-btn-garis"
                                             data-struk-url="{{ route('keuangan.payroll.struk', $item->id) }}">Rincian Gaji</button>
                                     @unless ($sudahLunas($item))
                                         <form method="POST" action="{{ route('keuangan.payroll.cair', $item->id) }}"
                                               onsubmit="return confirm(@js('Cairkan gaji '.$item->nama.' sebesar '.$rupiah($item->total_gaji).' hari ini?'));">
                                             @csrf
                                             @method('PATCH')
-                                            <button type="submit" class="btn-success btn-sm whitespace-nowrap">Cair</button>
+                                            <button type="submit" class="keu-btn-garis is-lunas">Cair</button>
                                         </form>
                                     @endunless
                                 </div>
@@ -126,7 +194,15 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="15" class="table-empty">Belum ada data payroll untuk periode {{ $daftarBulan[$bulan] }} {{ $tahun }}.</td>
+                            <td colspan="15" class="keu-kosong">
+                                @if ($cari !== '')
+                                    <p>Tidak ada karyawan dengan NIP atau nama &ldquo;{{ $cari }}&rdquo; pada payroll {{ $namaPeriode }}.</p>
+                                    <p>Coba sebagian nama atau NIP saja, atau periksa periode yang dipilih.</p>
+                                @else
+                                    <p>Belum ada data payroll untuk periode {{ $namaPeriode }}.</p>
+                                    <p>Tekan Generate Payroll {{ $namaPeriode }} untuk menghitung gaji periode ini.</p>
+                                @endif
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -135,7 +211,7 @@
 
         <div class="space-y-3 p-3 lg:hidden">
             @forelse ($payroll as $item)
-                <article class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                <article class="rounded-xl border border-gray-200 bg-white p-4">
                     <div class="flex min-w-0 items-start justify-between gap-2">
                         <div class="min-w-0">
                             <h3 class="font-semibold leading-5 text-gray-800">{{ $item->nama }}</h3>
@@ -166,9 +242,9 @@
                                 <dd @class(['whitespace-nowrap font-medium tabular-nums', 'text-red-600' => $potongan])>{{ $rupiah($nilai) }}</dd>
                             </div>
                         @endforeach
-                        <div class="flex justify-between gap-3 border-t border-gray-100 pt-2">
+                        <div class="flex justify-between gap-3 rounded-md bg-blue-50 px-2 py-1.5">
                             <dt class="font-semibold text-gray-700">Total Gaji</dt>
-                            <dd class="whitespace-nowrap font-bold text-gray-800 tabular-nums">{{ $rupiah($item->total_gaji) }}</dd>
+                            <dd class="whitespace-nowrap font-bold text-gray-900 tabular-nums">{{ $rupiah($item->total_gaji) }}</dd>
                         </div>
                     </dl>
 
@@ -182,23 +258,29 @@
                             @endif
                         </div>
                         <div class="flex flex-wrap justify-end gap-2">
-                            <button type="button" class="btn-secondary btn-sm whitespace-nowrap"
+                            <button type="button" class="keu-btn-garis"
                                     data-struk-url="{{ route('keuangan.payroll.struk', $item->id) }}">Rincian Gaji</button>
                             @unless ($sudahLunas($item))
                                 <form method="POST" action="{{ route('keuangan.payroll.cair', $item->id) }}"
                                       onsubmit="return confirm(@js('Cairkan gaji '.$item->nama.' sebesar '.$rupiah($item->total_gaji).' hari ini?'));">
                                     @csrf
                                     @method('PATCH')
-                                    <button type="submit" class="btn-success btn-sm whitespace-nowrap">Cair</button>
+                                    <button type="submit" class="keu-btn-garis is-lunas">Cair</button>
                                 </form>
                             @endunless
                         </div>
                     </div>
                 </article>
             @empty
-                <p class="table-empty rounded-lg border border-gray-200">
-                    Belum ada data payroll untuk periode {{ $daftarBulan[$bulan] }} {{ $tahun }}.
-                </p>
+                <div class="keu-kosong rounded-xl border border-gray-200">
+                    @if ($cari !== '')
+                        <p>Tidak ada karyawan dengan NIP atau nama &ldquo;{{ $cari }}&rdquo;.</p>
+                        <p>Coba sebagian nama atau NIP saja.</p>
+                    @else
+                        <p>Belum ada data payroll untuk periode {{ $namaPeriode }}.</p>
+                        <p>Tekan Generate Payroll {{ $namaPeriode }} untuk menghitung gaji periode ini.</p>
+                    @endif
+                </div>
             @endforelse
         </div>
 
@@ -206,6 +288,7 @@
             <span>Menampilkan {{ $payroll->firstItem() ?? 0 }}&ndash;{{ $payroll->lastItem() ?? 0 }} dari {{ $payroll->total() }} slip gaji</span>
             @include('partials.pagination', ['paginator' => $payroll])
         </div>
+    </section>
     </div>
 
     <dialog id="strukModal" aria-labelledby="strukModalJudul"

@@ -37,15 +37,20 @@ class KeuanganController extends Controller
     public function payroll(Request $request): View
     {
         $periode = $this->periodeDariRequest($request);
+        $cari = $this->kataKunci($request);
 
         return view('keuangan.payroll.index', [
             'payroll' => DB::table('v_slip_gaji_detail')
                 ->where('periode_bulan', $periode['bulan'])
                 ->where('periode_tahun', $periode['tahun'])
+                ->when($cari !== '', fn ($query) => $query->where(fn ($cocok) => $cocok
+                    ->where('nip', 'like', $this->polaLike($cari))
+                    ->orWhere('nama', 'like', $this->polaLike($cari))))
                 ->orderBy('status_bayar')
                 ->orderBy('nama')
                 ->paginate(15)
                 ->withQueryString(),
+            'cari' => $cari,
             'bulan' => $periode['bulan'],
             'tahun' => $periode['tahun'],
             'daftarBulan' => self::DAFTAR_BULAN,
@@ -68,6 +73,11 @@ class KeuanganController extends Controller
 
         $bulan = (int) $validated['bulan'];
         $tahun = (int) $validated['tahun'];
+
+        if (self::periodeBelumBerjalan($bulan, $tahun)) {
+            return back()->withInput()->withErrors(['bulan' => $this->pesanPeriodeBelumBerjalan('Payroll', $bulan, $tahun)]);
+        }
+
         $sudahAda = $this->jumlahPayroll($bulan, $tahun);
 
         $gagal = $this->jalankanProsedur('CALL sp_generate_payroll_bulanan(?, ?)', [$bulan, $tahun]);
@@ -156,11 +166,17 @@ class KeuanganController extends Controller
         return DB::table('tbl_payroll')->where('periode_bulan', $bulan)->where('periode_tahun', $tahun)->count();
     }
 
-    public function invoice(InvoiceKlienService $layanan): View
+    public function invoice(Request $request, InvoiceKlienService $layanan): View
     {
+        $cari = $this->kataKunci($request);
+
         return view('keuangan.invoice.index', [
             'invoice' => DB::table('tbl_invoice as i')
                 ->join('tbl_klien as k', 'k.id', '=', 'i.id_klien')
+                ->when($cari !== '', fn ($query) => $query->where(fn ($cocok) => $cocok
+                    ->where('k.kode_klien', 'like', $this->polaLike($cari))
+                    ->orWhere('k.nama_perusahaan', 'like', $this->polaLike($cari))
+                    ->orWhere('i.nomor_invoice', 'like', $this->polaLike($cari))))
                 ->orderByDesc('i.periode_tahun')
                 ->orderByDesc('i.periode_bulan')
                 ->orderBy('k.nama_perusahaan')
@@ -184,6 +200,7 @@ class KeuanganController extends Controller
                     'k.pic_telp',
                 ])
                 ->paginate(15)
+                ->withQueryString()
                 // Isian awal form "Kirim via Email" (subjek & pesan bawaan, dapat diedit sebelum dikirim) dan
                 // tautan "Kirim via WhatsApp" (hanya untuk invoice yang punya PDF tagihan).
                 ->through(fn (object $item): object => (object) [
@@ -199,6 +216,7 @@ class KeuanganController extends Controller
                 ->orderBy('nama_perusahaan')
                 // Management fee ditampilkan (tidak dapat diubah; diatur Operasional) saat Keuangan memilih klien.
                 ->get(['id', 'kode_klien', 'nama_perusahaan', 'management_fee']),
+            'cari' => $cari,
             'daftarBulan' => self::DAFTAR_BULAN,
             'bulanIni' => now()->month,
             'tahunIni' => now()->year,
@@ -212,6 +230,12 @@ class KeuanganController extends Controller
             'bulan' => ['bail', 'required', 'integer', 'between:1,12'],
             'tahun' => ['bail', 'required', 'integer', 'between:2000,2100'],
         ], $this->pesanValidasi());
+
+        if (self::periodeBelumBerjalan((int) $validated['bulan'], (int) $validated['tahun'])) {
+            return back()->withInput()->withErrors([
+                'bulan' => $this->pesanPeriodeBelumBerjalan('Invoice', (int) $validated['bulan'], (int) $validated['tahun']),
+            ]);
+        }
 
         $gagal = $this->jalankanProsedur('CALL sp_generate_invoice_klien(?, ?, ?)', [
             $validated['id_klien'],
@@ -377,6 +401,39 @@ class KeuanganController extends Controller
         ]);
 
         return $gagal ?? back()->with('success', 'Invoice berhasil ditandai lunas.');
+    }
+
+    /**
+     * True bila periode belum dimulai (bulan setelah bulan berjalan): payroll/invoice periode itu belum boleh dibuat
+     * karena absensinya belum ada, sehingga seluruh hari wajib akan terhitung absen.
+     */
+    public static function periodeBelumBerjalan(int $bulan, int $tahun): bool
+    {
+        return $tahun * 12 + $bulan > now()->year * 12 + now()->month;
+    }
+
+    private function pesanPeriodeBelumBerjalan(string $dokumen, int $bulan, int $tahun): string
+    {
+        return sprintf(
+            'Periode %s %d belum berjalan. %s hanya dapat dibuat sampai periode %s %d.',
+            self::DAFTAR_BULAN[$bulan], $tahun, $dokumen, self::DAFTAR_BULAN[now()->month], now()->year,
+        );
+    }
+
+    /**
+     * Kata kunci pencarian (?q=) yang sudah dirapikan; kosong bila tidak mencari.
+     */
+    private function kataKunci(Request $request): string
+    {
+        return mb_substr(trim((string) $request->query('q', '')), 0, 100);
+    }
+
+    /**
+     * Pola LIKE "mengandung" dengan karakter khusus LIKE (%, _, \) di-escape agar dicari apa adanya.
+     */
+    private function polaLike(string $kataKunci): string
+    {
+        return '%'.addcslashes($kataKunci, '%_\\').'%';
     }
 
     /**

@@ -153,6 +153,9 @@ class PayrollPph21PencairanTest extends TestCase
     {
         $karyawan = $this->buatKaryawan('Internal', ['gaji_pokok' => 10000000, 'status' => 'Aktif']);
         $this->loginSebagai(Role::Keuangan);
+        // Periode uji April 2099 baru boleh di-generate setelah periode itu berjalan (pindah waktu setelah akun uji
+        // dibuat, karena tbl_users.created_at bertipe TIMESTAMP).
+        $this->travelTo(now()->setDate(self::TAHUN, 5, 1));
 
         $this->post(route('keuangan.payroll.generate'), ['bulan' => 4, 'tahun' => self::TAHUN])
             ->assertSessionHas('success', fn (string $pesan): bool => str_contains($pesan, 'dilewati karena sudah ada') && ! str_contains($pesan, ': 0 payroll baru'));
@@ -160,7 +163,7 @@ class PayrollPph21PencairanTest extends TestCase
         $this->patch(route('keuangan.payroll.cair', $payroll->id))->assertSessionHas('success');
         DB::table('tbl_komponen_gaji')->insert([
             'id_karyawan' => $karyawan, 'periode_bulan' => 4, 'periode_tahun' => self::TAHUN,
-            'tunjangan' => 999999, 'potongan_pinjaman' => 0, 'created_at' => now(), 'updated_at' => now(),
+            'tunjangan' => 999999, 'potongan_pinjaman' => 0, 'created_at' => '2038-01-01 00:00:00', 'updated_at' => '2038-01-01 00:00:00',
         ]);
         $this->karyawanTurunan = [$karyawan];
         $jumlah = DB::table('tbl_payroll')->where('periode_bulan', 4)->where('periode_tahun', self::TAHUN)->count();
@@ -173,6 +176,23 @@ class PayrollPph21PencairanTest extends TestCase
         $this->assertSame(['Sudah Lunas', 0.0, (float) $payroll->total_gaji], [$setelah->status_bayar, (float) $setelah->komponen_tunjangan, (float) $setelah->total_gaji]);
 
         $this->post(route('keuangan.payroll.generate'), ['bulan' => 13, 'tahun' => self::TAHUN])->assertSessionHasErrors('bulan');
+    }
+
+    public function test_payroll_dan_invoice_periode_yang_belum_berjalan_ditolak(): void
+    {
+        $klien = $this->buatKlien(['management_fee' => 5]);
+        $this->loginSebagai(Role::Keuangan);
+        $this->travelTo(now()->setDate(self::TAHUN, 3, 15));
+
+        $this->post(route('keuangan.payroll.generate'), ['bulan' => 4, 'tahun' => self::TAHUN])
+            ->assertSessionHasErrors(['bulan' => 'Periode April 2099 belum berjalan. Payroll hanya dapat dibuat sampai periode Maret 2099.']);
+        $this->post(route('keuangan.invoice.generate'), ['id_klien' => $klien, 'bulan' => 1, 'tahun' => self::TAHUN + 1])
+            ->assertSessionHasErrors(['bulan' => 'Periode Januari 2100 belum berjalan. Invoice hanya dapat dibuat sampai periode Maret 2099.']);
+
+        $this->assertSame(0, DB::table('tbl_payroll')->where('periode_bulan', 4)->where('periode_tahun', self::TAHUN)->count());
+        $this->assertFalse(DB::table('tbl_invoice')->where('id_klien', $klien)->exists());
+        $this->get(route('keuangan.payroll.index', ['bulan' => 4, 'tahun' => self::TAHUN]))
+            ->assertOk()->assertSee('Periode April 2099 belum berjalan.');
     }
 
     public function test_cair_mengubah_status_sudah_lunas_sekali_tanpa_mutasi_kas(): void
