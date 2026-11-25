@@ -1,0 +1,1545 @@
+/*
+|--------------------------------------------------------------------------
+| Landing page publik (resources/views/landing.blade.php)
+|--------------------------------------------------------------------------
+| Semua aturan di-scope ke body.lp atau kelas berawalan .lp- sehingga tidak
+| memengaruhi dashboard maupun halaman role lain. Identitas visual: navy,
+| putih, dan aksen oranye, dengan foto dokumentasi asli perusahaan.
+*/
+
+.lp {
+    --lp-ink: #0b1a33;
+    --lp-navy: #12284f;
+    --lp-navy-2: #1b3a6e;
+    --lp-orange: #f47a1f;
+    --lp-orange-2: #ff9447;
+    --lp-orange-text: #c2410c;
+    --lp-orange-soft: #fff1e6;
+    --lp-slogan: #f6a83b;
+    --lp-white: #ffffff;
+    --lp-surface: #f4f6fa;
+    /* Cream dari desain landing sebelumnya (commit ef2b409). */
+    --lp-paper: #f4f0e8;
+    --lp-paper-2: #ece6da;
+    --lp-paper-line: #e4ddcf;
+    --lp-paper-card: #fbf6ed;
+    --lp-navy-soft: #e6eaf3;
+    --lp-red: #e11d24;
+    --lp-green: #2a6646;
+    --lp-green-soft: #e0eee5;
+    --lp-line: #e2e7ef;
+    --lp-text: #0f1b2d;
+    --lp-text-2: #475467;
+    --lp-on-dark: #ffffff;
+    --lp-on-dark-2: #b9c4d6;
+    --lp-line-dark: rgba(255, 255, 255, 0.14);
+    --lp-max: 1200px;
+    --lp-gutter: clamp(16px, 4vw, 40px);
+    --lp-radius: 18px;
+    --lp-radius-sm: 12px;
+    --lp-shadow: 0 1px 2px rgba(11, 26, 51, 0.06), 0 12px 32px -12px rgba(11, 26, 51, 0.18);
+    --lp-shadow-lg: 0 2px 4px rgba(11, 26, 51, 0.06), 0 24px 48px -16px rgba(11, 26, 51, 0.28);
+    --lp-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    margin: 0;
+    background: var(--lp-white);
+    color: var(--lp-text);
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+}
+
+.lp.lp-lock {
+    overflow: hidden;
+}
+
+.lp *,
+.lp *::before,
+.lp *::after {
+    box-sizing: border-box;
+}
+
+.lp :where(h1, h2, h3, p, ol, ul, dl, dd, figure) {
+    margin: 0;
+}
+
+.lp :where(ol, ul) {
+    padding: 0;
+    list-style: none;
+}
+
+.lp a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.lp img,
+.lp svg {
+    display: block;
+}
+
+.lp img {
+    max-width: 100%;
+}
+
+.lp :focus-visible {
+    outline: 3px solid var(--lp-orange);
+    outline-offset: 3px;
+    border-radius: 6px;
+}
+
+.lp [id] {
+    scroll-margin-top: 80px;
+}
+
+html:has(body.lp) {
+    scroll-behavior: smooth;
+}
+
+.lp-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.lp-skip {
+    position: fixed;
+    top: -60px;
+    left: 16px;
+    z-index: 100;
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: var(--lp-orange);
+    color: var(--lp-ink);
+    font-weight: 700;
+    transition: top 0.2s;
+}
+
+.lp-skip:focus {
+    top: 12px;
+}
+
+.lp-wrap {
+    width: 100%;
+    max-width: calc(var(--lp-max) + var(--lp-gutter) * 2);
+    margin-inline: auto;
+    padding-inline: var(--lp-gutter);
+}
+
+/* ---------- Tipografi bersama ---------- */
+
+.lp h1,
+.lp h2,
+.lp h3 {
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.12;
+    color: inherit;
+    text-wrap: balance;
+}
+
+.lp h2 {
+    font-size: clamp(30px, 3.6vw, 46px);
+}
+
+.lp h3 {
+    font-size: 20px;
+    letter-spacing: -0.015em;
+}
+
+.lp-kicker,
+.lp-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    color: var(--lp-orange-text);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.lp-kicker::before,
+.lp-eyebrow::before {
+    content: '';
+    width: 28px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+}
+
+.lp-head {
+    max-width: 640px;
+    margin-bottom: clamp(36px, 5vw, 56px);
+}
+
+.lp-head > p:last-child:not(.lp-kicker) {
+    margin-top: 16px;
+    color: var(--lp-text-2);
+    font-size: 17px;
+}
+
+.lp-head-split {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 24px 64px;
+    align-items: end;
+    max-width: none;
+}
+
+.lp-head-split > p {
+    color: var(--lp-text-2);
+    font-size: 17px;
+}
+
+.lp-head-center {
+    margin-inline: auto;
+    text-align: center;
+}
+
+.lp-head-center .lp-kicker {
+    justify-content: center;
+}
+
+/* ---------- Tombol & tautan ---------- */
+
+.lp-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 24px;
+    border: 1.5px solid transparent;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: transform 0.2s var(--lp-ease), background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.lp-btn svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.25s var(--lp-ease);
+}
+
+.lp-btn:hover {
+    transform: translateY(-2px);
+}
+
+.lp-btn:hover svg {
+    transform: translateX(3px);
+}
+
+.lp-btn:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.lp-btn-primary {
+    background: var(--lp-orange);
+    color: var(--lp-ink);
+    box-shadow: 0 8px 20px -8px rgba(244, 122, 31, 0.6);
+}
+
+.lp-btn-primary:hover {
+    background: var(--lp-orange-2);
+    box-shadow: 0 12px 24px -8px rgba(244, 122, 31, 0.7);
+}
+
+.lp-btn-ghost {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: var(--lp-on-dark);
+}
+
+.lp-btn-ghost:hover {
+    border-color: var(--lp-white);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.lp-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* ---------- Navbar ---------- */
+
+.lp-nav {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 50;
+    color: var(--lp-on-dark);
+    transition: background-color 0.3s, box-shadow 0.3s, color 0.3s;
+}
+
+.lp-nav.is-scrolled,
+.lp-nav.is-menu-open {
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--lp-text);
+    box-shadow: 0 1px 0 var(--lp-line), 0 8px 24px -16px rgba(11, 26, 51, 0.25);
+    backdrop-filter: saturate(1.4) blur(12px);
+}
+
+.lp-nav-inner {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    height: 76px;
+}
+
+.lp-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-right: auto;
+}
+
+.lp-brand img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    border-radius: 10px;
+    background: var(--lp-white);
+    padding: 3px;
+}
+
+.lp-brand span {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.lp-brand strong {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.lp-brand small {
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+.lp-menu {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.lp-menu-link {
+    position: relative;
+    padding: 10px 12px;
+    font-size: 15px;
+    font-weight: 600;
+    opacity: 0.85;
+    transition: opacity 0.2s;
+}
+
+.lp-menu-link::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 4px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--lp-orange);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s var(--lp-ease);
+}
+
+.lp-menu-link:hover {
+    opacity: 1;
+}
+
+.lp-menu-link:hover::after {
+    transform: scaleX(1);
+}
+
+.lp-menu-cta {
+    display: none;
+}
+
+.lp-nav-cta {
+    min-height: 44px;
+    padding: 10px 20px;
+}
+
+.lp-burger {
+    display: none;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 1.5px solid currentColor;
+    border-radius: 12px;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+.lp-burger svg {
+    width: 22px;
+    height: 22px;
+}
+
+.lp-burger path {
+    transition: transform 0.3s var(--lp-ease), opacity 0.2s;
+    transform-origin: center;
+}
+
+.lp-burger[aria-expanded='true'] .lp-burger-a {
+    transform: translateY(5px) rotate(45deg);
+}
+
+.lp-burger[aria-expanded='true'] .lp-burger-b {
+    opacity: 0;
+}
+
+.lp-burger[aria-expanded='true'] .lp-burger-c {
+    transform: translateY(-5px) rotate(-45deg);
+}
+
+/* ---------- A. Hero ---------- */
+
+.lp-hero {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 100svh;
+    padding: 120px 0 80px;
+    overflow: hidden;
+    background: var(--lp-ink);
+    color: var(--lp-on-dark);
+    isolation: isolate;
+}
+
+/*
+ * Latar foto perusahaan (--lp-hero-foto, diisi dari Blade). Blur hanya pada ::before sehingga teks tetap tajam;
+ * ::after memberi overlay navy, senada dengan section "Bagian dari Satu Jaya".
+ */
+.lp-hero::before,
+.lp-hero::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+}
+
+.lp-hero::before {
+    inset: -24px;
+    z-index: -2;
+    background: var(--lp-hero-foto) center 40% / cover no-repeat;
+    filter: blur(4px) saturate(0.95);
+}
+
+.lp-hero::after {
+    inset: 0;
+    z-index: -1;
+    background:
+        linear-gradient(90deg, rgba(11, 26, 51, 0.9) 0%, rgba(11, 26, 51, 0.74) 48%, rgba(18, 40, 79, 0.55) 100%),
+        linear-gradient(180deg, rgba(11, 26, 51, 0.4) 0%, transparent 28%, transparent 70%, rgba(11, 26, 51, 0.6) 100%);
+}
+
+.lp-hero-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: clamp(40px, 6vw, 88px);
+    align-items: center;
+}
+
+.lp-hero .lp-eyebrow {
+    color: var(--lp-orange-2);
+}
+
+/* Slogan resmi "NEAR FROM YOU" di baris kecil atas headline, diikuti keterangan bidang usaha. */
+.lp-hero .lp-hero-kicker {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    color: var(--lp-on-dark-2);
+}
+
+.lp-hero .lp-hero-kicker::before {
+    background: var(--lp-slogan);
+}
+
+.lp-slogan {
+    color: var(--lp-slogan);
+    font-weight: 800;
+    letter-spacing: 0.22em;
+}
+
+.lp-hero-kicker-sep {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.lp-hero h1 {
+    font-size: clamp(40px, 5.6vw, 72px);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+}
+
+.lp-hero h1 em {
+    font-style: normal;
+    color: var(--lp-orange);
+}
+
+.lp-lede {
+    max-width: 560px;
+    margin: 24px 0 36px;
+    color: var(--lp-on-dark-2);
+    font-size: clamp(17px, 1.4vw, 19px);
+}
+
+.lp-hero-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--lp-line-dark);
+    color: var(--lp-on-dark-2);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.lp-hero-tags li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.lp-hero-tags li::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lp-orange);
+}
+
+/* Mockup dashboard: potongan antarmuka penempatan (dipulihkan dari desain sebelumnya). */
+.lp-hero-visual {
+    position: relative;
+    justify-self: end;
+    width: min(100%, 480px);
+    padding: 28px 12px;
+}
+
+.lp-panel {
+    position: relative;
+    z-index: 1;
+    padding: 18px;
+    border-radius: var(--lp-radius);
+    background: var(--lp-white);
+    color: var(--lp-text);
+    box-shadow: 0 40px 80px -24px rgba(0, 0, 0, 0.6);
+}
+
+.lp-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--lp-paper-2);
+}
+
+.lp-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--lp-paper-2);
+}
+
+.lp-dot:first-child {
+    background: var(--lp-red);
+    opacity: 0.75;
+}
+
+.lp-dot:nth-child(2) {
+    background: var(--lp-orange);
+}
+
+.lp-panel-title {
+    margin-left: 8px;
+    color: var(--lp-text-2);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.lp-panel-list li {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--lp-paper-2);
+}
+
+.lp-panel-list strong {
+    display: block;
+    font-size: 15px;
+    line-height: 20px;
+}
+
+.lp-panel-list small {
+    display: block;
+    color: var(--lp-text-2);
+    font-size: 13px;
+}
+
+.lp-panel-ic {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--lp-navy-soft);
+    color: var(--lp-navy);
+}
+
+.lp-panel-ic svg {
+    width: 20px;
+    height: 20px;
+}
+
+.lp-chip {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.lp-chip.is-ok {
+    background: var(--lp-green-soft);
+    color: var(--lp-green);
+}
+
+.lp-chip.is-accent {
+    background: var(--lp-orange-soft);
+    color: var(--lp-orange-text);
+}
+
+.lp-week {
+    padding-top: 14px;
+}
+
+.lp-week-label {
+    color: var(--lp-text-2);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.lp-week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.lp-week-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: var(--lp-text-2);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.lp-week-day i {
+    width: 100%;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--lp-navy);
+}
+
+.lp-week-day i.is-libur {
+    background: var(--lp-orange-soft);
+    box-shadow: inset 0 0 0 1px #f8c9a2;
+}
+
+.lp-float {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px 10px 10px;
+    border-radius: 999px;
+    background: var(--lp-white);
+    color: var(--lp-text);
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: var(--lp-shadow-lg);
+}
+
+.lp-float-ic {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--lp-orange-soft);
+    color: var(--lp-orange-text);
+}
+
+.lp-float-ic svg {
+    width: 18px;
+    height: 18px;
+}
+
+.lp-float-a {
+    top: 0;
+    right: -4px;
+}
+
+.lp-float-a .lp-float-ic {
+    background: var(--lp-green-soft);
+    color: var(--lp-green);
+}
+
+.lp-float-b {
+    bottom: -14px;
+    left: -12px;
+}
+
+/* Masuk sekali saat halaman dimuat. */
+.lp-js .lp-enter {
+    opacity: 0;
+    transform: translateY(18px);
+    animation: lp-masuk 0.9s var(--lp-ease) forwards;
+    animation-delay: calc(var(--i, 0) * 90ms + 80ms);
+}
+
+@keyframes lp-masuk {
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Badge mockup muncul lembut setelah kartu mockup tampil. */
+.lp-js .lp-float {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+    animation: lp-masuk 0.7s var(--lp-ease) forwards;
+}
+
+.lp-js .lp-float-a {
+    animation-delay: 0.85s;
+}
+
+.lp-js .lp-float-b {
+    animation-delay: 1.05s;
+}
+
+/* Fade-up sekali saat section pertama kali terlihat (kelas is-in dari IntersectionObserver). */
+.lp-js [data-lp-reveal] {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.8s var(--lp-ease), transform 0.8s var(--lp-ease);
+    transition-delay: calc(var(--r, 0) * 120ms);
+}
+
+.lp-js [data-lp-reveal].is-in {
+    opacity: 1;
+    transform: none;
+}
+
+/* ---------- Section umum ---------- */
+
+.lp-section {
+    padding: clamp(80px, 10vw, 128px) 0;
+}
+
+/* ---------- B. Tentang Kami ---------- */
+
+.lp-about-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: clamp(40px, 6vw, 80px);
+    align-items: center;
+}
+
+.lp-about-photo {
+    aspect-ratio: 5 / 4;
+    overflow: hidden;
+    border-radius: var(--lp-radius);
+    box-shadow: var(--lp-shadow-lg);
+}
+
+.lp-about-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 55%;
+}
+
+/* Momen: foto terbuka dari bawah saat section pertama kali terlihat. */
+.lp-js .lp-about-photo[data-lp-moment] {
+    clip-path: inset(100% 0 0 0 round var(--lp-radius));
+    transition: clip-path 1.2s var(--lp-ease);
+}
+
+.lp-js .lp-about-photo[data-lp-moment] img {
+    transform: scale(1.12);
+    transition: transform 1.6s var(--lp-ease);
+}
+
+.lp-js .lp-about-photo.is-in {
+    clip-path: inset(0 0 0 0 round var(--lp-radius));
+}
+
+.lp-js .lp-about-photo.is-in img {
+    transform: scale(1);
+}
+
+.lp-about-lede {
+    margin: 20px 0 16px;
+    color: var(--lp-text);
+    font-size: clamp(18px, 1.6vw, 21px);
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.lp-about-text > p:last-child {
+    color: var(--lp-text-2);
+    font-size: 16px;
+}
+
+.lp-facts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: clamp(48px, 6vw, 72px);
+    border-top: 1px solid var(--lp-line);
+}
+
+.lp-facts > div {
+    padding: 28px 28px 0 0;
+}
+
+.lp-facts > div + div {
+    padding-left: 28px;
+    border-left: 1px solid var(--lp-line);
+}
+
+.lp-facts dt {
+    color: var(--lp-navy);
+    font-size: clamp(40px, 4.4vw, 56px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+}
+
+.lp-facts dt.is-text {
+    font-size: clamp(20px, 1.9vw, 24px);
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    padding-top: 6px;
+    min-height: clamp(40px, 4.4vw, 56px);
+}
+
+.lp-facts dd {
+    margin-top: 12px;
+    color: var(--lp-text-2);
+    font-size: 15px;
+}
+
+/* ---------- C. Layanan ---------- */
+
+.lp-services-section {
+    background: var(--lp-paper-2);
+}
+
+.lp-services {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.lp-service {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--lp-paper-line);
+    border-radius: var(--lp-radius);
+    background: var(--lp-paper-card);
+    box-shadow: var(--lp-shadow);
+    transition: transform 0.35s var(--lp-ease), box-shadow 0.35s var(--lp-ease);
+}
+
+.lp-service:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--lp-shadow-lg);
+}
+
+.lp-service-photo {
+    position: relative;
+    aspect-ratio: 4 / 3.4;
+    overflow: hidden;
+    background: var(--lp-navy);
+}
+
+.lp-service-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s var(--lp-ease);
+}
+
+.lp-service:hover .lp-service-photo img {
+    transform: scale(1.04);
+}
+
+.lp-service-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    padding: 24px 24px 28px;
+}
+
+.lp-service-label {
+    color: var(--lp-orange-text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.lp-service h3 {
+    margin: 6px 0 10px;
+    font-size: 24px;
+}
+
+.lp-service-body > p:not(.lp-service-label) {
+    flex: 1;
+    color: var(--lp-text-2);
+    font-size: 15px;
+}
+
+/* ---------- D. Keunggulan ---------- */
+
+.lp-benefits-grid {
+    display: grid;
+    grid-template-columns: 0.85fr 1.15fr;
+    gap: clamp(40px, 6vw, 80px);
+    align-items: start;
+}
+
+.lp-benefits-grid .lp-head {
+    position: sticky;
+    top: 120px;
+    margin-bottom: 0;
+}
+
+.lp-benefits {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.lp-benefit {
+    padding: 28px;
+    border: 1px solid var(--lp-line);
+    border-radius: var(--lp-radius);
+    background: var(--lp-white);
+    transition: border-color 0.3s, box-shadow 0.3s var(--lp-ease), transform 0.3s var(--lp-ease);
+}
+
+.lp-benefit:hover {
+    border-color: rgba(244, 122, 31, 0.45);
+    box-shadow: var(--lp-shadow);
+    transform: translateY(-2px);
+}
+
+.lp-benefit-ic {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 24px;
+    border-radius: 14px;
+    background: var(--lp-navy);
+    color: var(--lp-orange-2);
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.lp-benefit:hover .lp-benefit-ic {
+    background: var(--lp-orange);
+    color: var(--lp-ink);
+}
+
+.lp-benefit-ic svg {
+    width: 26px;
+    height: 26px;
+}
+
+.lp-benefit h3 {
+    margin-bottom: 8px;
+}
+
+.lp-benefit p {
+    color: var(--lp-text-2);
+    font-size: 15px;
+}
+
+/* ---------- E. Alur Kerja ---------- */
+
+.lp-flow {
+    position: relative;
+    background: var(--lp-ink);
+    color: var(--lp-on-dark);
+    overflow: hidden;
+}
+
+.lp-flow .lp-kicker {
+    color: var(--lp-orange-2);
+}
+
+.lp-flow .lp-head > p:last-child {
+    color: var(--lp-on-dark-2);
+}
+
+/*
+ * Timeline horizontal (desain lama ef2b409, aksen emas -> oranye): lingkaran bernomor dihubungkan
+ * garis putus-putus per tahap. ::before = jalur redup, ::after = garis oranye yang terisi berurutan.
+ */
+.lp-steps {
+    --lp-step-size: 52px;
+    --lp-step-gap: 28px;
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--lp-step-gap);
+}
+
+.lp-step {
+    position: relative;
+}
+
+.lp-step:not(:last-child)::before,
+.lp-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: calc(var(--lp-step-size) / 2 - 1px);
+    left: calc(var(--lp-step-size) + 14px);
+    right: calc(14px - var(--lp-step-gap));
+    height: 2px;
+}
+
+.lp-step:not(:last-child)::before {
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0 8px, transparent 8px 14px);
+}
+
+.lp-step:not(:last-child)::after {
+    background: repeating-linear-gradient(90deg, var(--lp-orange) 0 8px, transparent 8px 14px);
+    clip-path: inset(0 0 0 0);
+}
+
+.lp-step-no {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: var(--lp-step-size);
+    height: var(--lp-step-size);
+    border-radius: 50%;
+    background: var(--lp-orange);
+    color: var(--lp-ink);
+    font-size: 16px;
+    font-weight: 800;
+    box-shadow: 0 0 0 8px var(--lp-ink);
+    transition: transform 0.3s var(--lp-ease), box-shadow 0.3s var(--lp-ease);
+}
+
+.lp-step:hover .lp-step-no {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 8px var(--lp-ink), 0 0 0 10px rgba(244, 122, 31, 0.35);
+}
+
+.lp-step h3 {
+    margin-top: 22px;
+    font-size: 17px;
+    line-height: 1.35;
+}
+
+.lp-step p {
+    margin-top: 8px;
+    color: var(--lp-on-dark-2);
+    font-size: 14.5px;
+}
+
+.lp-step-tim {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 4px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Tahap muncul berurutan, lalu garisnya terisi menuju tahap berikutnya. */
+.lp-js .lp-step {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.6s var(--lp-ease), transform 0.6s var(--lp-ease);
+    transition-delay: calc(var(--d) * 200ms + 150ms);
+}
+
+.lp-js .lp-steps.is-in .lp-step {
+    opacity: 1;
+    transform: none;
+}
+
+.lp-js .lp-step:not(:last-child)::after {
+    clip-path: inset(0 100% 0 0);
+    transition: clip-path 0.5s ease-out;
+    transition-delay: calc(var(--d) * 200ms + 550ms);
+}
+
+.lp-js .lp-steps.is-in .lp-step:not(:last-child)::after {
+    clip-path: inset(0 0 0 0);
+}
+
+/* ---------- F. Bagian dari Satu Jaya ---------- */
+
+.lp-cta {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 560px;
+    padding: clamp(80px, 10vw, 120px) 0;
+    overflow: hidden;
+    background: var(--lp-navy);
+    color: var(--lp-on-dark);
+    isolation: isolate;
+}
+
+.lp-cta-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 62%;
+}
+
+.lp-cta::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(90deg, rgba(11, 26, 51, 0.96) 0%, rgba(11, 26, 51, 0.88) 45%, rgba(11, 26, 51, 0.35) 100%);
+}
+
+.lp-cta-text {
+    max-width: 600px;
+}
+
+.lp-cta .lp-kicker {
+    color: var(--lp-orange-2);
+}
+
+.lp-cta p:not(.lp-kicker) {
+    margin: 20px 0 36px;
+    color: var(--lp-on-dark-2);
+    font-size: 17px;
+}
+
+/* ---------- G. Kontak & Footer ---------- */
+
+.lp-footer {
+    padding-top: clamp(72px, 9vw, 112px);
+    background: var(--lp-ink);
+    color: var(--lp-on-dark);
+}
+
+.lp-footer-top {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px 64px;
+    align-items: end;
+    padding-bottom: clamp(48px, 6vw, 72px);
+    border-bottom: 1px solid var(--lp-line-dark);
+}
+
+.lp-footer .lp-kicker {
+    color: var(--lp-orange-2);
+}
+
+.lp-footer-intro h2 {
+    font-size: clamp(28px, 3.2vw, 40px);
+}
+
+.lp-footer-intro p:last-child {
+    margin-top: 16px;
+    max-width: 480px;
+    color: var(--lp-on-dark-2);
+}
+
+.lp-social {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    justify-self: end;
+}
+
+.lp-social-ic {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--lp-line-dark);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--lp-white);
+    transition: transform 0.25s var(--lp-ease), background-color 0.25s, border-color 0.25s, box-shadow 0.25s;
+}
+
+.lp-social-ic svg {
+    width: 24px;
+    height: 24px;
+}
+
+.lp-social-ic:hover {
+    transform: translateY(-3px);
+    border-color: transparent;
+    box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.6);
+}
+
+.lp-social-ic:active {
+    transform: translateY(0) scale(0.96);
+}
+
+.lp-social-ic.is-instagram:hover {
+    background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+}
+
+.lp-social-ic.is-youtube:hover {
+    background: #ff0000;
+}
+
+.lp-footer-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr 1fr;
+    gap: 40px;
+    padding: 56px 0;
+}
+
+.lp-footer-brand {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.lp-footer-brand img {
+    width: 52px;
+    height: 52px;
+    flex: none;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--lp-white);
+    object-fit: contain;
+}
+
+.lp-footer-brand strong {
+    font-size: 17px;
+}
+
+.lp-footer-brand p {
+    max-width: 280px;
+    margin-top: 6px;
+    color: var(--lp-on-dark-2);
+    font-size: 14px;
+}
+
+.lp-footer-brand .lp-footer-slogan {
+    margin-top: 12px;
+    color: var(--lp-slogan);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+}
+
+.lp-footer-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.lp-footer-col h3 {
+    margin-bottom: 8px;
+    color: var(--lp-on-dark);
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.lp-footer-col a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    color: var(--lp-on-dark-2);
+    font-size: 15px;
+    transition: color 0.2s;
+}
+
+.lp-footer-col a:hover {
+    color: var(--lp-orange-2);
+}
+
+.lp-footer-bottom {
+    padding-top: 24px;
+    padding-bottom: 32px;
+    border-top: 1px solid var(--lp-line-dark);
+    color: var(--lp-on-dark-2);
+    font-size: 14px;
+}
+
+/* ---------- Responsif ---------- */
+
+@media (max-width: 900px) {
+    .lp-steps {
+        --lp-step-gap: 24px;
+        grid-template-columns: 1fr;
+        max-width: 560px;
+        margin-inline: auto;
+    }
+
+    .lp-step {
+        display: grid;
+        grid-template-columns: var(--lp-step-size) minmax(0, 1fr);
+        column-gap: 20px;
+        align-items: start;
+    }
+
+    .lp-step-body {
+        padding-top: 12px;
+    }
+
+    .lp-step h3 {
+        margin-top: 0;
+    }
+
+    .lp-step:not(:last-child)::before,
+    .lp-step:not(:last-child)::after {
+        top: calc(var(--lp-step-size) + 12px);
+        bottom: calc(12px - var(--lp-step-gap));
+        left: calc(var(--lp-step-size) / 2 - 1px);
+        right: auto;
+        width: 2px;
+        height: auto;
+    }
+
+    .lp-step:not(:last-child)::before {
+        background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0 8px, transparent 8px 14px);
+    }
+
+    .lp-step:not(:last-child)::after {
+        background: repeating-linear-gradient(180deg, var(--lp-orange) 0 8px, transparent 8px 14px);
+    }
+
+    .lp-js .lp-step:not(:last-child)::after {
+        clip-path: inset(0 0 100% 0);
+    }
+
+    .lp-js .lp-steps.is-in .lp-step:not(:last-child)::after {
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+@media (max-width: 1023px) {
+    .lp-menu {
+        position: fixed;
+        inset: 76px 0 0;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 16px var(--lp-gutter) 32px;
+        background: var(--lp-white);
+        color: var(--lp-text);
+        overflow-y: auto;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-8px);
+        transition: opacity 0.25s, transform 0.3s var(--lp-ease), visibility 0.25s;
+    }
+
+    .lp-menu.is-open {
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+    }
+
+    .lp-menu-link {
+        padding: 16px 0;
+        border-bottom: 1px solid var(--lp-line);
+        font-size: 18px;
+        opacity: 1;
+    }
+
+    .lp-menu-link::after {
+        display: none;
+    }
+
+    .lp-menu-cta {
+        display: inline-flex;
+        margin-top: 24px;
+    }
+
+    .lp-nav-cta {
+        display: none;
+    }
+
+    .lp-burger {
+        display: grid;
+    }
+
+    .lp-hero-grid,
+    .lp-about-grid,
+    .lp-benefits-grid,
+    .lp-head-split,
+    .lp-footer-top {
+        grid-template-columns: 1fr;
+    }
+
+    .lp-hero {
+        padding-top: 120px;
+    }
+
+    .lp-hero-visual {
+        justify-self: center;
+        width: min(100%, 520px);
+    }
+
+    .lp-social {
+        justify-self: start;
+    }
+
+    .lp-benefits-grid .lp-head {
+        position: static;
+    }
+
+    .lp-services {
+        gap: 16px;
+    }
+
+    .lp-service-body {
+        padding: 20px 18px 24px;
+    }
+
+    .lp-footer-grid {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .lp-footer-brand {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 680px) {
+    .lp-hero {
+        padding: 104px 0 64px;
+        min-height: auto;
+    }
+
+    .lp-actions .lp-btn {
+        flex: 1 1 100%;
+    }
+
+    .lp-hero-kicker-sep {
+        display: none;
+    }
+
+    .lp-hero-visual {
+        padding: 44px 0;
+    }
+
+    .lp-panel {
+        padding: 14px;
+    }
+
+    .lp-float {
+        font-size: 13px;
+    }
+
+    .lp-float-a {
+        top: 0;
+        right: 4px;
+    }
+
+    .lp-float-b {
+        bottom: 0;
+        left: 4px;
+    }
+
+    .lp-facts {
+        grid-template-columns: 1fr;
+    }
+
+    .lp-facts > div,
+    .lp-facts > div + div {
+        padding: 24px 0;
+        border-left: 0;
+        border-bottom: 1px solid var(--lp-line);
+    }
+
+    .lp-facts dt.is-text {
+        min-height: 0;
+    }
+
+    .lp-services,
+    .lp-benefits {
+        grid-template-columns: 1fr;
+    }
+
+    .lp-cta::before {
+        background: linear-gradient(180deg, rgba(11, 26, 51, 0.82) 0%, rgba(11, 26, 51, 0.95) 100%);
+    }
+
+    .lp-footer-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .lp-footer-col:last-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html:has(body.lp) {
+        scroll-behavior: auto;
+    }
+
+    .lp *,
+    .lp *::before,
+    .lp *::after {
+        animation-duration: 0.01ms !important;
+        animation-delay: 0s !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0s !important;
+    }
+}

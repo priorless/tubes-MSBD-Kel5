@@ -80,8 +80,8 @@ class PertukaranShiftController extends Controller
                 ->withQueryString(),
             'filter' => [
                 'status' => $status,
-                'tanggal_dari' => $validated['tanggal_dari'] ?? null,
-                'tanggal_sampai' => $validated['tanggal_sampai'] ?? null,
+                'tanggal_dari' => $tanggalDari,
+                'tanggal_sampai' => $tanggalSampai,
                 'cari' => $cari,
                 'id_klien' => isset($validated['id_klien']) ? (int) $validated['id_klien'] : null,
             ],

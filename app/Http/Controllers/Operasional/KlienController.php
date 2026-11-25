@@ -42,6 +42,7 @@ class KlienController extends Controller
             'status' => $status,
             'jumlahPerStatus' => DB::table('tbl_klien')->groupBy('status')->selectRaw('status, COUNT(*) as jumlah')->pluck('jumlah', 'status'),
             'layananPerKlien' => $layananPerKlien,
+            'ruteKlien' => $this->ruteKlien(),
         ]);
     }
 
@@ -66,6 +67,8 @@ class KlienController extends Controller
             'layanan' => $this->layananAktifPerKlien([$klien])->get($klien, collect()),
             'kerjaSamaSejak' => $penempatan->min('tgl_mulai'),
             'managementFeeTersedia' => $this->managementFeeTersedia(),
+            'bpjsTersedia' => $this->bpjsTersedia(),
+            'ruteKlien' => $this->ruteKlien(),
         ]);
     }
 
@@ -94,12 +97,14 @@ class KlienController extends Controller
         return view('operasional.klien.form', [
             'klien' => null,
             'managementFeeTersedia' => $this->managementFeeTersedia(),
+            'bpjsTersedia' => $this->bpjsTersedia(),
+            'ruteKlien' => $this->ruteKlien(),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate($this->validationRules($request), $this->validationMessages());
+        $validated = $request->validate($this->validationRules($request), $this->validationMessages($request));
 
         try {
             $idKlien = (int) DB::table('tbl_klien')->insertGetId($validated);
@@ -111,7 +116,7 @@ class KlienController extends Controller
             return back()->withInput()->with('error', 'Kode klien sudah digunakan. Periksa kembali data klien.');
         }
 
-        return redirect()->route('operasional.klien.show', $idKlien)
+        return redirect()->route($this->ruteKlien().'.show', $idKlien)
             ->with('success', 'Klien berhasil ditambahkan. Langkah berikutnya: buat penempatan karyawan untuk klien ini.');
     }
 
@@ -120,6 +125,8 @@ class KlienController extends Controller
         return view('operasional.klien.form', [
             'klien' => DB::table('tbl_klien')->where('id', $klien)->firstOrFail(),
             'managementFeeTersedia' => $this->managementFeeTersedia(),
+            'bpjsTersedia' => $this->bpjsTersedia(),
+            'ruteKlien' => $this->ruteKlien(),
         ]);
     }
 
@@ -127,7 +134,7 @@ class KlienController extends Controller
     {
         $existingClient = DB::table('tbl_klien')->where('id', $klien)->firstOrFail();
 
-        $validated = $request->validate($this->validationRules($request, $existingClient->id), $this->validationMessages());
+        $validated = $request->validate($this->validationRules($request, $existingClient->id), $this->validationMessages($request));
 
         try {
             DB::table('tbl_klien')->where('id', $existingClient->id)->update($validated);
@@ -139,7 +146,7 @@ class KlienController extends Controller
             return back()->withInput()->with('error', 'Kode klien sudah digunakan. Periksa kembali data klien.');
         }
 
-        return redirect()->route('operasional.klien.show', $existingClient->id)->with('success', 'Data klien berhasil diperbarui.');
+        return redirect()->route($this->ruteKlien().'.show', $existingClient->id)->with('success', 'Data klien berhasil diperbarui.');
     }
 
     public function destroy(int $klien): RedirectResponse
@@ -156,7 +163,16 @@ class KlienController extends Controller
             return back()->with('error', 'Klien tidak dapat dihapus karena masih digunakan pada data operasional.');
         }
 
-        return redirect()->route('operasional.klien.index')->with('success', 'Data klien berhasil dihapus.');
+        return redirect()->route($this->ruteKlien().'.index')->with('success', 'Data klien berhasil dihapus.');
+    }
+
+    /**
+     * Prefix nama route Data Klien sesuai modul yang membuka halaman. Controller ini dipakai bersama oleh
+     * Operasional (operasional.klien.*) dan HRD (hrd.klien.*) agar data dan aturannya tetap satu sumber.
+     */
+    private function ruteKlien(): string
+    {
+        return request()->routeIs('hrd.*') ? 'hrd.klien' : 'operasional.klien';
     }
 
     /**
@@ -194,6 +210,14 @@ class KlienController extends Controller
     }
 
     /**
+     * Kolom tbl_klien.bpjs_metode/bpjs_nilai dibuat migrasi 2026_11_18_041642. Pola sama dengan Management Fee.
+     */
+    private function bpjsTersedia(): bool
+    {
+        return Schema::hasColumn('tbl_klien', 'bpjs_metode');
+    }
+
+    /**
      * Aturan validasi tambah/ubah klien. Management Fee: kosong = belum ditentukan (NULL), 0 = tanpa fee,
      * maksimal dua angka desimal; koma desimal ("7,5") diterima dan diubah menjadi titik.
      *
@@ -212,30 +236,63 @@ class KlienController extends Controller
             'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
         ];
 
-        if (! $this->managementFeeTersedia()) {
-            return $aturan;
+        if ($this->managementFeeTersedia()) {
+            if (is_string($request->input('management_fee'))) {
+                $request->merge(['management_fee' => str_replace(',', '.', trim($request->input('management_fee')))]);
+            }
+
+            $aturan['management_fee'] = ['bail', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:100'];
         }
 
-        if (is_string($request->input('management_fee'))) {
-            $request->merge(['management_fee' => str_replace(',', '.', trim($request->input('management_fee')))]);
+        if ($this->bpjsTersedia()) {
+            $aturan = [...$aturan, ...$this->aturanBpjs($request)];
         }
+
+        return $aturan;
+    }
+
+    /**
+     * BPJS default klien (satu BPJS gabungan): metode kosong = belum ditentukan/tanpa BPJS, sehingga nilainya
+     * ikut dikosongkan. Persentase 0 < x <= 100; nominal rupiah per tenaga > 0. Koma desimal diterima.
+     *
+     * @return array<string, list<mixed>>
+     */
+    private function aturanBpjs(Request $request): array
+    {
+        $metode = $request->input('bpjs_metode');
+
+        if (! is_string($metode) || trim($metode) === '') {
+            $request->merge(['bpjs_metode' => null, 'bpjs_nilai' => null]);
+        } elseif (is_string($request->input('bpjs_nilai'))) {
+            $request->merge(['bpjs_nilai' => str_replace(',', '.', trim($request->input('bpjs_nilai')))]);
+        }
+
+        $batasAtas = $request->input('bpjs_metode') === 'Persentase' ? 'max:100' : 'max:9999999999.99';
 
         return [
-            ...$aturan,
-            'management_fee' => ['bail', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:100'],
+            'bpjs_metode' => ['nullable', Rule::in(['Persentase', 'Nominal'])],
+            'bpjs_nilai' => ['bail', 'nullable', 'required_with:bpjs_metode', 'numeric', 'decimal:0,2', 'gt:0', $batasAtas],
         ];
     }
 
     /**
      * @return array<string, string>
      */
-    private function validationMessages(): array
+    private function validationMessages(Request $request): array
     {
         return [
             'management_fee.numeric' => 'Management Fee harus berupa angka.',
             'management_fee.decimal' => 'Management Fee maksimal dua angka di belakang koma.',
             'management_fee.min' => 'Management Fee tidak boleh kurang dari 0%.',
             'management_fee.max' => 'Management Fee tidak boleh lebih dari 100%.',
+            'bpjs_metode.in' => 'Metode BPJS tidak valid.',
+            'bpjs_nilai.required_with' => 'Nilai BPJS wajib diisi untuk metode yang dipilih.',
+            'bpjs_nilai.numeric' => 'Nilai BPJS harus berupa angka.',
+            'bpjs_nilai.decimal' => 'Nilai BPJS maksimal dua angka di belakang koma.',
+            'bpjs_nilai.gt' => 'Nilai BPJS harus lebih dari 0. Pilih "Tanpa BPJS" bila klien tidak memakai BPJS.',
+            'bpjs_nilai.max' => $request->input('bpjs_metode') === 'Persentase'
+                ? 'Persentase BPJS tidak boleh lebih dari 100%.'
+                : 'Nominal BPJS terlalu besar.',
             'kode_klien.required' => 'Kode klien wajib diisi.',
             'kode_klien.max' => 'Kode klien maksimal 10 karakter.',
             'kode_klien.unique' => 'Kode klien sudah digunakan.',

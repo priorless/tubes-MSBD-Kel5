@@ -456,6 +456,55 @@ class JadwalKerjaService
     }
 
     /**
+     * Memindahkan satu jadwal ke tanggal baru sekaligus mengganti isi shift-nya, tanpa mengubah
+     * id_penempatan. Dipakai pertukaran shift; pemanggil wajib memastikan tanggal baru belum
+     * terisi jadwal lain pada penempatan yang sama (unique id_penempatan + tanggal_kerja).
+     *
+     * @param  array<string, mixed>  $nilaiJadwal
+     * @param  array<string, mixed>  $sumberRiwayat
+     */
+    public function tukarTanggalDanNilai(
+        object $jadwalLama,
+        string $tanggalBaru,
+        array $nilaiJadwal,
+        int $idUser,
+        array $sumberRiwayat = [],
+    ): void {
+        $sebelum = [
+            'id_penempatan' => (int) $jadwalLama->id_penempatan,
+            'tanggal_kerja' => (string) $jadwalLama->tanggal_kerja,
+            ...$this->snapshot($jadwalLama),
+        ];
+
+        $sesudah = [
+            'id_penempatan' => (int) $jadwalLama->id_penempatan,
+            'tanggal_kerja' => $tanggalBaru,
+            ...$nilaiJadwal,
+        ];
+
+        if ($sumberRiwayat !== []) {
+            $sesudah['sumber'] = $sumberRiwayat;
+        }
+
+        DB::table('tbl_jadwal_kerja')
+            ->where('id', $jadwalLama->id)
+            ->update([
+                ...$nilaiJadwal,
+                'tanggal_kerja' => $tanggalBaru,
+                'diubah_oleh' => $idUser,
+                'updated_at' => now(),
+            ]);
+
+        $this->catatRiwayat(
+            (int) $jadwalLama->id,
+            'Diubah',
+            $sebelum,
+            $sesudah,
+            $idUser,
+        );
+    }
+
+    /**
      * @return array<string, null|string>
      */
     private function nilaiLibur(): array

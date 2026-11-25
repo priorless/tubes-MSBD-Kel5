@@ -90,6 +90,7 @@
                             </tbody>
                         </table>
                     </div>
+                    <p class="mt-2 text-xs text-gray-500">Tanggal kerja dan penempatan masing-masing karyawan tidak berubah; hanya isi shift yang ditukar.</p>
                 </section>
 
                 {{-- Langkah 3: keputusan --}}
@@ -120,7 +121,7 @@
                                 @csrf
                                 @method('PATCH')
                                 <p class="text-sm font-medium text-gray-800">Setujui</p>
-                                <p class="mt-1 text-sm text-gray-500">Jadwal kedua karyawan ditukar dan tercatat di riwayat jadwal.</p>
+                                <p class="mt-1 text-sm text-gray-500">Shift kedua jadwal ditukar dan tercatat di riwayat jadwal.</p>
                                 <button type="submit" class="btn-primary mt-4" @disabled($masalah !== [])>Approve</button>
                             </form>
 

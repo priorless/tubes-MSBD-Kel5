@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'Masuk') - SJI</title>
     <link rel="icon" type="image/png" href="{{ asset('images/logo-sji.png') }}">
+    @include('layouts.partials.font-tema')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-gray-50 font-sans text-gray-800 antialiased">
+<body class="tema-operasional min-h-screen bg-gray-50 font-sans text-gray-800 antialiased">
     <div class="flex min-h-screen">
         {{-- Panel merek (layar lebar) --}}
         <div class="relative hidden w-1/2 flex-col items-center justify-center overflow-hidden bg-sji-biru-tua p-12 text-white lg:flex">

@@ -19,9 +19,7 @@
 @endphp
 
 @section('content')
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+{{-- Plus Jakarta Sans sudah dimuat oleh layouts.app (layouts/partials/font-tema). --}}
 <style>
     .tk-heading, .card-title { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.02em; }
 </style>
@@ -228,6 +226,21 @@
                         <p class="text-[11px] font-semibold uppercase tracking-wider text-blue-200">Lokasi Penempatan</p>
                         <p class="tk-heading mt-1 text-sm font-bold text-white">{{ $penugasan->nama_klien }}</p>
                         <p class="text-xs text-blue-100">{{ $penugasan->lokasi_kerja }}</p>
+                        @if ($penugasan->nama_layanan ?? null)
+                            <span class="mt-2 inline-block rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white">{{ $penugasan->nama_layanan }}</span>
+                        @endif
+                    </div>
+
+                    {{-- Foto absensi & dokumentasi sesuai jenis layanan --}}
+                    <div class="my-4 border-t border-white/15"></div>
+                    <div class="relative z-10">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-blue-200">Foto Absensi</p>
+                        <p class="mt-1 text-sm font-bold text-white">Wajib saat check-in &amp; check-out</p>
+                        @if ($jenisMonitoring === \App\Services\LaporanAktivitasService::JENIS_BERKALA)
+                            <p class="mt-1 text-xs text-blue-100">Ditambah laporan foto aktivitas setiap jam selama bekerja.</p>
+                        @elseif ($driver)
+                            <p class="mt-1 text-xs text-blue-100">Ditambah P2H &amp; foto kendaraan saat check-in/check-out serta laporan per tahapan perjalanan.</p>
+                        @endif
                     </div>
                 @endif
             </section>

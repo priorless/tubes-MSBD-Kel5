@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BerandaController;
+use App\Http\Controllers\Ceo\KlienController as KlienCeoController;
 use App\Http\Controllers\Ceo\LogAktivitasController;
 use App\Http\Controllers\CeoController;
 use App\Http\Controllers\FotoAbsensiController;
@@ -9,10 +10,10 @@ use App\Http\Controllers\Hrd\AbsensiKaryawanController;
 use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
 use App\Http\Controllers\Hrd\KetidakhadiranController;
-use App\Http\Controllers\Hrd\PersetujuanLemburController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
 use App\Http\Controllers\Hrd\SertifikatController;
 use App\Http\Controllers\KeuanganController;
+use App\Http\Controllers\KeuanganKomponenGajiController;
 use App\Http\Controllers\Operasional\AkhiriPenempatanController;
 use App\Http\Controllers\Operasional\BerandaOperasionalController;
 use App\Http\Controllers\Operasional\JadwalKerjaController;
@@ -31,7 +32,12 @@ use App\Http\Middleware\PastikanKaryawan;
 use App\Models\Role;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login');
+// Landing page publik: dapat dibuka tamu maupun pengguna yang sudah login (tombol "Buka Dashboard").
+Route::view('/', 'landing')->name('landing');
+
+// PDF tagihan invoice untuk klien penerima tautan WhatsApp: tanpa login, hanya lewat signed URL per invoice.
+Route::get('/tagihan/{id}/pdf', [KeuanganController::class, 'pdfInvoicePublik'])
+    ->whereNumber('id')->middleware(['signed', 'throttle:30,1'])->name('invoice.publik.pdf');
 
 /*
 |--------------------------------------------------------------------------
@@ -73,7 +79,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
      * ===================================================================== */
     Route::middleware('role:'.Role::Ceo)->prefix('ceo')->name('ceo.')->group(function () {
         Route::get('/dashboard', [CeoController::class, 'dashboard'])->name('dashboard');
-        Route::get('/profit-klien', [CeoController::class, 'profitKlien'])->name('profit-klien');
+        Route::get('/klien', KlienCeoController::class)->name('klien');
         Route::get('/log-aktivitas', LogAktivitasController::class)->name('log-aktivitas');
     });
 
@@ -88,8 +94,10 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('absensi-karyawan/rekap/pdf', [AbsensiKaryawanController::class, 'exportPdf'])->name('absensi.rekap.pdf');
         Route::get('absensi-karyawan', AbsensiKaryawanController::class)->name('absensi');
         Route::post('absensi-karyawan/ketidakhadiran', KetidakhadiranController::class)->name('absensi.ketidakhadiran');
-        Route::post('absensi-karyawan/lembur/{absensi}', PersetujuanLemburController::class)->whereNumber('absensi')->name('absensi.lembur');
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
+        // Data Klien: controller & tampilan yang sama dengan Operasional (satu sumber data tbl_klien).
+        Route::resource('klien', KlienController::class);
+        Route::patch('klien/{klien}/status', [KlienController::class, 'updateStatus'])->whereNumber('klien')->name('klien.status');
     });
 
     /* =====================================================================
@@ -165,6 +173,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
      * Keuangan
      * ===================================================================== */
     Route::middleware('role:'.Role::Keuangan)->prefix('keuangan')->name('keuangan.')->controller(KeuanganController::class)->group(function () {
+        Route::get('komponen-gaji', [KeuanganKomponenGajiController::class, 'index'])->name('komponen-gaji.index');
+        Route::put('komponen-gaji', [KeuanganKomponenGajiController::class, 'store'])->name('komponen-gaji.store');
         Route::get('payroll', 'payroll')->name('payroll.index');
         Route::post('payroll/generate', 'generatePayroll')->name('payroll.generate');
         Route::patch('payroll/{id}/cair', 'tandaiPayrollCair')->whereNumber('id')->name('payroll.cair');
@@ -174,8 +184,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::post('invoice', 'generateInvoice')->name('invoice.generate');
         Route::patch('invoice/{id}/lunas', 'tandaiInvoiceLunas')->whereNumber('id')->name('invoice.lunas');
         Route::get('invoice/{id}/struk', 'strukInvoice')->whereNumber('id')->name('invoice.struk');
-
-        Route::get('mutasi', 'mutasi')->name('mutasi.index');
+        Route::put('invoice/{id}/dokumen', 'simpanDokumenInvoice')->whereNumber('id')->name('invoice.dokumen');
+        Route::post('invoice/{id}/email', 'kirimInvoiceEmail')->whereNumber('id')->middleware('throttle:10,1')->name('invoice.email');
     });
 
     /* =====================================================================

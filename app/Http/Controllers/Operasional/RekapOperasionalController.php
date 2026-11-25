@@ -57,8 +57,6 @@ class RekapOperasionalController extends Controller
             'Kerja tanpa catatan absensi' => static fn (object $b): int => count($b->tanggal_tanpa_absensi),
             'Jam kerja tercatat' => static fn (object $b): int => $b->jam_kerja,
             'Jam lembur' => static fn (object $b): int => $b->jam_lembur,
-            'Lembur disetujui (diteruskan ke Keuangan)' => static fn (object $b): int|string => $rekap['kolom']['status_lembur'] ? $b->lembur_disetujui : $belumTersedia,
-            'Lembur menunggu persetujuan' => static fn (object $b): int|string => $rekap['kolom']['status_lembur'] ? $b->lembur_menunggu : $belumTersedia,
         ];
 
         return response()->streamDownload(function () use ($rekap, $kolom): void {

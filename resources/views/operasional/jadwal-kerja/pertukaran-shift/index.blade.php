@@ -102,8 +102,8 @@
                                 @foreach ($daftarPengajuan as $item)
                                     @php
                                         $menunggu = $item->status === PertukaranShiftService::STATUS_MENUNGGU;
-                                        $kedaluwarsa = $menunggu && $pertukaranShift->tanggalSudahLewat(PertukaranShiftService::tanggalTerawal($item));
-                                        $tanggalRekan = PertukaranShiftService::tanggalRekan($item);
+                                        $kedaluwarsa = $menunggu && $pertukaranShift->pengajuanKedaluwarsa($item);
+                                        $tanggalRekan = $pertukaranShift->tanggalKerjaRekan($item);
                                     @endphp
                                     <tr @class(['bg-amber-50/40' => $menunggu && ! $kedaluwarsa])>
                                         <td>
@@ -121,8 +121,8 @@
                                             <p class="text-xs text-gray-400">Diajukan {{ \Carbon\CarbonImmutable::parse($item->created_at)->format('d/m/Y H:i') }}</p>
                                         </td>
                                         <td class="whitespace-nowrap text-sm">
-                                            <p><span class="text-gray-500">{{ \Illuminate\Support\Str::words($item->nama_pengaju, 1, '') }}:</span> {{ $pertukaranShift->labelShift($item->snapshot_pengaju) }}</p>
-                                            <p><span class="text-gray-500">{{ \Illuminate\Support\Str::words($item->nama_rekan, 1, '') }}:</span> {{ $pertukaranShift->labelShift($item->snapshot_rekan) }}</p>
+                                            <p><span class="text-gray-500">{{ \Illuminate\Support\Str::words($item->nama_pengaju, 1, '') }}:</span> {{ \Carbon\CarbonImmutable::parse($item->tanggal_kerja)->format('d/m') }} &middot; {{ $pertukaranShift->labelShift($item->snapshot_pengaju) }}</p>
+                                            <p><span class="text-gray-500">{{ \Illuminate\Support\Str::words($item->nama_rekan, 1, '') }}:</span> {{ \Carbon\CarbonImmutable::parse($tanggalRekan)->format('d/m') }} &middot; {{ $pertukaranShift->labelShift($item->snapshot_rekan) }}</p>
                                         </td>
                                         <td class="max-w-xs"><span title="{{ $item->alasan }}">{{ \Illuminate\Support\Str::limit($item->alasan, 60) }}</span></td>
                                         <td class="whitespace-nowrap">

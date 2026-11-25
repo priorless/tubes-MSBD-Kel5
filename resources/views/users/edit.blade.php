@@ -3,13 +3,11 @@
 @section('title', 'Ubah User')
 
 @section('content')
+    <x-ui.page-header :title="'Ubah Akun: '.$user->username" />
+
     <form method="POST" action="{{ route('users.update', $user) }}" class="card max-w-2xl" novalidate>
         @csrf
         @method('PUT')
-
-        <div class="card-header">
-            <h2 class="card-title">Ubah Akun: <span class="font-mono">{{ $user->username }}</span></h2>
-        </div>
 
         <div class="card-body space-y-4">
             @include('users._form', ['roles' => $roles, 'user' => $user, 'isEditingSelf' => $isEditingSelf])
