@@ -10,7 +10,8 @@ use App\Http\Controllers\Hrd\AbsensiKaryawanController;
 use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
 use App\Http\Controllers\Hrd\KetidakhadiranController;
-use App\Http\Controllers\Hrd\KoreksiCheckOutController;
+
+use App\Http\Controllers\Hrd\KoreksiJamLemburController;
 use App\Http\Controllers\Hrd\MonitoringTenagaKerjaController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
 use App\Http\Controllers\Hrd\SertifikatController;
@@ -96,16 +97,10 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('absensi-karyawan/karyawan/cari', [AbsensiKaryawanController::class, 'cariKaryawan'])->name('absensi.karyawan.cari');
         Route::get('absensi-karyawan/rekap/pdf', [AbsensiKaryawanController::class, 'exportPdf'])->name('absensi.rekap.pdf');
         Route::get('absensi-karyawan', AbsensiKaryawanController::class)->name('absensi');
+        Route::get('absensi-karyawan/{absensi}', [AbsensiKaryawanController::class, 'show'])->whereNumber('absensi')->name('absensi.detail');
+        Route::patch('absensi-karyawan/{absensi}/jam-lembur', KoreksiJamLemburController::class)->whereNumber('absensi')->name('absensi.jam-lembur');
         Route::post('absensi-karyawan/ketidakhadiran', KetidakhadiranController::class)->name('absensi.ketidakhadiran');
-        Route::controller(KoreksiCheckOutController::class)
-            ->prefix('absensi-karyawan/koreksi-check-out')
-            ->name('absensi.koreksi-check-out.')
-            ->group(function () {
-                Route::get('/', 'index')->name('index');
-                Route::post('/', 'store')->name('store');
-                Route::patch('{koreksiCheckOut}/setujui', 'approve')->whereNumber('koreksiCheckOut')->name('approve');
-                Route::patch('{koreksiCheckOut}/tolak', 'reject')->whereNumber('koreksiCheckOut')->name('reject');
-            });
+
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
         Route::get('monitoring-tenaga-kerja', MonitoringTenagaKerjaController::class)->name('monitoring');
         // Data Klien: controller & tampilan yang sama dengan Operasional (satu sumber data tbl_klien).
@@ -232,7 +227,6 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
 
             Route::get('/riwayat-absensi', 'riwayat')->name('riwayat');
             Route::get('/riwayat-absensi/unduh', 'riwayatPdf')->name('riwayat.unduh');
-            Route::post('/riwayat-absensi/koreksi-check-out', 'ajukanKoreksiCheckOut')->middleware('throttle:10,1')->name('koreksi-check-out.store');
 
             Route::get('/slip-gaji', 'slipGaji')->name('slip-gaji');
 

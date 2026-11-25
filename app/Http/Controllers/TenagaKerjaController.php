@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Services\FotoAbsensiService;
 use App\Services\JadwalAbsensiService;
-use App\Services\KoreksiCheckOutService;
 use App\Services\LaporanAktivitasService;
 use App\Services\PertukaranShiftService;
 use App\Services\TenagaKerjaService;
@@ -541,7 +540,7 @@ class TenagaKerjaController extends Controller
         ];
     }
 
-    public function riwayat(Request $request, JadwalAbsensiService $jadwal, KoreksiCheckOutService $koreksi)
+    public function riwayat(Request $request, JadwalAbsensiService $jadwal)
     {
         [$tahun, $bulan] = $this->validasiPeriode($request);
         $id = KaryawanAktif::id();
@@ -553,8 +552,6 @@ class TenagaKerjaController extends Controller
         $harian = collect();
         $periodeHarian = null;
         $kehadiran = null;
-        $lupaCheckOut = collect();
-        $riwayatKoreksi = collect();
 
         try {
             $view = $this->db->tabel('rekap_absensi');
@@ -571,8 +568,6 @@ class TenagaKerjaController extends Controller
             ];
             $harian = $this->db->absensiHarian($id, $periodeHarian['tahun'], $periodeHarian['bulan']);
             $kehadiran = $jadwal->rekapKehadiran($id, $periodeHarian['tahun'], $periodeHarian['bulan'], substr($sekarang, 0, 10));
-            $lupaCheckOut = $koreksi->absensiLupaCheckOut($id);
-            $riwayatKoreksi = $koreksi->riwayatKaryawan($id);
         } catch (QueryException $e) {
             session()->now('gagal', TenagaKerjaService::pesanError($e));
         } catch (KolomTidakDitemukan $e) {
@@ -580,7 +575,7 @@ class TenagaKerjaController extends Controller
         }
 
         return view('tenaga-kerja.riwayat', compact('riwayat', 'rekap', 'kolom', 'kolomStatus', 'tahun', 'bulan', 'harian',
-            'periodeHarian', 'kehadiran', 'lupaCheckOut', 'riwayatKoreksi') + $this->dataUmum());
+            'periodeHarian', 'kehadiran') + $this->dataUmum());
     }
 
     /**
@@ -619,31 +614,6 @@ class TenagaKerjaController extends Controller
             'labelPeriode' => FormatKolom::namaBulan($bulan).' '.$tahun,
             'dicetakPada' => CarbonImmutable::now()->format('d/m/Y H:i').' WIB',
         ])->setPaper('a4', 'landscape')->download("rekap-absensi-{$nip}-{$periode}.pdf");
-    }
-
-    /** Karyawan mengajukan jam keluar untuk absensi yang lupa check-out. */
-    public function ajukanKoreksiCheckOut(Request $request, KoreksiCheckOutService $koreksi): RedirectResponse
-    {
-        $valid = $request->validate([
-            'id_absensi' => ['required', 'integer', 'min:1'],
-            'jam_keluar' => ['required', 'date_format:H:i'],
-            'alasan' => ['required', 'string', 'min:10', 'max:500'],
-        ], [
-            'id_absensi.*' => 'Absensi yang dipilih tidak valid.',
-            'jam_keluar.required' => 'Jam keluar wajib diisi.',
-            'jam_keluar.date_format' => 'Format jam keluar harus JJ:MM.',
-            'alasan.required' => 'Alasan wajib diisi.',
-            'alasan.min' => 'Alasan minimal :min karakter.',
-            'alasan.max' => 'Alasan maksimal :max karakter.',
-        ]);
-
-        try {
-            $koreksi->ajukan((int) KaryawanAktif::id(), (int) $valid['id_absensi'], $valid['jam_keluar'], trim($valid['alasan']), (int) $request->user()->id);
-        } catch (ValidationException $e) {
-            return back()->withInput()->with('gagal', $e->validator->errors()->first());
-        }
-
-        return back()->with('sukses', 'Pengajuan koreksi check-out terkirim dan menunggu pemeriksaan HRD.');
     }
 
     /* =====================================================================

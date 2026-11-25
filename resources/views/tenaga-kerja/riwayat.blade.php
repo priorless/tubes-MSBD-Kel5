@@ -68,61 +68,6 @@
     </section>
 @endif
 
-{{-- ===================== Lupa check-out ===================== --}}
-@if ($lupaCheckOut->isNotEmpty() || $riwayatKoreksi->isNotEmpty())
-    <section class="tk-reveal card mb-6 p-6" id="koreksi-check-out">
-        <h2 class="card-title text-lg font-bold text-gray-900">Perbaikan Lupa Check-out</h2>
-        <p class="mt-1 text-sm text-gray-500">Ajukan jam keluar yang sebenarnya untuk absensi yang lupa di-check-out. Setelah disetujui HRD, jam kerja dan lembur dihitung ulang otomatis.</p>
-
-        @foreach ($lupaCheckOut as $absensi)
-            <div class="mt-4 rounded-xl border border-gray-200 p-4">
-                <p class="font-semibold text-gray-800">{{ FormatKolom::tanggal($absensi->tgl, 'D, d M Y') }} &mdash; check-in {{ FormatKolom::jam($absensi->jam_masuk) }}</p>
-                @if ($absensi->id_koreksi)
-                    <p class="mt-1 text-sm text-amber-700">Pengajuan jam keluar {{ FormatKolom::jam($absensi->jam_keluar_diajukan) }} sedang menunggu pemeriksaan HRD.</p>
-                @else
-                    <form method="POST" action="{{ route('tenaga-kerja.koreksi-check-out.store') }}" class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-12"
-                          onsubmit="return confirm('Kirim pengajuan koreksi check-out ke HRD?')">
-                        @csrf
-                        <input type="hidden" name="id_absensi" value="{{ $absensi->id }}">
-                        <div class="md:col-span-3">
-                            <label for="jam_keluar_{{ $absensi->id }}" class="form-label">Jam keluar</label>
-                            <input type="time" id="jam_keluar_{{ $absensi->id }}" name="jam_keluar" required class="form-input">
-                        </div>
-                        <div class="md:col-span-7">
-                            <label for="alasan_{{ $absensi->id }}" class="form-label">Alasan</label>
-                            <input id="alasan_{{ $absensi->id }}" name="alasan" minlength="10" maxlength="500" required class="form-input"
-                                   placeholder="Contoh: baterai ponsel habis saat jam pulang">
-                        </div>
-                        <div class="flex items-end md:col-span-2">
-                            <button type="submit" class="btn-primary w-full">Ajukan</button>
-                        </div>
-                    </form>
-                @endif
-            </div>
-        @endforeach
-
-        @if ($riwayatKoreksi->isNotEmpty())
-            <div class="mt-5 overflow-x-auto">
-                <table class="table">
-                    <thead>
-                        <tr><th>Tanggal Absensi</th><th>Jam Keluar</th><th>Status</th><th>Catatan HRD</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($riwayatKoreksi as $item)
-                            <tr>
-                                <td class="whitespace-nowrap">{{ FormatKolom::tanggal($item->tgl, 'd M Y') }}</td>
-                                <td class="font-mono">{{ FormatKolom::jam($item->jam_keluar) }}</td>
-                                <td><span class="tk-badge-{{ $item->status === 'Disetujui' ? 'sukses' : ($item->status === 'Ditolak' ? 'bahaya' : 'peringatan') }}">{{ $item->status }}</span></td>
-                                <td class="text-sm text-gray-600">{{ $item->catatan_keputusan ?? '-' }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @endif
-    </section>
-@endif
-
 {{-- ===================== Filter per periode ===================== --}}
 <section class="tk-reveal card mb-6 p-6">
     <form method="GET" action="{{ route('tenaga-kerja.riwayat') }}" class="grid grid-cols-2 items-end gap-4 md:grid-cols-12" id="tkFormFilter">
