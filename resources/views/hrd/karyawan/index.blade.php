@@ -7,7 +7,7 @@
 @section('title', 'Data Karyawan')
 
 @section('content')
-    <x-ui.page-header title="Data Karyawan" description="Daftar karyawan SJI, baik karyawan lapangan maupun staf internal.">
+    <x-ui.page-header title="Data Karyawan" description="Daftar data karyawan SJI.">
         <a href="{{ route('hrd.karyawan.create') }}" class="btn-primary">+ Tambah Karyawan</a>
     </x-ui.page-header>
 
@@ -33,14 +33,14 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Karyawan</th>
-                        <th>Kategori</th>
-                        <th>Layanan / Gaji Pokok</th>
-                        <th>Kontak</th>
-                        <th>Jaminan Kesehatan</th>
-                        <th>Status</th>
-                        <th>Akun Login</th>
-                        <th class="text-right">Aksi</th>
+                        <th class="min-w-56">Karyawan</th>
+                        <th class="min-w-36">Layanan</th>
+                        <th class="min-w-36 text-right">Gaji Pokok</th>
+                        <th class="min-w-44">Kontak</th>
+                        <th class="min-w-40">Jaminan Kesehatan</th>
+                        <th class="min-w-28">Status</th>
+                        <th class="min-w-32">Akun Login</th>
+                        <th class="min-w-32 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,12 +68,12 @@
                                     </div>
                                 </div>
                             </td>
-                            <td><span class="badge badge-{{ $item->kategori === 'Internal' ? 'dark' : 'info' }}">{{ $item->kategori }}</span></td>
-                            <td class="whitespace-nowrap">
-                                @if ($item->kategori === 'Lapangan')
-                                    {{ $item->nama_layanan ?? '—' }}
+                            <td class="whitespace-nowrap">{{ $item->nama_layanan ?: '-' }}</td>
+                            <td class="whitespace-nowrap text-right">
+                                @if ($item->gaji_pokok_tampil !== null)
+                                    Rp {{ number_format((float) $item->gaji_pokok_tampil, 0, ',', '.') }}
                                 @else
-                                    Rp {{ number_format((float) $item->gaji_pokok, 0, ',', '.') }}
+                                    -
                                 @endif
                             </td>
                             <td class="whitespace-nowrap">

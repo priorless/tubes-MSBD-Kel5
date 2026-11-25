@@ -11,6 +11,7 @@ use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
 use App\Http\Controllers\Hrd\KetidakhadiranController;
 use App\Http\Controllers\Hrd\KoreksiCheckOutController;
+use App\Http\Controllers\Hrd\MonitoringTenagaKerjaController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
 use App\Http\Controllers\Hrd\SertifikatController;
 use App\Http\Controllers\KeuanganController;
@@ -106,6 +107,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
                 Route::patch('{koreksiCheckOut}/tolak', 'reject')->whereNumber('koreksiCheckOut')->name('reject');
             });
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
+        Route::get('monitoring-tenaga-kerja', MonitoringTenagaKerjaController::class)->name('monitoring');
         // Data Klien: controller & tampilan yang sama dengan Operasional (satu sumber data tbl_klien).
         Route::resource('klien', KlienController::class);
         Route::patch('klien/{klien}/status', [KlienController::class, 'updateStatus'])->whereNumber('klien')->name('klien.status');

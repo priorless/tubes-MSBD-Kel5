@@ -35,6 +35,48 @@ class GajiPokokKaryawanHrdTest extends TestCase
         $this->actingAs($this->hrd);
     }
 
+    public function test_employee_index_separates_service_and_effective_salary_without_category_column(): void
+    {
+        $idLapangan = $this->buatLapangan('TST-001', '1111111111111111');
+        $this->simpanKomponen($idLapangan, 9, 2026, 4250000);
+        DB::table('tbl_komponen_gaji')->insert([
+            'id_karyawan' => $idLapangan, 'periode_bulan' => 12, 'periode_tahun' => 2026,
+            'gaji_pokok' => 8000000, 'tunjangan' => 0, 'potongan_pinjaman' => 0,
+        ]);
+
+        $idFallback = $this->buatLapangan('TST-002', '2222222222222222');
+        $idPenempatan = (int) DB::table('tbl_penempatan')->insertGetId([
+            'id_karyawan' => $idFallback, 'id_klien' => null, 'tgl_mulai' => '2026-11-01', 'status' => 'Aktif',
+        ]);
+        DB::table('tbl_kontrak')->insert([
+            'id_penempatan' => $idPenempatan, 'gaji_pokok' => 4100000, 'hari_kerja_per_bulan' => 25,
+        ]);
+
+        $idTanpaGaji = $this->buatLapangan('TST-003', '3333333333333333');
+        $idInternal = (int) DB::table('tbl_karyawan')->insertGetId([
+            ...$this->dataKaryawan('TST-004', '4444444444444444'),
+            'kategori' => 'Internal', 'id_jenis_layanan' => null, 'gaji_pokok' => 5000000, 'status' => 'Aktif',
+        ]);
+
+        $this->get(route('hrd.karyawan.index'))
+            ->assertOk()
+            ->assertSee('<th class="min-w-36">Layanan</th>', false)
+            ->assertSee('<th class="min-w-36 text-right">Gaji Pokok</th>', false)
+            ->assertDontSee('<th>Kategori</th>', false)
+            ->assertDontSee('badge-dark', false)
+            ->assertSee('name="kategori"', false)
+            ->assertSeeText('Rp 4.250.000')
+            ->assertSeeText('Rp 4.100.000')
+            ->assertSeeText('Rp 5.000.000')
+            ->assertDontSeeText('Rp 8.000.000');
+
+        $html = $this->get(route('hrd.karyawan.index', ['q' => 'TST-003']))->assertOk()->getContent();
+        preg_match('/<tr>.*?<p class="font-medium whitespace-nowrap text-gray-800">Karyawan TST-003<\\/p>.*?<\\/tr>/s', $html, $baris);
+        $this->assertNotEmpty($baris);
+        preg_match_all('/<td[^>]*>(.*?)<\\/td>/s', $baris[0], $sel);
+        $this->assertSame('Satpam', trim(strip_tags($sel[1][1])));
+        $this->assertSame('-', trim(strip_tags($sel[1][2])));
+    }
     public function test_add_form_shows_rupiah_salary_input(): void
     {
         $this->get(route('hrd.karyawan.create'))

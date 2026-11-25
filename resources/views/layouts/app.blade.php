@@ -33,11 +33,14 @@
         if ($penggunaAktif->hasRole(Role::Hrd)) {
             $menu['HRD'] = [
                 ['Dashboard HRD', 'hrd.dashboard', 'hrd.dashboard'],
+            ];
+            $menu['Data Karyawan'] = [
                 ['Data Karyawan', 'hrd.karyawan.index', 'hrd.karyawan.*'],
-                ['Pool Karyawan', 'hrd.pool', 'hrd.pool'],
                 ['Absensi Karyawan', 'hrd.absensi', 'hrd.absensi'],
-                ['Dokumen Sertifikat', 'hrd.sertifikat.index', 'hrd.sertifikat.*'],
-                ['Data Klien', 'hrd.klien.index', 'hrd.klien.*'],
+                ['Sertifikat Karyawan', 'hrd.sertifikat.index', 'hrd.sertifikat.*'],
+            ];
+            $menu['Monitoring'] = [
+                ['Monitoring Tenaga Kerja', 'hrd.monitoring', 'hrd.monitoring'],
             ];
         }
 
@@ -96,6 +99,7 @@
         'hrd.absensi' => '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
         'hrd.sertifikat.index' => '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
         'hrd.klien.index' => $ikonGedung,
+        'hrd.monitoring' => '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/>',
         'operasional.beranda' => $ikonDashboard,
         'operasional.klien.index' => $ikonGedung,
         'operasional.penempatan.index' => '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="m16 11 2 2 4-4"/>',
