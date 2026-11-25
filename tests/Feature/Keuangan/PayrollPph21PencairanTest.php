@@ -74,32 +74,34 @@ class PayrollPph21PencairanTest extends TestCase
         $this->assertEquals(0, (float) $this->payroll($pagi, 3)->upah_backup);
     }
 
-    public function test_tukar_shift_barter_yang_disetujui_tidak_menghasilkan_upah_backup(): void
+    public function test_backup_shift_dibayar_sebagai_upah_backup_rekan_dan_bukan_hari_wajib_pengaju(): void
     {
         $klien = $this->buatKlien();
         $pengaju = $this->buatKaryawan();
         $rekan = $this->buatKaryawan();
         $penempatanPengaju = $this->buatPenempatan($pengaju, $klien, '2099-03-01', null, [], 3460000, 25);
-        $penempatanRekan = $this->buatPenempatan($rekan, $klien, '2099-03-01', null, [], 3460000, 25);
+        $this->buatPenempatan($rekan, $klien, '2099-03-01', null, [], 3460000, 25);
         $this->karyawanTurunan = [$pengaju, $rekan];
 
-        $jadwalPengaju = $this->jadwal($penempatanPengaju, '2099-03-10', '16:00:00', '00:00:00');
-        $jadwalRekan = $this->jadwal($penempatanRekan, '2099-03-10', '08:00:00', '16:00:00');
-        DB::table('tbl_pertukaran_shift')->insert([
-            'id_karyawan_pengaju' => $pengaju, 'id_karyawan_rekan' => $rekan,
-            'id_jadwal_pengaju' => $jadwalPengaju, 'id_jadwal_rekan' => $jadwalRekan,
-            'tanggal_kerja' => '2099-03-10', 'tanggal_kerja_rekan' => '2099-03-10',
-            'snapshot_pengaju' => '{}', 'snapshot_rekan' => '{}', 'alasan' => 'Uji barter',
-            'status' => 'Disetujui', 'status_rekan' => 'Diterima',
+        $jadwalPengaju = $this->jadwal($penempatanPengaju, '2099-03-10', '08:00:00', '16:00:00');
+        $idPengajuan = DB::table('tbl_pertukaran_shift')->insertGetId([
+            'id_karyawan_pengaju' => $pengaju, 'id_karyawan_rekan' => $rekan, 'id_jadwal_pengaju' => $jadwalPengaju,
+            'tanggal_kerja' => '2099-03-10', 'snapshot_pengaju' => '{}', 'alasan' => 'Uji backup shift',
+        ]);
+        DB::table('tbl_pertukaran_shift')->where('id', $idPengajuan)->update([
+            'status' => 'Disetujui', 'status_rekan' => 'Diterima', 'ditanggapi_rekan_pada' => now(),
             'diproses_oleh' => $this->loginSebagai(Role::Operasional)->id, 'diproses_pada' => now(),
         ]);
-        $this->checkInOut($pengaju, '2099-03-10', '08:00:00', '16:00:00');
-        $this->checkInOut($rekan, '2099-03-10', '16:00:00', '23:55:00');
+        DB::table('tbl_jadwal_kerja')->where('id', $jadwalPengaju)->update(['id_karyawan_pengganti' => $rekan]);
+        $id = $this->buatAbsensi($rekan, '2099-03-10', 'Hadir', ['jam_masuk' => '08:00:00', 'id_penempatan' => $penempatanPengaju]);
+        DB::table('tbl_absensi')->where('id', $id)->update(['jam_keluar' => '16:00:00']);
 
         $this->generate(3);
 
-        $this->assertEquals(0, (float) $this->payroll($pengaju, 3)->upah_backup);
-        $this->assertEquals(0, (float) $this->payroll($rekan, 3)->upah_backup);
+        // Tarif harian 3.460.000 / 25 = 138.400. Pengaju: 30 hari tanpa jadwal diprorata 25 x 30/31 = 24 hari wajib;
+        // tanggal 10 yang digantikan rekan tidak ikut dihitung (tanpa backup menjadi 25 hari = 3.460.000).
+        $this->assertEquals(138400, (float) $this->payroll($rekan, 3)->upah_backup);
+        $this->assertEquals(24 * 138400, (float) $this->payroll($pengaju, 3)->potongan_absen);
     }
 
     public function test_pph21_ter_kategori_a_tunjangan_dan_pinjaman_dari_komponen_gaji(): void

@@ -24,15 +24,24 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Badge sidebar "Jadwal Kerja": jumlah pengajuan tukar shift yang belum diproses (hanya untuk Operasional).
+        // Badge sidebar: pengajuan backup shift yang masih menunggu tanggapan atau keputusan.
         View::composer('layouts.app', function (\Illuminate\View\View $view): void {
             $pengguna = auth()->user();
+            $siap = $pengguna !== null && ! $pengguna->must_change_password;
+            $badge = [];
+            $judul = [];
 
-            $view->with('badgeMenu', [
-                'operasional.jadwal-kerja' => $pengguna?->hasRole(Role::Operasional) && ! $pengguna->must_change_password
-                    ? app(PertukaranShiftService::class)->jumlahMenunggu()
-                    : 0,
-            ]);
+            if ($siap && $pengguna->hasRole(Role::Operasional)) {
+                $badge['operasional.jadwal-kerja'] = app(PertukaranShiftService::class)->jumlahMenunggu();
+                $judul['operasional.jadwal-kerja'] = 'pengajuan backup shift menunggu persetujuan';
+            }
+
+            if ($siap && $pengguna->hasRole(Role::KaryawanLapangan) && $pengguna->id_karyawan !== null) {
+                $badge['tenaga-kerja.tukar-shift.index'] = app(PertukaranShiftService::class)->jumlahPermintaanMasuk((int) $pengguna->id_karyawan);
+                $judul['tenaga-kerja.tukar-shift.index'] = 'permintaan backup shift menunggu tanggapan Anda';
+            }
+
+            $view->with('badgeMenu', $badge)->with('judulBadgeMenu', $judul);
         });
     }
 }

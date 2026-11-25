@@ -23,7 +23,7 @@ class BerandaOperasionalController extends Controller
 
     public function __invoke(Request $request, PertukaranShiftService $pertukaranShiftService): View
     {
-        $hariIni = CarbonImmutable::now((string) config('app.timezone', 'UTC'))->startOfDay();
+        $hariIni = CarbonImmutable::now((string) config('app.timezone'))->startOfDay();
         $awalBulan = $hariIni->startOfMonth();
         $akhirBulan = $hariIni->endOfMonth()->startOfDay();
 

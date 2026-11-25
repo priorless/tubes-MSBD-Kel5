@@ -93,42 +93,32 @@ class MonitoringDriverTest extends TestCase
         ]);
     }
 
-    public function test_laporan_perjalanan_dinamis_tanpa_periode_per_jam(): void
+    public function test_laporan_perjalanan_cukup_keterangan_tanpa_tahapan_dan_tanpa_periode(): void
     {
         $idKaryawan = $this->driverSudahCheckIn();
 
         $this->waktuServer('08:03:00');
-        $this->kirimLaporan($idKaryawan, ['tahapan' => 'Mulai Perjalanan', 'keterangan' => 'Berangkat ke PT ABC'])->assertSessionHas('sukses');
+        $this->kirimLaporan($idKaryawan, ['keterangan' => 'Berangkat ke PT ABC'])->assertSessionHas('sukses');
         $this->waktuServer('08:10:00');
-        $this->kirimLaporan($idKaryawan, ['tahapan' => 'Tiba di Lokasi', 'keterangan' => 'Tiba di PT ABC'])->assertSessionHas('sukses');
+        $this->kirimLaporan($idKaryawan, ['keterangan' => 'Tiba di PT ABC'])->assertSessionHas('sukses');
 
         $laporan = DB::table('tbl_laporan_aktivitas')->where('id_karyawan', $idKaryawan)->orderBy('id')->get();
-        $this->assertSame(['Mulai Perjalanan', 'Tiba di Lokasi'], $laporan->pluck('tahapan')->all());
+        $this->assertSame(['Berangkat ke PT ABC', 'Tiba di PT ABC'], $laporan->pluck('keterangan')->all());
+        $this->assertSame([null, null], $laporan->pluck('tahapan')->all());
         $this->assertSame([null, null], $laporan->pluck('periode_ke')->all());
         $this->assertSame($this->hariIniDb().' 08:10:00', $laporan[1]->waktu_lapor);
-    }
-
-    public function test_laporan_driver_wajib_tahapan_valid(): void
-    {
-        $idKaryawan = $this->driverSudahCheckIn();
-        $this->waktuServer('08:03:00');
-
-        $this->kirimLaporan($idKaryawan)->assertSessionHas('gagal', 'Pilih tahapan perjalanan yang valid.');
-        $this->kirimLaporan($idKaryawan, ['tahapan' => 'Istirahat'])->assertSessionHasErrors(['tahapan' => 'Pilih tahapan perjalanan yang valid.']);
-
-        $this->assertDatabaseMissing('tbl_laporan_aktivitas', ['id_karyawan' => $idKaryawan]);
     }
 
     public function test_setiap_laporan_driver_memiliki_batas_unggah_sendiri(): void
     {
         $idKaryawan = $this->driverSudahCheckIn();
         $this->waktuServer('08:03:00');
-        $this->kirimLaporan($idKaryawan, ['tahapan' => 'Mulai Perjalanan']);
-        $this->kirimLaporan($idKaryawan, ['tahapan' => 'Tiba di Lokasi']);
+        $this->kirimLaporan($idKaryawan, ['keterangan' => 'Berangkat ke PT ABC']);
+        $this->kirimLaporan($idKaryawan, ['keterangan' => 'Tiba di PT ABC']);
         [$pertama, $kedua] = DB::table('tbl_laporan_aktivitas')->where('id_karyawan', $idKaryawan)->orderBy('id')->pluck('id')->all();
 
         $this->kirimKoreksi($idKaryawan, $pertama)->assertSessionHas('sukses');
-        $this->kirimKoreksi($idKaryawan, $pertama)->assertSessionHas('gagal', 'Batas unggahan laporan ini sudah habis (maksimal 2 kali). Foto tidak dapat diganti lagi.');
+        $this->kirimKoreksi($idKaryawan, $pertama)->assertSessionHas('gagal', 'Foto laporan ini sudah dikoreksi (maksimal 2 unggahan). Kirim laporan baru bila perlu.');
         $this->kirimKoreksi($idKaryawan, $kedua)->assertSessionHas('sukses');
 
         $this->assertDatabaseHas('tbl_laporan_aktivitas', ['id' => $pertama, 'jumlah_upload' => 2]);
@@ -148,27 +138,26 @@ class MonitoringDriverTest extends TestCase
         $this->assertNull($this->absensiKaryawan($idKaryawan)->jam_keluar);
     }
 
-    public function test_check_out_driver_ditolak_bila_perjalanan_belum_selesai(): void
+    public function test_check_out_driver_tidak_diblokir_oleh_catatan_perjalanan(): void
     {
         $idKaryawan = $this->driverSudahCheckIn();
         $this->waktuServer('08:03:00');
-        $this->kirimLaporan($idKaryawan, ['tahapan' => 'Mulai Perjalanan']);
+        $this->kirimLaporan($idKaryawan, ['keterangan' => 'Berangkat ke PT ABC']);
 
         $this->waktuServer('16:00:00');
         $this->kirimCheckOut($idKaryawan, ['kondisi_akhir' => 'Baik', 'foto_kendaraan' => $this->fotoUji('kendaraan.jpg')])
-            ->assertStatus(422)
-            ->assertJson(['pesan' => 'Laporan perjalanan belum diselesaikan. Kirim laporan tahapan "Menyelesaikan tugas perjalanan" sebelum check-out.']);
+            ->assertOk();
 
-        $this->assertNull($this->absensiKaryawan($idKaryawan)->jam_keluar);
+        $this->assertSame('16:00:00', $this->absensiKaryawan($idKaryawan)->jam_keluar);
     }
 
-    public function test_tahapan_selesai_tidak_otomatis_check_out_dan_check_out_menyimpan_kondisi_akhir(): void
+    public function test_laporan_terakhir_tidak_otomatis_check_out_dan_check_out_menyimpan_kondisi_akhir(): void
     {
         $idKaryawan = $this->driverSudahCheckIn();
         $this->waktuServer('08:03:00');
-        $this->kirimLaporan($idKaryawan, ['tahapan' => 'Mulai Perjalanan']);
+        $this->kirimLaporan($idKaryawan, ['keterangan' => 'Berangkat ke PT ABC']);
         $this->waktuServer('15:30:00');
-        $this->kirimLaporan($idKaryawan, ['tahapan' => 'Selesai Perjalanan', 'keterangan' => 'Kembali ke kantor']);
+        $this->kirimLaporan($idKaryawan, ['keterangan' => 'Kembali ke kantor']);
         $this->assertNull($this->absensiKaryawan($idKaryawan)->jam_keluar);
 
         $this->waktuServer('16:00:00');

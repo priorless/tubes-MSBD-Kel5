@@ -2,7 +2,7 @@
 @php
     $daftarTab = [
         ['kunci' => 'jadwal', 'label' => 'Jadwal Kerja', 'url' => route('operasional.jadwal-kerja')],
-        ['kunci' => 'pertukaran', 'label' => 'Pengajuan Pertukaran Shift', 'url' => route('operasional.jadwal-kerja.pertukaran-shift.index')],
+        ['kunci' => 'pertukaran', 'label' => 'Pengajuan Backup Shift', 'url' => route('operasional.jadwal-kerja.pertukaran-shift.index')],
     ];
 @endphp
 

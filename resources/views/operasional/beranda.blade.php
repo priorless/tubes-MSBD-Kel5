@@ -92,8 +92,8 @@
                                 <th scope="colgroup" colspan="4">
                                     <div class="flex flex-wrap items-center justify-between gap-3">
                                         <div class="min-w-0">
-                                            <strong>Pengajuan pertukaran shift menunggu persetujuan</strong>
-                                            Periksa detail tiap pengajuan, lalu setujui atau tolak sebelum tanggal shift.
+                                            <strong>Pengajuan backup shift menunggu persetujuan</strong>
+                                            Rekan pengganti sudah menerima. Periksa detail, lalu setujui atau tolak sebelum shift dimulai.
                                         </div>
                                         <a href="{{ $urlPertukaran('Menunggu') }}" class="btn-primary btn-sm">Tinjau {{ $pertukaranMenunggu }} pengajuan</a>
                                     </div>
@@ -191,7 +191,7 @@
             @if ($pertukaranShiftTersedia)
                 <section class="op-kartu-navy" aria-labelledby="judul-pertukaran-shift">
                     <p class="op-lab" style="color: var(--op-gold)">Jadwal Kerja</p>
-                    <h3 id="judul-pertukaran-shift" class="mt-1 text-lg font-bold">Pengajuan Pertukaran Shift</h3>
+                    <h3 id="judul-pertukaran-shift" class="mt-1 text-lg font-bold">Pengajuan Backup Shift</h3>
                     <div class="op-trio">
                         <a href="{{ $urlPertukaran('Menunggu') }}" @class(['is-menunggu' => $pertukaranMenunggu > 0])>
                             <span class="op-trio-label">Menunggu persetujuan</span>

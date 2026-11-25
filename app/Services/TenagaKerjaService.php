@@ -86,6 +86,11 @@ class TenagaKerjaService
     public static function pesanError(QueryException $e): string
     {
         // SIGNAL SQLSTATE '45000': kode bisa ada di getCode() atau hanya di errorInfo (tergantung driver).
+        // 1062 = UNIQUE uq_absensi_karyawan_tgl: satu absensi per karyawan per tanggal (pengganti trg_cegah_absen_ganda).
+        if ((int) ($e->errorInfo[1] ?? 0) === 1062 && str_contains($e->getMessage(), 'uq_absensi_karyawan_tgl')) {
+            return 'Karyawan sudah absen pada tanggal ini.';
+        }
+
         if ((string) $e->getCode() === '45000' || ($e->errorInfo[0] ?? null) === '45000') {
             if (is_string($e->errorInfo[2] ?? null) && $e->errorInfo[2] !== '') {
                 return $e->errorInfo[2];
@@ -217,10 +222,11 @@ class TenagaKerjaService
      * itu tugas trigger database. Pesan SIGNAL-nya akan ditangkap controller.
      *
      * @param  string|null  $tanggalShift  tanggal shift (Y-m-d) yang divalidasi JadwalAbsensiService; null = hari ini
+     * @param  int|null  $idPenempatan  penempatan shift (milik sendiri, atau milik rekan untuk backup shift); null = diisi trigger
      * @param  (Closure(int, object): void)|null  $lanjutan  dokumentasi tambahan (mis. P2H) di dalam transaksi yang sama,
      *                                                       menerima id absensi baru dan waktu transaksi
      */
-    public function checkIn(int $idKaryawan, string $isiFoto, ?string $tanggalShift = null, ?Closure $lanjutan = null): void
+    public function checkIn(int $idKaryawan, string $isiFoto, ?string $tanggalShift = null, ?Closure $lanjutan = null, ?int $idPenempatan = null): void
     {
         $jpeg = $this->foto->siapkan($isiFoto);
         $tabel = $this->tabel('absensi');
@@ -231,7 +237,7 @@ class TenagaKerjaService
         $path = null;
 
         try {
-            DB::transaction(function () use ($tabel, $kolomId, $kolomMasuk, $kolomTanggal, $kolomFoto, $idKaryawan, $jpeg, $tanggalShift, $lanjutan, &$path): void {
+            DB::transaction(function () use ($tabel, $kolomId, $kolomMasuk, $kolomTanggal, $kolomFoto, $idKaryawan, $jpeg, $tanggalShift, $lanjutan, $idPenempatan, &$path): void {
                 $waktu = $this->waktuTransaksi();
                 $waktu->tgl_shift = $tanggalShift ?? $waktu->tgl;
                 $path = $this->foto->pathBaru('masuk', $waktu->tgl);
@@ -241,6 +247,9 @@ class TenagaKerjaService
                     $kolomMasuk => $this->bertipeDatetime($tabel, $kolomMasuk) ? $waktu->sekarang : $waktu->jam,
                     $kolomFoto => $path,
                 ];
+                if ($idPenempatan !== null && Schema::hasColumn($tabel, 'id_penempatan')) {
+                    $data['id_penempatan'] = $idPenempatan;
+                }
                 if ($kolomTanggal && $kolomTanggal !== $kolomMasuk) {
                     $data[$kolomTanggal] = $this->bertipeDatetime($tabel, $kolomTanggal) ? $waktu->sekarang : $waktu->tgl_shift;
                 }
@@ -321,6 +330,31 @@ class TenagaKerjaService
     }
 
     /**
+     * Riwayat perubahan jadwal yang menyangkut karyawan (jadwal miliknya atau shift yang ia gantikan) sejak tanggal tertentu,
+     * terbaru dahulu. data_sebelum/data_sesudah berupa JSON dari tbl_jadwal_kerja_riwayat.
+     *
+     * @return Collection<int, object>
+     */
+    public function perubahanJadwal(int $idKaryawan, string $sejak, int $batas = 30): Collection
+    {
+        if (! Schema::hasTable('tbl_jadwal_kerja_riwayat')) {
+            return collect();
+        }
+
+        return DB::table('tbl_jadwal_kerja_riwayat as r')
+            ->join('tbl_jadwal_kerja as j', 'j.id', '=', 'r.id_jadwal_kerja')
+            ->join('tbl_penempatan as p', 'p.id', '=', 'j.id_penempatan')
+            ->join('tbl_karyawan as k', 'k.id', '=', 'p.id_karyawan')
+            ->where('r.aksi', 'Diubah')
+            ->where('r.created_at', '>=', $sejak)
+            ->where(fn ($q) => $q->where('p.id_karyawan', $idKaryawan)->orWhere('j.id_karyawan_pengganti', $idKaryawan))
+            ->orderByDesc('r.created_at')
+            ->orderByDesc('r.id')
+            ->limit($batas)
+            ->get(['r.id', 'r.created_at', 'r.data_sebelum', 'r.data_sesudah', 'j.tanggal_kerja', 'p.id_karyawan as id_pemilik', 'k.nama as nama_pemilik']);
+    }
+
+    /**
      * Penempatan aktif hari ini + jadwal kerja efektif (v_penugasan_aktif).
      * Null jika belum ditempatkan atau view belum dipasang.
      */
@@ -385,13 +419,6 @@ class TenagaKerjaService
         return $this->urutkanPeriode($this->queryRiwayat($idKaryawan, $tahun, $bulan), $this->tabel('rekap_absensi'))
             ->paginate($perHalaman)
             ->withQueryString();
-    }
-
-    /** Semua baris (untuk ekspor CSV) — tetap hanya milik karyawan ini. */
-    public function semuaRiwayatAbsensi(int $idKaryawan, ?int $tahun, ?int $bulan): Collection
-    {
-        return $this->urutkanPeriode($this->queryRiwayat($idKaryawan, $tahun, $bulan), $this->tabel('rekap_absensi'))
-            ->get();
     }
 
     /**

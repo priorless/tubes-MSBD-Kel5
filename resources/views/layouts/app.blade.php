@@ -70,7 +70,8 @@
         if ($penggunaAktif->hasRole(Role::KaryawanLapangan)) {
             $menu['Portal Karyawan'] = [
                 ['Absensi', 'tenaga-kerja.absensi', 'tenaga-kerja.absensi*'],
-                ['Tukar Shift', 'tenaga-kerja.tukar-shift.index', 'tenaga-kerja.tukar-shift.*'],
+                ['Jadwal Saya', 'tenaga-kerja.jadwal', 'tenaga-kerja.jadwal'],
+                ['Backup Shift', 'tenaga-kerja.tukar-shift.index', 'tenaga-kerja.tukar-shift.*'],
                 ['Riwayat Absensi', 'tenaga-kerja.riwayat', 'tenaga-kerja.riwayat*'],
                 ['Slip Gaji', 'tenaga-kerja.slip-gaji', 'tenaga-kerja.slip-gaji'],
                 ['Profil Saya', 'tenaga-kerja.profil', 'tenaga-kerja.profil'],
@@ -106,6 +107,7 @@
         'keuangan.payroll.index' => '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
         'keuangan.invoice.index' => '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
         'tenaga-kerja.absensi' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        'tenaga-kerja.jadwal' => '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h2M14 14h2M8 18h2"/>',
         'tenaga-kerja.tukar-shift.index' => '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
         'tenaga-kerja.riwayat' => '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/>',
         'tenaga-kerja.slip-gaji' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9.5 14.5h4a1.5 1.5 0 0 0 0-3h-3a1.5 1.5 0 0 1 0-3h4"/>',
@@ -167,7 +169,7 @@
                                     {{ $label }}
                                     @if (($badgeMenu[$namaRoute] ?? 0) > 0)
                                         <span class="ml-auto rounded-full bg-sji-emas px-2 py-0.5 text-xs font-bold text-sji-biru-tua"
-                                              title="{{ $badgeMenu[$namaRoute] }} pengajuan tukar shift menunggu persetujuan"
+                                              title="{{ $badgeMenu[$namaRoute] }} {{ $judulBadgeMenu[$namaRoute] ?? '' }}"
                                               data-badge-menu="{{ $namaRoute }}">{{ $badgeMenu[$namaRoute] }}</span>
                                     @endif
                                 </a>

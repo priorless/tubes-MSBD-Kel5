@@ -20,14 +20,14 @@
         <div class="card">
             <div class="card-header">
                 <div>
-                    <h2 class="card-title">Pengajuan Pertukaran Shift</h2>
+                    <h2 class="card-title">Pengajuan Backup Shift</h2>
                     <p class="mt-1 text-sm text-gray-500">
                         @if ($jumlahMenunggu > 0)
                             <span class="font-medium text-amber-700">{{ $jumlahMenunggu }} pengajuan menunggu keputusan Anda.</span>
                         @else
                             Tidak ada pengajuan yang menunggu keputusan.
                         @endif
-                        Buka <b>Detail</b> untuk memeriksa, lalu setujui atau tolak.
+                        Pengajuan baru masuk ke sini setelah <b>diterima rekan pengganti</b>. Buka <b>Detail</b> untuk memeriksa, lalu setujui atau tolak.
                     </p>
                 </div>
             </div>
@@ -82,17 +82,16 @@
 
                 @if ($daftarPengajuan->isEmpty())
                     <x-ui.empty-state
-                        :title="$totalPengajuan === 0 ? 'Belum ada pengajuan pertukaran shift.' : 'Tidak ada pengajuan yang cocok dengan filter.'"
-                        :message="$totalPengajuan === 0 ? 'Pengajuan dibuat karyawan dari menu Absensi dan akan langsung muncul di sini.' : 'Ubah atau reset filter untuk melihat pengajuan lainnya.'" />
+                        :title="$totalPengajuan === 0 ? 'Belum ada pengajuan backup shift.' : 'Tidak ada pengajuan yang cocok dengan filter.'"
+                        :message="$totalPengajuan === 0 ? 'Pengajuan dibuat karyawan dari menu Backup Shift dan muncul di sini.' : 'Ubah atau reset filter untuk melihat pengajuan lainnya.'" />
                 @else
                     <div class="overflow-x-auto">
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Pemohon &amp; Rekan</th>
-                                    <th>Klien</th>
-                                    <th>Tanggal Shift</th>
-                                    <th>Shift Saat Pengajuan</th>
+                                    <th>Pemohon &rarr; Pengganti</th>
+                                    <th>Klien Jadwal</th>
+                                    <th>Tanggal &amp; Shift</th>
                                     <th>Alasan</th>
                                     <th>Status</th>
                                     <th class="text-right">Aksi</th>
@@ -102,43 +101,32 @@
                                 @foreach ($daftarPengajuan as $item)
                                     @php
                                         $menunggu = $item->status === PertukaranShiftService::STATUS_MENUNGGU;
-                                        $kedaluwarsa = $menunggu && $pertukaranShift->pengajuanKedaluwarsa($item);
-                                        $tanggalRekan = $pertukaranShift->tanggalKerjaRekan($item);
+                                        $siapDiputuskan = $menunggu && $item->status_rekan === PertukaranShiftService::REKAN_DITERIMA;
                                     @endphp
-                                    <tr @class(['bg-amber-50/40' => $menunggu && ! $kedaluwarsa])>
+                                    <tr @class(['bg-amber-50/40' => $siapDiputuskan])>
                                         <td>
                                             <p class="font-medium text-gray-800">{{ $item->nama_pengaju }}</p>
-                                            <p class="text-xs text-gray-500">&#8644; {{ $item->nama_rekan }}</p>
+                                            <p class="text-xs text-gray-500">&rarr; {{ $item->nama_rekan }}</p>
                                         </td>
                                         <td>{{ $item->nama_perusahaan }}</td>
                                         <td class="whitespace-nowrap">
-                                            @if ($tanggalRekan === (string) $item->tanggal_kerja)
-                                                {{ \Carbon\CarbonImmutable::parse($item->tanggal_kerja)->format('d/m/Y') }}
-                                            @else
-                                                <p><span class="text-gray-500">{{ \Illuminate\Support\Str::words($item->nama_pengaju, 1, '') }}:</span> {{ \Carbon\CarbonImmutable::parse($item->tanggal_kerja)->format('d/m/Y') }}</p>
-                                                <p><span class="text-gray-500">{{ \Illuminate\Support\Str::words($item->nama_rekan, 1, '') }}:</span> {{ \Carbon\CarbonImmutable::parse($tanggalRekan)->format('d/m/Y') }}</p>
-                                            @endif
+                                            {{ \Carbon\CarbonImmutable::parse($item->tanggal_kerja)->format('d/m/Y') }}
+                                            <p class="text-sm">{{ $pertukaranShift->labelShift($item->snapshot_pengaju) }}</p>
                                             <p class="text-xs text-gray-400">Diajukan {{ \Carbon\CarbonImmutable::parse($item->created_at)->format('d/m/Y H:i') }}</p>
-                                        </td>
-                                        <td class="whitespace-nowrap text-sm">
-                                            <p><span class="text-gray-500">{{ \Illuminate\Support\Str::words($item->nama_pengaju, 1, '') }}:</span> {{ \Carbon\CarbonImmutable::parse($item->tanggal_kerja)->format('d/m') }} &middot; {{ $pertukaranShift->labelShift($item->snapshot_pengaju) }}</p>
-                                            <p><span class="text-gray-500">{{ \Illuminate\Support\Str::words($item->nama_rekan, 1, '') }}:</span> {{ \Carbon\CarbonImmutable::parse($tanggalRekan)->format('d/m') }} &middot; {{ $pertukaranShift->labelShift($item->snapshot_rekan) }}</p>
                                         </td>
                                         <td class="max-w-xs"><span title="{{ $item->alasan }}">{{ \Illuminate\Support\Str::limit($item->alasan, 60) }}</span></td>
                                         <td class="whitespace-nowrap">
                                             <span class="badge {{ PertukaranShiftService::kelasBadge($item->status) }}">{{ PertukaranShiftService::labelTahap($item) }}</span>
-                                            @if ($kedaluwarsa)
-                                                <p class="mt-1 text-xs text-red-600">Tanggal sudah lewat</p>
-                                            @elseif (! $menunggu)
-                                                <p class="mt-1 text-xs text-gray-400">{{ $item->nama_pemroses ?? '-' }} &middot; {{ \Carbon\CarbonImmutable::parse($item->diproses_pada)->format('d/m/Y H:i') }}</p>
+                                            @if (! $menunggu && $item->diproses_pada)
+                                                <p class="mt-1 text-xs text-gray-400">{{ $item->nama_pemroses ?? 'Sistem' }} &middot; {{ \Carbon\CarbonImmutable::parse($item->diproses_pada)->format('d/m/Y H:i') }}</p>
                                             @endif
                                         </td>
                                         <td>
                                             <div class="flex flex-wrap justify-end gap-2">
                                                 <a href="{{ route('operasional.jadwal-kerja.pertukaran-shift.show', $item->id) }}" class="btn-secondary btn-sm">Detail</a>
-                                                @if ($menunggu && ! $kedaluwarsa)
+                                                @if ($siapDiputuskan)
                                                     <form method="POST" action="{{ route('operasional.jadwal-kerja.pertukaran-shift.approve', $item->id) }}"
-                                                          onsubmit="return confirm(@js('Setujui pertukaran shift '.$item->nama_pengaju.' dengan '.$item->nama_rekan.'? Jadwal keduanya akan langsung ditukar.'))">
+                                                          onsubmit="return confirm(@js('Setujui backup shift: '.$item->nama_rekan.' menggantikan '.$item->nama_pengaju.'?'))">
                                                         @csrf
                                                         @method('PATCH')
                                                         <button type="submit" class="btn-primary btn-sm">Approve</button>
@@ -146,7 +134,7 @@
                                                 @endif
                                                 @if ($menunggu)
                                                     <form method="POST" action="{{ route('operasional.jadwal-kerja.pertukaran-shift.reject', $item->id) }}"
-                                                          onsubmit="return confirm(@js('Tolak pengajuan '.$item->nama_pengaju.'? Jadwal keduanya tetap seperti semula.'))">
+                                                          onsubmit="return confirm(@js('Tolak pengajuan '.$item->nama_pengaju.'? Jadwalnya tetap seperti semula.'))">
                                                         @csrf
                                                         @method('PATCH')
                                                         <button type="submit" class="btn-outline-danger btn-sm">Reject</button>

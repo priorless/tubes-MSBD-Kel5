@@ -13,18 +13,24 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * Tab "Pengajuan Pertukaran Shift" pada menu Jadwal Kerja: Operasional memeriksa,
- * menyetujui, atau menolak pengajuan tukar shift dari karyawan.
+ * Tab "Pengajuan Backup Shift" pada menu Jadwal Kerja: Operasional memeriksa, menyetujui, atau menolak
+ * pengajuan backup shift yang sudah diterima rekan pengganti. Pengajuan yang masih menunggu tanggapan rekan
+ * hanya ditampilkan (filter "Menunggu Rekan").
  */
 class PertukaranShiftController extends Controller
 {
     /** @var list<string> */
     private const array FILTER_STATUS = [
         PertukaranShiftService::STATUS_MENUNGGU,
+        self::FILTER_MENUNGGU_REKAN,
         PertukaranShiftService::STATUS_DISETUJUI,
         PertukaranShiftService::STATUS_DITOLAK,
+        PertukaranShiftService::STATUS_DIBATALKAN,
+        PertukaranShiftService::STATUS_KEDALUWARSA,
         'Semua',
     ];
+
+    private const string FILTER_MENUNGGU_REKAN = 'MenungguRekan';
 
     /**
      * Semua pengajuan dari semua karyawan (tanpa memilih karyawan), Menunggu paling atas.
@@ -32,6 +38,7 @@ class PertukaranShiftController extends Controller
     public function index(Request $request, PertukaranShiftService $pertukaranShiftService): View
     {
         $this->pastikanTersedia($pertukaranShiftService);
+        $pertukaranShiftService->sinkronkanKedaluwarsa();
         $validated = $request->validate([
             'status' => ['nullable', Rule::in(self::FILTER_STATUS)],
             'tanggal_dari' => ['nullable', 'date_format:Y-m-d'],
@@ -52,15 +59,16 @@ class PertukaranShiftController extends Controller
         $tanggalSampai = $validated['tanggal_sampai'] ?? null;
 
         $query = $pertukaranShiftService->queryDaftar()
-            ->when($status !== 'Semua', fn (Builder $query) => $query->where('ps.status', $status))
-            ->when($tanggalDari !== null || $tanggalSampai !== null, fn (Builder $query) => $query->where(function (Builder $query) use ($tanggalDari, $tanggalSampai): void {
-                // Cocok bila tanggal jadwal pengaju (ps) ATAU tanggal jadwal rekan (jr) berada dalam rentang.
-                foreach (['ps.tanggal_kerja', 'jr.tanggal_kerja'] as $kolom) {
-                    $query->orWhere(fn (Builder $query) => $query
-                        ->when($tanggalDari, fn (Builder $query, string $tanggal) => $query->where($kolom, '>=', $tanggal))
-                        ->when($tanggalSampai, fn (Builder $query, string $tanggal) => $query->where($kolom, '<=', $tanggal)));
-                }
-            }))
+            ->when($status === PertukaranShiftService::STATUS_MENUNGGU, fn (Builder $query) => $query
+                ->where('ps.status', PertukaranShiftService::STATUS_MENUNGGU)
+                ->where('ps.status_rekan', PertukaranShiftService::REKAN_DITERIMA))
+            ->when($status === self::FILTER_MENUNGGU_REKAN, fn (Builder $query) => $query
+                ->where('ps.status', PertukaranShiftService::STATUS_MENUNGGU)
+                ->where('ps.status_rekan', PertukaranShiftService::REKAN_MENUNGGU))
+            ->when(! in_array($status, ['Semua', PertukaranShiftService::STATUS_MENUNGGU, self::FILTER_MENUNGGU_REKAN], true),
+                fn (Builder $query) => $query->where('ps.status', $status))
+            ->when($tanggalDari, fn (Builder $query, string $tanggal) => $query->where('ps.tanggal_kerja', '>=', $tanggal))
+            ->when($tanggalSampai, fn (Builder $query, string $tanggal) => $query->where('ps.tanggal_kerja', '<=', $tanggal))
             ->when($validated['id_klien'] ?? null, fn (Builder $query, int|string $idKlien) => $query->where('pp.id_klien', (int) $idKlien))
             ->when($cari !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($cari): void {
                 $pola = '%'.addcslashes($cari, '%_\\').'%';
@@ -72,7 +80,7 @@ class PertukaranShiftController extends Controller
 
         return view('operasional.jadwal-kerja.pertukaran-shift.index', [
             'daftarPengajuan' => $query
-                ->orderByRaw("CASE WHEN ps.status = 'Menunggu' THEN 0 ELSE 1 END")
+                ->orderByRaw("CASE WHEN ps.status = 'Menunggu' AND ps.status_rekan = 'Diterima' THEN 0 WHEN ps.status = 'Menunggu' THEN 1 ELSE 2 END")
                 ->orderByRaw("CASE WHEN ps.status = 'Menunggu' THEN ps.tanggal_kerja END ASC")
                 ->orderByDesc('ps.diproses_pada')
                 ->orderByDesc('ps.id')
@@ -127,7 +135,7 @@ class PertukaranShiftController extends Controller
 
         return redirect()
             ->route('operasional.jadwal-kerja.pertukaran-shift.show', $pertukaranShift)
-            ->with('success', 'Pengajuan disetujui. Jadwal kedua karyawan sudah ditukar.');
+            ->with('success', 'Pengajuan disetujui. Shift sudah ditugaskan kepada rekan pengganti.');
     }
 
     public function reject(Request $request, int $pertukaranShift, PertukaranShiftService $pertukaranShiftService): RedirectResponse
@@ -151,11 +159,11 @@ class PertukaranShiftController extends Controller
 
         return redirect()
             ->route('operasional.jadwal-kerja.pertukaran-shift.show', $pertukaranShift)
-            ->with('success', 'Pengajuan ditolak. Jadwal kedua karyawan tetap seperti semula.');
+            ->with('success', 'Pengajuan ditolak. Jadwal pengaju tetap seperti semula.');
     }
 
     private function pastikanTersedia(PertukaranShiftService $pertukaranShiftService): void
     {
-        abort_unless($pertukaranShiftService->tersedia(), 503, 'Fitur Pertukaran Shift belum tersedia sebelum migration diterapkan.');
+        abort_unless($pertukaranShiftService->tersedia(), 503, 'Fitur Backup Shift belum tersedia sebelum migration diterapkan.');
     }
 }

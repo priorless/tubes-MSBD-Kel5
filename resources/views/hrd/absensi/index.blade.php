@@ -11,10 +11,7 @@
 @section('content')
     <x-ui.page-header title="Absensi Karyawan" description="Pantau absensi harian karyawan lapangan dan rekap per periode." />
 
-    <nav class="mb-6 flex gap-2 border-b border-gray-200" aria-label="Bagian absensi karyawan">
-        <a href="{{ route('hrd.absensi', ['tab' => 'harian']) }}" @class(['border-b-2 px-4 py-3 text-sm font-medium', 'border-sji-biru text-sji-biru' => $tab === 'harian', 'border-transparent text-gray-500 hover:text-gray-700' => $tab !== 'harian']) @if ($tab === 'harian') aria-current="page" @endif>Absensi Harian</a>
-        <a href="{{ route('hrd.absensi', ['tab' => 'rekap']) }}" @class(['border-b-2 px-4 py-3 text-sm font-medium', 'border-sji-biru text-sji-biru' => $tab === 'rekap', 'border-transparent text-gray-500 hover:text-gray-700' => $tab !== 'rekap']) @if ($tab === 'rekap') aria-current="page" @endif>Rekap Absensi</a>
-    </nav>
+    @include('hrd.absensi._tab', ['tab' => $tab])
 
     @if ($tab === 'rekap')
         @include('hrd.absensi.rekap')
@@ -103,7 +100,7 @@
                                 <td class="font-mono">{{ FormatKolom::jam($baris->jam_masuk) }}</td>
                                 <td class="font-mono">
                                     @if ($baris->lupa_check_out)
-                                        <span class="badge badge-danger">Lupa check-out</span>
+                                        <a href="{{ route('hrd.absensi.koreksi-check-out.index') }}" class="badge badge-danger" title="Isi jam keluar di tab Koreksi Check-out">Lupa check-out</a>
                                     @else
                                         {{ FormatKolom::jam($baris->jam_keluar) }}
                                     @endif

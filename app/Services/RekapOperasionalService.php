@@ -44,12 +44,22 @@ class RekapOperasionalService
             ->orderBy('k.nama')
             ->get(['p.id', 'p.id_karyawan', 'p.tgl_mulai', 'p.tgl_selesai', 'k.nip', 'k.nama', 'kl.nama_perusahaan']);
 
+        $adaPengganti = Schema::hasTable('tbl_jadwal_kerja') && Schema::hasColumn('tbl_jadwal_kerja', 'id_karyawan_pengganti');
         $jadwal = Schema::hasTable('tbl_jadwal_kerja') && $penempatan->isNotEmpty()
             ? DB::table('tbl_jadwal_kerja')
                 ->whereIn('id_penempatan', $penempatan->pluck('id')->all())
                 ->whereBetween('tanggal_kerja', [$awalBulan->toDateString(), $akhirBulan->toDateString()])
-                ->get(['id_penempatan', 'tanggal_kerja', 'status'])
+                ->get(array_values(array_filter(['id_penempatan', 'tanggal_kerja', 'status', $adaPengganti ? 'id_karyawan_pengganti' : null])))
                 ->keyBy(static fn (object $baris): string => $baris->id_penempatan.'|'.$baris->tanggal_kerja)
+            : collect();
+        // Backup shift: tanggal yang dikerjakan karyawan sebagai pengganti rekan (penempatan milik rekan).
+        $backup = $adaPengganti && $penempatan->isNotEmpty()
+            ? DB::table('tbl_jadwal_kerja')
+                ->whereIn('id_karyawan_pengganti', $penempatan->pluck('id_karyawan')->unique()->all())
+                ->where('status', 'Kerja')
+                ->whereBetween('tanggal_kerja', [$awalBulan->toDateString(), $akhirBulan->toDateString()])
+                ->get(['id_karyawan_pengganti', 'tanggal_kerja'])
+                ->groupBy('id_karyawan_pengganti')
             : collect();
         $absensi = $penempatan->isEmpty() ? collect() : DB::table('tbl_absensi')
             ->whereIn('id_karyawan', $penempatan->pluck('id_karyawan')->unique()->all())
@@ -60,7 +70,7 @@ class RekapOperasionalService
             ])))
             ->groupBy('id_karyawan');
 
-        $baris = $penempatan->groupBy('id_karyawan')->map(function (Collection $daftar) use ($awalBulan, $akhirBulan, $hariIni, $jadwal, $absensi, $kolom): object {
+        $baris = $penempatan->groupBy('id_karyawan')->map(function (Collection $daftar) use ($awalBulan, $akhirBulan, $hariIni, $jadwal, $backup, $absensi, $kolom): object {
             $data = $this->barisKosong($daftar);
             $tanggalPenempatan = [];
 
@@ -69,7 +79,17 @@ class RekapOperasionalService
                 $selesai = min($item->tgl_selesai ?? $akhirBulan->toDateString(), $akhirBulan->toDateString());
 
                 for ($tanggal = CarbonImmutable::parse($mulai); $tanggal->toDateString() <= $selesai; $tanggal = $tanggal->addDay()) {
-                    $tanggalPenempatan[$tanggal->toDateString()] = $jadwal->get($item->id.'|'.$tanggal->toDateString())?->status;
+                    $hariJadwal = $jadwal->get($item->id.'|'.$tanggal->toDateString());
+                    // Jadwal yang digantikan rekan bukan hari kerja pemiliknya (tidak dihitung tanpa absensi).
+                    $tanggalPenempatan[$tanggal->toDateString()] = $hariJadwal?->status === 'Kerja' && ($hariJadwal->id_karyawan_pengganti ?? null) !== null
+                        ? 'Libur'
+                        : $hariJadwal?->status;
+                }
+            }
+
+            foreach ($backup->get($daftar->first()->id_karyawan, collect()) as $hariBackup) {
+                if (array_key_exists((string) $hariBackup->tanggal_kerja, $tanggalPenempatan)) {
+                    $tanggalPenempatan[(string) $hariBackup->tanggal_kerja] = 'Kerja';
                 }
             }
 

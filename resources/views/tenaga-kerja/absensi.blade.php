@@ -359,13 +359,13 @@
         </div>
     </dialog>
 
-    {{-- ===================== Tukar shift: dipindah ke halaman tersendiri ===================== --}}
+    {{-- ===================== Backup shift: halaman tersendiri ===================== --}}
     <a href="{{ route('tenaga-kerja.tukar-shift.index') }}" class="tk-reveal card group flex items-center justify-between gap-4 p-5 transition hover:border-sji-biru hover:shadow-md">
         <div>
             <p class="tk-heading flex items-center gap-2 font-bold text-gray-800">
-                Tukar Shift dengan Rekan
+                Backup Shift dengan Rekan
             </p>
-            <p class="text-sm text-gray-500">Ajukan atau batalkan pertukaran shift dengan rekan satu layanan di lokasi yang sama</p>
+            <p class="text-sm text-gray-500">Minta rekan sejabatan menggantikan shift Anda, atau tanggapi permintaan rekan</p>
         </div>
         <span class="text-gray-400 transition group-hover:translate-x-1 group-hover:text-sji-biru">&rarr;</span>
     </a>

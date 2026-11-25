@@ -57,7 +57,7 @@ class JadwalKerjaController extends Controller
             'bulan.date_format' => 'Format bulan tidak valid.',
         ]);
 
-        $zonaWaktu = (string) config('app.timezone', 'UTC');
+        $zonaWaktu = (string) config('app.timezone');
         $tanggalHariIni = CarbonImmutable::now($zonaWaktu)->startOfDay();
         $awalBulan = isset($validated['bulan'])
             ? CarbonImmutable::parse($validated['bulan'].'-01', $zonaWaktu)

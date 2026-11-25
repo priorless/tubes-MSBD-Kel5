@@ -30,6 +30,99 @@
     @endforeach
 </div>
 
+{{-- ===================== Hari wajib (roster) vs kehadiran ===================== --}}
+@if ($kehadiran && $periodeHarian)
+    <section class="tk-reveal card mb-6 p-6">
+        <h2 class="card-title text-lg font-bold text-gray-900">
+            Hari Wajib Kerja vs Kehadiran
+            <span class="font-normal text-gray-400">({{ FormatKolom::namaBulan($periodeHarian['bulan']) }} {{ $periodeHarian['tahun'] }})</span>
+        </h2>
+        <p class="mt-1 text-sm text-gray-500">
+            Hari wajib dihitung dari roster Operasional (jadwal Kerja dan backup shift). Hari wajib yang sudah lewat tanpa absensi
+            dihitung <b>Alpha (tanpa keterangan)</b>. Toleransi terlambat 30 menit: telat 1–30 menit tetap Hadir; mulai 31 menit
+            tercatat Terlambat dengan seluruh menit telatnya.
+        </p>
+        <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-5">
+            @foreach ([
+                ['Hari Wajib', $kehadiran['hari_wajib'], 'text-sji-biru'],
+                ['Hadir', $kehadiran['hadir'], 'text-emerald-600'],
+                ['Izin / Sakit', $kehadiran['izin'] + $kehadiran['sakit'], 'text-sky-600'],
+                ['Alpha (Tanpa Keterangan)', $kehadiran['alpha'], 'text-red-500'],
+                ['Belum Berjalan', $kehadiran['belum_berjalan'], 'text-gray-500'],
+            ] as [$label, $nilai, $warnaAngka])
+                <div class="rounded-xl bg-gray-50 p-4">
+                    <p class="text-xs font-medium text-gray-500">{{ $label }}</p>
+                    <p class="mt-1 text-2xl font-bold {{ $warnaAngka }}">{{ $nilai }}</p>
+                </div>
+            @endforeach
+        </div>
+        @php $tanggalAlpha = collect($kehadiran['harian'])->where('keterangan_hadir', 'Alpha (tanpa keterangan)')->pluck('tanggal'); @endphp
+        @if ($tanggalAlpha->isNotEmpty())
+            <p class="mt-3 text-sm text-red-600">
+                Tanpa absensi pada: {{ $tanggalAlpha->map(fn ($t) => FormatKolom::tanggal($t, 'd M'))->implode(', ') }}.
+            </p>
+        @endif
+        @if ($kehadiran['hadir_luar_roster'] > 0)
+            <p class="mt-1 text-sm text-gray-500">{{ $kehadiran['hadir_luar_roster'] }} hari hadir di luar roster (jadwal penempatan).</p>
+        @endif
+    </section>
+@endif
+
+{{-- ===================== Lupa check-out ===================== --}}
+@if ($lupaCheckOut->isNotEmpty() || $riwayatKoreksi->isNotEmpty())
+    <section class="tk-reveal card mb-6 p-6" id="koreksi-check-out">
+        <h2 class="card-title text-lg font-bold text-gray-900">Perbaikan Lupa Check-out</h2>
+        <p class="mt-1 text-sm text-gray-500">Ajukan jam keluar yang sebenarnya untuk absensi yang lupa di-check-out. Setelah disetujui HRD, jam kerja dan lembur dihitung ulang otomatis.</p>
+
+        @foreach ($lupaCheckOut as $absensi)
+            <div class="mt-4 rounded-xl border border-gray-200 p-4">
+                <p class="font-semibold text-gray-800">{{ FormatKolom::tanggal($absensi->tgl, 'D, d M Y') }} &mdash; check-in {{ FormatKolom::jam($absensi->jam_masuk) }}</p>
+                @if ($absensi->id_koreksi)
+                    <p class="mt-1 text-sm text-amber-700">Pengajuan jam keluar {{ FormatKolom::jam($absensi->jam_keluar_diajukan) }} sedang menunggu pemeriksaan HRD.</p>
+                @else
+                    <form method="POST" action="{{ route('tenaga-kerja.koreksi-check-out.store') }}" class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-12"
+                          onsubmit="return confirm('Kirim pengajuan koreksi check-out ke HRD?')">
+                        @csrf
+                        <input type="hidden" name="id_absensi" value="{{ $absensi->id }}">
+                        <div class="md:col-span-3">
+                            <label for="jam_keluar_{{ $absensi->id }}" class="form-label">Jam keluar</label>
+                            <input type="time" id="jam_keluar_{{ $absensi->id }}" name="jam_keluar" required class="form-input">
+                        </div>
+                        <div class="md:col-span-7">
+                            <label for="alasan_{{ $absensi->id }}" class="form-label">Alasan</label>
+                            <input id="alasan_{{ $absensi->id }}" name="alasan" minlength="10" maxlength="500" required class="form-input"
+                                   placeholder="Contoh: baterai ponsel habis saat jam pulang">
+                        </div>
+                        <div class="flex items-end md:col-span-2">
+                            <button type="submit" class="btn-primary w-full">Ajukan</button>
+                        </div>
+                    </form>
+                @endif
+            </div>
+        @endforeach
+
+        @if ($riwayatKoreksi->isNotEmpty())
+            <div class="mt-5 overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <tr><th>Tanggal Absensi</th><th>Jam Keluar</th><th>Status</th><th>Catatan HRD</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($riwayatKoreksi as $item)
+                            <tr>
+                                <td class="whitespace-nowrap">{{ FormatKolom::tanggal($item->tgl, 'd M Y') }}</td>
+                                <td class="font-mono">{{ FormatKolom::jam($item->jam_keluar) }}</td>
+                                <td><span class="tk-badge-{{ $item->status === 'Disetujui' ? 'sukses' : ($item->status === 'Ditolak' ? 'bahaya' : 'peringatan') }}">{{ $item->status }}</span></td>
+                                <td class="text-sm text-gray-600">{{ $item->catatan_keputusan ?? '-' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </section>
+@endif
+
 {{-- ===================== Filter per periode ===================== --}}
 <section class="tk-reveal card mb-6 p-6">
     <form method="GET" action="{{ route('tenaga-kerja.riwayat') }}" class="grid grid-cols-2 items-end gap-4 md:grid-cols-12" id="tkFormFilter">
@@ -51,10 +144,12 @@
             @if ($adaFilter)
                 <a href="{{ route('tenaga-kerja.riwayat') }}" class="btn-secondary">Reset</a>
             @endif
-            <a href="{{ route('tenaga-kerja.riwayat.unduh', array_filter(['tahun' => $tahun, 'bulan' => $bulan])) }}"
-               class="btn-secondary md:ml-auto" data-no-transisi>
-                Unduh CSV
-            </a>
+            @if ($periodeHarian)
+                <a href="{{ route('tenaga-kerja.riwayat.unduh', $periodeHarian) }}"
+                   class="btn-secondary md:ml-auto" data-no-transisi>
+                    Unduh Rekap PDF ({{ FormatKolom::namaBulan($periodeHarian['bulan']) }} {{ $periodeHarian['tahun'] }})
+                </a>
+            @endif
         </div>
     </form>
 </section>

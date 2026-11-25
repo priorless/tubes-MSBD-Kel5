@@ -10,6 +10,7 @@ use App\Http\Controllers\Hrd\AbsensiKaryawanController;
 use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
 use App\Http\Controllers\Hrd\KetidakhadiranController;
+use App\Http\Controllers\Hrd\KoreksiCheckOutController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
 use App\Http\Controllers\Hrd\SertifikatController;
 use App\Http\Controllers\KeuanganController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\TenagaKerja\LaporanAktivitasController;
 use App\Http\Controllers\TenagaKerja\PembatalanTukarShiftController;
 use App\Http\Controllers\TenagaKerja\PengajuanTukarShiftController;
+use App\Http\Controllers\TenagaKerja\TanggapanBackupShiftController;
 use App\Http\Controllers\TenagaKerjaController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Middleware\PastikanKaryawan;
@@ -94,6 +96,15 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('absensi-karyawan/rekap/pdf', [AbsensiKaryawanController::class, 'exportPdf'])->name('absensi.rekap.pdf');
         Route::get('absensi-karyawan', AbsensiKaryawanController::class)->name('absensi');
         Route::post('absensi-karyawan/ketidakhadiran', KetidakhadiranController::class)->name('absensi.ketidakhadiran');
+        Route::controller(KoreksiCheckOutController::class)
+            ->prefix('absensi-karyawan/koreksi-check-out')
+            ->name('absensi.koreksi-check-out.')
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::post('/', 'store')->name('store');
+                Route::patch('{koreksiCheckOut}/setujui', 'approve')->whereNumber('koreksiCheckOut')->name('approve');
+                Route::patch('{koreksiCheckOut}/tolak', 'reject')->whereNumber('koreksiCheckOut')->name('reject');
+            });
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
         // Data Klien: controller & tampilan yang sama dengan Operasional (satu sumber data tbl_klien).
         Route::resource('klien', KlienController::class);
@@ -202,19 +213,24 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             Route::post('/absensi/check-in', 'checkIn')->middleware('throttle:10,1')->name('absensi.check-in');
             Route::post('/absensi/check-out', 'checkOut')->middleware('throttle:10,1')->name('absensi.check-out');
 
-            // Tukar shift (roker) dengan rekan: pengajuan langsung ke Operasional, dan pembatalan oleh pengaju.
+            // Backup shift (roker 1 arah): pengaju meminta rekan menggantikan shift -> rekan menanggapi -> Operasional.
             Route::get('/tukar-shift', 'tukarShift')->name('tukar-shift.index');
             Route::post('/tukar-shift', PengajuanTukarShiftController::class)->middleware('throttle:10,1')->name('tukar-shift.store');
             Route::patch('/tukar-shift/{pertukaranShift}/batalkan', PembatalanTukarShiftController::class)
                 ->whereNumber('pertukaranShift')->middleware('throttle:10,1')->name('tukar-shift.batalkan');
+            Route::patch('/tukar-shift/{pertukaranShift}/tanggapi', TanggapanBackupShiftController::class)
+                ->whereNumber('pertukaranShift')->middleware('throttle:10,1')->name('tukar-shift.tanggapi');
 
-            // Laporan aktivitas: monitoring per jam (Satpam/Cleaning Service) & perjalanan (Driver).
+            Route::get('/jadwal', 'jadwal')->name('jadwal');
+
+            // Laporan aktivitas: monitoring kapan saja (Satpam/Cleaning Service) & catatan perjalanan (Driver).
             Route::post('/absensi/laporan', [LaporanAktivitasController::class, 'store'])->middleware('throttle:20,1')->name('laporan.store');
             Route::post('/absensi/laporan/{laporanAktivitas}/koreksi', [LaporanAktivitasController::class, 'koreksi'])
                 ->whereNumber('laporanAktivitas')->middleware('throttle:20,1')->name('laporan.koreksi');
 
             Route::get('/riwayat-absensi', 'riwayat')->name('riwayat');
-            Route::get('/riwayat-absensi/unduh', 'riwayatCsv')->name('riwayat.unduh');
+            Route::get('/riwayat-absensi/unduh', 'riwayatPdf')->name('riwayat.unduh');
+            Route::post('/riwayat-absensi/koreksi-check-out', 'ajukanKoreksiCheckOut')->middleware('throttle:10,1')->name('koreksi-check-out.store');
 
             Route::get('/slip-gaji', 'slipGaji')->name('slip-gaji');
 
