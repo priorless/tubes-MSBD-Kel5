@@ -15,7 +15,7 @@
 
     <div class="keu-halaman min-w-0 space-y-6">
     <x-ui.page-header kicker="Keuangan · Input bulanan" title="Komponen Gaji"
-        description="Isi tunjangan dan potongan pinjaman / koperasi karyawan per periode sebelum payroll di-generate." />
+        description="Isi gaji pokok, tunjangan, dan potongan pinjaman / koperasi karyawan sebelum payroll di-generate." />
 
     <section class="keu-panel" aria-label="Filter karyawan">
         <form method="GET" action="{{ route('keuangan.komponen-gaji.index') }}" id="filterKomponen"
@@ -61,7 +61,7 @@
             <div class="keu-catatan-isi">
                 <div>
                     <h3>Gaji pokok &amp; potongan absensi</h3>
-                    <p>Mengikuti sumber serta rumus Generate Payroll yang berlaku. Hanya Tunjangan dan Potongan Pinjaman / Koperasi yang diisi manual.</p>
+                    <p>Gaji pokok sebulan diisi Keuangan sesuai data dari sekretaris dan berlaku sampai diubah; bila belum pernah diisi, sementara memakai gaji kontrak penempatan. Potongan absensi = (gaji pokok / hari kerja kontrak) &times; hari tidak masuk, dihitung otomatis.</p>
                 </div>
                 <div>
                     <h3>Upah lembur</h3>
@@ -92,7 +92,8 @@
             <div class="keu-panel-kepala">
                 <div>
                     <h2 class="keu-judul-panel" id="judul-komponen">Komponen periode {{ $namaPeriode }}</h2>
-                    <p class="keu-sub">{{ $karyawan->count() }} karyawan. Kolom <span class="rounded bg-(--op-gold-soft) px-1 font-semibold text-[#7e5710]">berwarna</span> diisi manual; kolom lain otomatis.</p>
+                    <p class="keu-sub">{{ $karyawan->count() }} karyawan. Kolom <span class="rounded bg-(--op-gold-soft) px-1 font-semibold text-[#7e5710]">berwarna</span> diisi manual; kolom lain otomatis.
+                        Gaji pokok cukup diisi saat ada gaji baru dari sekretaris, lalu berlaku untuk periode berikutnya sampai diubah.</p>
                 </div>
                 @include('keuangan._cari', [
                     'id' => 'cari_komponen',
@@ -111,9 +112,9 @@
             @endif
 
             <div class="relative overflow-x-auto">
-                <table class="table keu-tabel w-[1700px] min-w-[1700px] table-fixed">
+                <table class="table keu-tabel w-[1800px] min-w-[1800px] table-fixed">
                     <colgroup>
-                        <col class="w-36"><col class="w-48"><col class="w-40"><col class="w-36">
+                        <col class="w-36"><col class="w-48"><col class="w-40"><col class="w-60">
                         <col class="w-40"><col class="w-36"><col class="w-36"><col class="w-40">
                         <col class="w-44"><col class="w-56">
                     </colgroup>
@@ -122,7 +123,7 @@
                             <th class="sticky left-0 z-30 bg-gray-50">NIP</th>
                             <th class="sticky left-36 z-30 bg-gray-50">Nama Karyawan</th>
                             <th class="sticky left-[21rem] z-30 bg-gray-50 shadow-[inset_-1px_0_0_var(--op-line)]">Jenis Pekerjaan</th>
-                            <th class="text-right">Gaji Pokok</th>
+                            <th class="keu-kolom-isi text-right">Gaji Pokok <span class="font-normal">/ bulan</span></th>
                             <th class="keu-kolom-isi text-right">Tunjangan</th>
                             <th class="text-right">Upah Back-up</th>
                             <th class="text-right">Upah Lembur</th>
@@ -137,7 +138,15 @@
                                 <td class="sticky left-0 z-10 bg-white whitespace-nowrap font-mono text-gray-600">{{ $item->nip }}</td>
                                 <td class="sticky left-36 z-10 bg-white whitespace-nowrap font-medium text-gray-800">{{ $item->nama }}</td>
                                 <td class="sticky left-[21rem] z-10 bg-white shadow-[inset_-1px_0_0_var(--op-line)]">{{ $item->nama_layanan ?? 'Belum diatur' }}</td>
-                                <td class="keu-angka">Rp {{ number_format($item->gaji_pokok, 0, ',', '.') }}@if ($item->status_gaji)<span class="keu-ket text-amber-700">{{ $item->status_gaji }}</span>@endif</td>
+                                <td class="keu-kolom-isi">
+                                    <label class="sr-only" for="gaji-{{ $item->id }}">Gaji pokok sebulan {{ $item->nama }}</label>
+                                    <div class="grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-1"><span class="text-gray-500">Rp</span><input id="gaji-{{ $item->id }}" @class(['form-input min-w-0 w-full bg-white text-right tabular-nums', 'form-input-error' => $errors->has('komponen.'.$item->id.'.gaji_pokok')]) type="number" name="komponen[{{ $item->id }}][gaji_pokok]" min="1" max="9999999999.99" step="0.01" value="{{ old('komponen.'.$item->id.'.gaji_pokok', $item->gaji_bulanan !== null ? (float) $item->gaji_bulanan : '') }}" placeholder="Isi gaji pokok"></div>
+                                    <span @class(['keu-ket is-bungkus text-right', 'is-peringatan' => $item->gaji_belum_diinput])>{{ $item->sumber_gaji }}</span>
+                                    @if ($item->hari_wajib !== null && $item->gaji_bulanan !== null && abs((float) $item->gaji_pokok - (float) $item->gaji_bulanan) >= 1)
+                                        <span class="keu-ket is-bungkus text-right">Prorata {{ $item->hari_wajib }} hari wajib: Rp {{ number_format($item->gaji_pokok, 0, ',', '.') }}</span>
+                                    @endif
+                                    @error('komponen.'.$item->id.'.gaji_pokok') <span class="form-error block text-right">{{ $message }}</span> @enderror
+                                </td>
                                 <td class="keu-kolom-isi">
                                     <label class="sr-only" for="tunjangan-{{ $item->id }}">Tunjangan {{ $item->nama }}</label>
                                     <div class="grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-1"><span class="text-gray-500">Rp</span><input id="tunjangan-{{ $item->id }}" class="form-input min-w-0 w-full bg-white text-right tabular-nums" type="number" name="komponen[{{ $item->id }}][tunjangan]" min="0" max="9999999999.99" step="0.01" value="{{ old('komponen.'.$item->id.'.tunjangan', $item->tunjangan) }}" required></div>
@@ -151,7 +160,7 @@
                                         <span class="keu-ket is-bungkus">{{ $item->keterangan_bpjs }}</span>
                                     @else
                                         <span class="text-gray-400">&mdash;</span>
-                                        <span class="keu-ket is-bungkus text-amber-700">{{ $item->keterangan_bpjs }}</span>
+                                        <span class="keu-ket is-bungkus is-peringatan">{{ $item->keterangan_bpjs }}</span>
                                     @endif
                                 </td>
                                 <td class="keu-kolom-isi">

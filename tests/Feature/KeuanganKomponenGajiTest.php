@@ -65,6 +65,7 @@ class KeuanganKomponenGajiTest extends TestCase
             $table->integer('id_karyawan');
             $table->unsignedTinyInteger('periode_bulan');
             $table->unsignedSmallInteger('periode_tahun');
+            $table->decimal('gaji_pokok', 12, 2)->nullable();
             $table->decimal('tunjangan', 12, 2)->default(0);
             $table->decimal('potongan_pinjaman', 12, 2)->default(0);
             $table->timestamps();
@@ -328,7 +329,8 @@ class KeuanganKomponenGajiTest extends TestCase
 
         $this->actingAs($user)->get($this->urlHalaman($karyawan['id_klien']))
             ->assertOk()
-            ->assertSeeInOrder(['Rp 4.000.000', 'Rp 0', 'Aturan nominal belum tersedia'])
+            ->assertSee('value="4000000"', false)
+            ->assertSeeInOrder(['Rp 0', 'Aturan nominal belum tersedia'])
             ->assertSee('Tukar shift (barter) tidak termasuk back-up');
     }
 
@@ -349,10 +351,12 @@ class KeuanganKomponenGajiTest extends TestCase
         $tersimpan = DB::table('tbl_komponen_gaji')->get();
         $this->assertCount(1, $tersimpan);
         $this->assertSame(
-            ['id', 'id_karyawan', 'periode_bulan', 'periode_tahun', 'tunjangan', 'potongan_pinjaman', 'created_at', 'updated_at'],
+            ['id', 'id_karyawan', 'periode_bulan', 'periode_tahun', 'gaji_pokok', 'tunjangan', 'potongan_pinjaman', 'created_at', 'updated_at'],
             array_keys((array) $tersimpan->first()),
         );
         $this->assertEquals([150000, 20000], [(float) $tersimpan->first()->tunjangan, (float) $tersimpan->first()->potongan_pinjaman]);
+        // gaji_pokok di luar daftar komponen tidak dipakai; gaji pokok hanya dari komponen[id][gaji_pokok].
+        $this->assertNull($tersimpan->first()->gaji_pokok);
         $this->assertDatabaseCount('tbl_payroll', 0);
     }
 

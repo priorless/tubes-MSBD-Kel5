@@ -159,6 +159,12 @@
                 color: var(--op-text-3);
             }
 
+            /* Keterangan yang perlu perhatian (mis. gaji pokok belum diinput, BPJS belum diatur). */
+            .keu-halaman .keu-ket.is-peringatan {
+                color: #a3640b;
+                font-weight: 600;
+            }
+
             /* Keterangan panjang (mis. BPJS + nama klien) turun ke baris berikut, tidak melewati garis kolom. */
             .keu-halaman .keu-ket.is-bungkus {
                 white-space: normal;

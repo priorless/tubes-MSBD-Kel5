@@ -2,7 +2,8 @@
 
 @php
     $isEditing = $karyawan !== null;
-    $kategoriAktif = $isEditing ? $karyawan->kategori : old('kategori', 'Lapangan');
+    // Karyawan baru selalu Lapangan; kategori karyawan lama (termasuk Internal) tetap ditampilkan saat edit.
+    $kategoriAktif = $isEditing ? $karyawan->kategori : \App\Http\Requests\Hrd\StoreKaryawanRequest::KATEGORI;
 @endphp
 
 @section('title', $isEditing ? 'Ubah Karyawan' : 'Tambah Karyawan')
@@ -45,23 +46,14 @@
                             </div>
                         </div>
 
-                        <div>
-                            <span class="form-label">Kategori</span>
-                            @if ($isEditing)
+                        {{-- Tambah Karyawan tidak menampilkan kategori: backend selalu menetapkan Lapangan (StoreKaryawanRequest). --}}
+                        @if ($isEditing)
+                            <div>
+                                <span class="form-label">Kategori</span>
                                 <span class="badge badge-{{ $karyawan->kategori === 'Internal' ? 'dark' : 'info' }}">{{ $karyawan->kategori }}</span>
                                 <p class="form-hint">Kategori tidak dapat diubah setelah karyawan terdaftar.</p>
-                            @else
-                                <div class="flex flex-wrap gap-x-6 gap-y-2">
-                                    @foreach (['Lapangan' => 'Lapangan (satpam, driver, cleaning service)', 'Internal' => 'Internal (staf kantor)'] as $nilai => $label)
-                                        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                            <input type="radio" name="kategori" value="{{ $nilai }}" class="form-check js-kategori" @checked($kategoriAktif === $nilai)>
-                                            {{ $label }}
-                                        </label>
-                                    @endforeach
-                                </div>
-                                @error('kategori') <p class="form-error">{{ $message }}</p> @enderror
-                            @endif
-                        </div>
+                            </div>
+                        @endif
 
                         <div class="js-bagian-lapangan">
                             <label for="id_jenis_layanan" class="form-label">Jenis Layanan</label>
@@ -77,13 +69,33 @@
                             <p class="form-hint">Wajib untuk karyawan Lapangan. Gaji karyawan Lapangan diatur lewat kontrak penempatan.</p>
                         </div>
 
-                        <div class="js-bagian-internal">
-                            <label for="gaji_pokok" class="form-label">Gaji Pokok (Rp)</label>
-                            <input id="gaji_pokok" name="gaji_pokok" type="number" min="0" step="1000"
-                                @class(['form-input', 'form-input-error' => $errors->has('gaji_pokok')])
-                                value="{{ old('gaji_pokok', $karyawan?->gaji_pokok) }}">
-                            @error('gaji_pokok') <p class="form-error">{{ $message }}</p> @enderror
-                            <p class="form-hint">Wajib untuk karyawan Internal. Gaji yang dibayarkan = gaji pokok + lembur &minus; potongan absen.</p>
+                        {{-- Internal: tbl_karyawan.gaji_pokok. Lapangan: Komponen Gaji (tbl_komponen_gaji), sumber yang sama dengan Keuangan & payroll. --}}
+                        <div>
+                            <label for="gaji_pokok" class="form-label">Gaji Pokok</label>
+                            @if (! $gajiPokok['tersedia'])
+                                <p class="text-sm text-amber-700">Belum tersedia &mdash; database belum dimigrasi (kolom gaji pokok pada Komponen Gaji).</p>
+                            @else
+                                <div class="flex max-w-64 items-center gap-2">
+                                    <span class="text-sm text-gray-600">Rp</span>
+                                    <input id="gaji_pokok" name="gaji_pokok" type="number" inputmode="decimal" min="0" step="0.01"
+                                        placeholder="Contoh: 4500000" data-rupiah-input
+                                        @class(['form-input', 'form-input-error' => $errors->has('gaji_pokok')])
+                                        value="{{ old('gaji_pokok', $gajiPokok['nilai']) }}">
+                                </div>
+                                <p class="form-hint font-medium text-gray-700" data-rupiah-pratinjau></p>
+                                @error('gaji_pokok') <p class="form-error">{{ $message }}</p> @enderror
+                                <p class="form-hint">
+                                    @if ($kategoriAktif === 'Internal')
+                                        Wajib untuk karyawan Internal. Gaji yang dibayarkan = gaji pokok + lembur &minus; potongan absen.
+                                    @elseif ($isEditing)
+                                        {{ $gajiPokok['keterangan'] }}
+                                        Perubahan berlaku mulai periode {{ \App\Services\GajiPokokLapanganService::labelPeriode(now()->month, now()->year) }} dan dipakai Generate Payroll; payroll yang sudah dibuat tidak dihitung ulang. Kosongkan bila tidak diubah.
+                                    @else
+                                        Gaji pokok sebulan, berlaku mulai bulan tanggal masuk dan dipakai Generate Payroll. Kosongkan bila belum ditentukan (payroll memakai gaji kontrak penempatan).
+                                    @endif
+                                    Nilai yang sama tampil dan dapat diubah Keuangan di Komponen Gaji.
+                                </p>
+                            @endif
                         </div>
 
                         <div>
@@ -244,47 +256,6 @@
                             Username dan password awal = NIP.
                         </div>
                     </div>
-
-                    <div class="card js-bagian-internal">
-                        <div class="card-header">
-                            <h2 class="card-title">Akun Login Staf</h2>
-                        </div>
-                        <div class="card-body space-y-4">
-                            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                <input type="hidden" name="buat_akun" value="0">
-                                <input type="checkbox" class="form-check" id="buat_akun" name="buat_akun" value="1" @checked(old('buat_akun'))>
-                                Buat akun login untuk staf ini
-                            </label>
-                            <div class="js-bagian-akun space-y-4">
-                                <div>
-                                    <label for="id_role" class="form-label">Role</label>
-                                    <select id="id_role" name="id_role" @class(['form-input', 'form-input-error' => $errors->has('id_role')])>
-                                        <option value="">&mdash; Pilih role &mdash;</option>
-                                        @foreach ($roles as $role)
-                                            <option value="{{ $role->id }}" @selected((string) old('id_role') === (string) $role->id)>{{ $role->nama_role }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('id_role') <p class="form-error">{{ $message }}</p> @enderror
-                                </div>
-                                <div>
-                                    <label for="username" class="form-label">Username</label>
-                                    <input id="username" name="username" type="text" maxlength="50" autocomplete="off"
-                                        @class(['form-input', 'form-input-error' => $errors->has('username')]) value="{{ old('username') }}">
-                                    @error('username') <p class="form-error">{{ $message }}</p> @enderror
-                                </div>
-                                <div>
-                                    <label for="password" class="form-label">Password</label>
-                                    <input id="password" name="password" type="password" autocomplete="new-password"
-                                        @class(['form-input', 'form-input-error' => $errors->has('password')])>
-                                    @error('password') <p class="form-error">{{ $message }}</p> @enderror
-                                </div>
-                                <div>
-                                    <label for="password_confirmation" class="form-label">Ulangi Password</label>
-                                    <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" class="form-input">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 @endif
             </div>
         </div>
@@ -299,11 +270,7 @@
 @push('scripts')
     <script>
         (function () {
-            const kategoriTetap = @json($isEditing ? $karyawan->kategori : null);
-
-            function kategoriTerpilih() {
-                return kategoriTetap ?? document.querySelector('.js-kategori:checked')?.value ?? 'Lapangan';
-            }
+            const kategori = @json($kategoriAktif);
 
             function aturBagian(selector, tampil) {
                 document.querySelectorAll(selector).forEach(function (el) {
@@ -316,22 +283,24 @@
                 });
             }
 
+            // Jenis Layanan & jaminan kesehatan hanya untuk Lapangan; Gaji Pokok tampil untuk semua kategori.
             function perbarui() {
-                const kategori = kategoriTerpilih();
                 aturBagian('.js-bagian-lapangan', kategori === 'Lapangan');
-                aturBagian('.js-bagian-internal', kategori === 'Internal');
                 aturBagian('.js-bagian-jaminan-kesehatan', kategori !== 'Internal');
-
-                const sakelarAkun = document.getElementById('buat_akun');
-                if (sakelarAkun && kategori === 'Internal') {
-                    aturBagian('.js-bagian-akun', sakelarAkun.checked);
-                }
             }
 
-            document.querySelectorAll('.js-kategori').forEach(function (radio) {
-                radio.addEventListener('change', perbarui);
-            });
-            document.getElementById('buat_akun')?.addEventListener('change', perbarui);
+            // Pratinjau nominal dalam format Rupiah agar mudah dibaca, mis. 4500000 -> Rp 4.500.000.
+            const inputGaji = document.querySelector('[data-rupiah-input]');
+            const pratinjauGaji = document.querySelector('[data-rupiah-pratinjau]');
+            const formatRupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 });
+            function tampilkanRupiah() {
+                const nilai = Number(inputGaji.value);
+                pratinjauGaji.textContent = inputGaji.value !== '' && Number.isFinite(nilai) ? formatRupiah.format(nilai) : '';
+            }
+            if (inputGaji && pratinjauGaji) {
+                inputGaji.addEventListener('input', tampilkanRupiah);
+                tampilkanRupiah();
+            }
 
             document.getElementById('foto').addEventListener('change', function (event) {
                 const berkas = event.target.files[0];

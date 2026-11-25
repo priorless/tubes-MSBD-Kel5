@@ -60,10 +60,14 @@ class KeuanganKomponenGajiController extends Controller
             ->keyBy('id_karyawan');
 
         $baris = $karyawan->map(function (object $item) use ($bulan, $tahun, $manual): object {
-            $otomatis = $this->komponenOtomatis($item, $bulan, $tahun);
+            $gajiPokok = $this->gajiPokokBulanan((int) $item->id, $bulan, $tahun);
+            $otomatis = $this->komponenOtomatis($item, $bulan, $tahun, $gajiPokok['berlaku']);
             $tersimpan = $manual->get($item->id);
 
             return (object) [...(array) $item, ...$otomatis,
+                'gaji_bulanan' => $gajiPokok['berlaku'],
+                'sumber_gaji' => $gajiPokok['keterangan'],
+                'gaji_belum_diinput' => $gajiPokok['belum_diinput'],
                 'tunjangan' => (float) ($tersimpan->tunjangan ?? 0),
                 'potongan_pinjaman' => (float) ($tersimpan->potongan_pinjaman ?? 0),
             ];
@@ -93,12 +97,14 @@ class KeuanganKomponenGajiController extends Controller
             'penempatan' => ['required', 'string', Rule::in($klien)],
             'jenis_pekerjaan' => ['nullable', 'integer', Rule::in($jenisPekerjaan->pluck('id')->all())],
             'komponen' => ['required', 'array', 'min:1'],
+            'komponen.*.gaji_pokok' => ['sometimes', 'nullable', 'numeric', 'decimal:0,2', 'gt:0', 'max:9999999999.99'],
             'komponen.*.tunjangan' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'komponen.*.potongan_pinjaman' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
         ], [
             'komponen.required' => 'Komponen gaji tidak ditemukan untuk disimpan.',
             'komponen.*.*.min' => 'Nominal tidak boleh negatif.',
             'komponen.*.*.numeric' => 'Nominal harus berupa angka yang valid.',
+            'komponen.*.gaji_pokok.gt' => 'Gaji pokok harus lebih dari Rp0.',
         ]);
 
         $idJenisPekerjaan = isset($validated['jenis_pekerjaan']) ? (int) $validated['jenis_pekerjaan'] : null;
@@ -107,16 +113,23 @@ class KeuanganKomponenGajiController extends Controller
         $idsDikirim = array_map('strval', array_keys($validated['komponen']));
         abort_if(array_diff($idsDikirim, $karyawanIds) !== [], 422, 'Daftar karyawan tidak sesuai dengan filter periode dan penempatan.');
 
-        // Hanya Tunjangan & Potongan Pinjaman yang diambil dari request (field lain di request diabaikan oleh validate()).
-        // Komponen otomatis (gaji pokok, lembur, back-up, potongan absensi, BPJS) tidak disimpan di sini:
-        // Generate Payroll menghitungnya sendiri dari data sumber di database.
+        // Diambil dari request hanya Gaji Pokok, Tunjangan, dan Potongan Pinjaman (field lain diabaikan validate()).
+        // Komponen otomatis (lembur, back-up, potongan absensi, BPJS) tidak disimpan di sini: Generate Payroll
+        // menghitungnya sendiri dari gaji pokok yang berlaku dan data sumber di database.
+        $bulan = (int) $validated['bulan'];
+        $tahun = (int) $validated['tahun'];
+        $tersimpan = DB::table('tbl_komponen_gaji')->where('periode_bulan', $bulan)->where('periode_tahun', $tahun)
+            ->whereIn('id_karyawan', array_map('intval', $idsDikirim))->pluck('gaji_pokok', 'id_karyawan');
         $sekarang = now();
         $baris = [];
         foreach ($validated['komponen'] as $idKaryawan => $nilai) {
             $baris[] = [
                 'id_karyawan' => (int) $idKaryawan,
-                'periode_bulan' => (int) $validated['bulan'],
-                'periode_tahun' => (int) $validated['tahun'],
+                'periode_bulan' => $bulan,
+                'periode_tahun' => $tahun,
+                'gaji_pokok' => array_key_exists('gaji_pokok', $nilai)
+                    ? $this->gajiPokokUntukDisimpan((int) $idKaryawan, $bulan, $tahun, $nilai['gaji_pokok'])
+                    : $tersimpan->get((int) $idKaryawan),
                 'tunjangan' => $nilai['tunjangan'],
                 'potongan_pinjaman' => $nilai['potongan_pinjaman'],
                 'created_at' => $sekarang,
@@ -127,7 +140,7 @@ class KeuanganKomponenGajiController extends Controller
         DB::transaction(fn () => DB::table('tbl_komponen_gaji')->upsert(
             $baris,
             ['id_karyawan', 'periode_bulan', 'periode_tahun'],
-            ['tunjangan', 'potongan_pinjaman', 'updated_at'],
+            ['gaji_pokok', 'tunjangan', 'potongan_pinjaman', 'updated_at'],
         ));
 
         return redirect()->route('keuangan.komponen-gaji.index', [
@@ -169,11 +182,82 @@ class KeuanganKomponenGajiController extends Controller
     }
 
     /**
+     * Gaji pokok sebulan karyawan Lapangan pada suatu periode, mengikuti sp_generate_payroll_bulanan:
+     * input Komponen Gaji terakhir pada periode <= periode ini ("berlaku sampai diubah"), atau gaji kontrak
+     * penempatan bila belum pernah diinput.
+     *
+     * @return array{berlaku: float|null, warisan: float|null, keterangan: string, belum_diinput: bool}
+     */
+    private function gajiPokokBulanan(int $idKaryawan, int $bulan, int $tahun): array
+    {
+        $input = DB::table('tbl_komponen_gaji')
+            ->where('id_karyawan', $idKaryawan)
+            ->whereNotNull('gaji_pokok')
+            ->whereRaw('periode_tahun * 12 + periode_bulan <= ?', [$tahun * 12 + $bulan])
+            ->orderByDesc('periode_tahun')->orderByDesc('periode_bulan')
+            ->limit(2)
+            ->get(['gaji_pokok', 'periode_bulan', 'periode_tahun']);
+        $periodeIni = $input->first(fn (object $baris): bool => (int) $baris->periode_bulan === $bulan && (int) $baris->periode_tahun === $tahun);
+        $sebelumnya = $input->first(fn (object $baris): bool => $baris !== $periodeIni);
+        $kontrak = $this->gajiKontrak($idKaryawan, $bulan, $tahun);
+        $warisan = $sebelumnya !== null ? (float) $sebelumnya->gaji_pokok : $kontrak;
+
+        $keterangan = match (true) {
+            $periodeIni !== null => 'Diubah mulai '.self::DAFTAR_BULAN[$bulan].' '.$tahun,
+            $sebelumnya !== null => 'Berlaku sejak '.self::DAFTAR_BULAN[(int) $sebelumnya->periode_bulan].' '.$sebelumnya->periode_tahun,
+            $kontrak !== null => 'Belum diinput · sementara gaji kontrak',
+            default => 'Belum ada data gaji',
+        };
+
+        return [
+            'berlaku' => $periodeIni !== null ? (float) $periodeIni->gaji_pokok : $warisan,
+            'warisan' => $warisan,
+            'keterangan' => $keterangan,
+            'belum_diinput' => $periodeIni === null && $sebelumnya === null,
+        ];
+    }
+
+    /**
+     * Nilai kolom tbl_komponen_gaji.gaji_pokok untuk periode ini: hanya disimpan bila berbeda dari gaji yang
+     * sudah berlaku sebelumnya, sehingga riwayat berisi periode perubahan gaji saja. NULL = ikut gaji sebelumnya.
+     */
+    private function gajiPokokUntukDisimpan(int $idKaryawan, int $bulan, int $tahun, mixed $input): ?string
+    {
+        if ($input === null || $input === '') {
+            return null;
+        }
+
+        $warisan = $this->gajiPokokBulanan($idKaryawan, $bulan, $tahun)['warisan'];
+
+        return $warisan !== null && abs((float) $input - $warisan) < 0.005 ? null : (string) $input;
+    }
+
+    /** Gaji pokok pada kontrak penempatan terbaru dalam periode (sama dengan pencarian kontrak di Generate Payroll). */
+    private function gajiKontrak(int $idKaryawan, int $bulan, int $tahun): ?float
+    {
+        $kontrak = $this->kontrakPeriode($idKaryawan, $bulan, $tahun);
+
+        return $kontrak === null ? null : (float) $kontrak->gaji_pokok;
+    }
+
+    private function kontrakPeriode(int $idKaryawan, int $bulan, int $tahun): ?object
+    {
+        $awal = Carbon::create($tahun, $bulan, 1)->toDateString();
+        $akhir = Carbon::create($tahun, $bulan, 1)->endOfMonth()->toDateString();
+
+        return DB::table('tbl_kontrak as c')->join('tbl_penempatan as p', 'p.id', '=', 'c.id_penempatan')
+            ->where('p.id_karyawan', $idKaryawan)->where('p.tgl_mulai', '<=', $akhir)
+            ->where(fn ($query) => $query->whereNull('p.tgl_selesai')->orWhere('p.tgl_selesai', '>=', $awal))
+            ->orderByDesc('p.tgl_mulai')->orderByDesc('p.id')->orderByDesc('c.id')
+            ->first(['c.gaji_pokok', 'c.hari_kerja_per_bulan', 'p.id_klien']);
+    }
+
+    /**
      * Komponen otomatis (read-only). Gaji pokok & potongan absensi mengikuti sp_generate_payroll_bulanan;
      * lembur, BPJS, dan back-up mengikuti aturan Komponen Gaji (lihat upahLembur(), potonganBpjs()).
      * Nilai ini selalu dihitung ulang di server dan tidak pernah diambil dari request.
      */
-    private function komponenOtomatis(object $karyawan, int $bulan, int $tahun): array
+    private function komponenOtomatis(object $karyawan, int $bulan, int $tahun, ?float $gajiBulanan = null): array
     {
         $idKlien = null;
         $awal = Carbon::create($tahun, $bulan, 1)->toDateString();
@@ -195,11 +279,7 @@ class KeuanganKomponenGajiController extends Controller
                 $potongan = (float) DB::selectOne('SELECT fn_hitung_potongan_absen(?, 25, ?) AS nominal', [$gaji, $hariAbsen])->nominal;
             }
         } else {
-            $kontrak = DB::table('tbl_kontrak as c')->join('tbl_penempatan as p', 'p.id', '=', 'c.id_penempatan')
-                ->where('p.id_karyawan', $karyawan->id)->where('p.tgl_mulai', '<=', $akhir)
-                ->where(fn ($query) => $query->whereNull('p.tgl_selesai')->orWhere('p.tgl_selesai', '>=', $awal))
-                ->orderByDesc('p.tgl_mulai')->orderByDesc('p.id')->orderByDesc('c.id')
-                ->first(['c.gaji_pokok', 'c.hari_kerja_per_bulan', 'p.id_klien']);
+            $kontrak = $this->kontrakPeriode((int) $karyawan->id, $bulan, $tahun);
 
             if ($kontrak !== null && (int) $kontrak->hari_kerja_per_bulan > 0) {
                 $gajiTersedia = true;
@@ -210,7 +290,8 @@ class KeuanganKomponenGajiController extends Controller
                 $hariMasuk = DB::table('tbl_absensi')->where('id_karyawan', $karyawan->id)
                     ->whereBetween('tgl', [$awal, $akhir])->whereIn('status_kehadiran', ['Hadir', 'Terlambat', 'Sakit'])->count();
                 $hariAbsen = max(0, $hariWajib - $hariMasuk);
-                $tarif = (float) $kontrak->gaji_pokok / (int) $kontrak->hari_kerja_per_bulan;
+                // Gaji pokok sebulan dari Komponen Gaji (bila sudah diinput), selain itu gaji kontrak.
+                $tarif = ($gajiBulanan ?? (float) $kontrak->gaji_pokok) / (int) $kontrak->hari_kerja_per_bulan;
                 $gaji = round($tarif * $hariWajib, 2);
                 $potongan = round($tarif * $hariAbsen, 2);
             }
