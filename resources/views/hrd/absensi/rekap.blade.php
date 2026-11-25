@@ -92,7 +92,7 @@
         <div class="card-header"><h2 class="card-title">Detail absensi</h2></div>
         <div class="overflow-x-auto">
             <table class="table">
-                <thead><tr><th>Tanggal</th><th>Karyawan</th><th>Klien / lokasi</th><th>Status</th><th>Terlambat</th><th>Masuk</th><th>Keluar</th><th>Lembur</th></tr></thead>
+                <thead><tr><th>Tanggal</th><th>Karyawan</th><th>Klien / lokasi</th><th>Status</th><th>Terlambat</th><th>Masuk</th><th>Keluar</th><th>Lembur</th><th>Foto Check-in / Check-out</th></tr></thead>
                 <tbody>
                     @forelse ($rekap as $baris)
                         <tr>
@@ -104,9 +104,26 @@
                             <td class="font-mono">{{ FormatKolom::jam($baris->jam_masuk) }}</td>
                             <td class="font-mono">{{ FormatKolom::jam($baris->jam_keluar) }}</td>
                             <td>{{ (int) $baris->jam_lembur > 0 ? $baris->jam_lembur.' jam' : '—' }}</td>
+                            <td class="whitespace-nowrap">
+                                @if ($baris->foto_masuk || $baris->foto_keluar)
+                                    <div class="flex gap-2">
+                                        @foreach (['masuk' => 'check-in', 'keluar' => 'check-out'] as $jenis => $labelFoto)
+                                            @if ($baris->{'foto_'.$jenis})
+                                                @php $urlFoto = route('absensi.foto', ['absensi' => $baris->id_absensi, 'jenis' => $jenis]); @endphp
+                                                <a href="{{ $urlFoto }}" target="_blank" rel="noopener" title="Buka foto {{ $labelFoto }}">
+                                                    <img src="{{ $urlFoto }}" alt="Foto {{ $labelFoto }} {{ $baris->nama }} {{ FormatKolom::tanggal($baris->tgl, 'd/m/Y') }}" loading="lazy"
+                                                        class="h-12 w-16 rounded border border-gray-200 object-cover">
+                                                </a>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="text-gray-400">&mdash;</span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="table-empty">Tidak ada catatan absensi pada periode dan filter ini.</td></tr>
+                        <tr><td colspan="9" class="table-empty">Tidak ada catatan absensi pada periode dan filter ini.</td></tr>
                     @endforelse
                 </tbody>
             </table>
