@@ -4,7 +4,6 @@ namespace Tests\Concerns;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 /**
@@ -26,9 +25,6 @@ trait MemakaiDatabaseSji
     /** @var list<array{int, int}> periode [bulan, tahun] yang payroll-nya dihapus di tearDown */
     private array $periodeUji = [];
 
-    /** id log aktivitas terakhir sebelum test; log yang lebih baru (hasil test) dihapus di tearDown. */
-    private ?int $batasLogAktivitas = null;
-
     /** false bila test dilewati karena db_sji tidak tersedia (tearDown tidak menyentuh database). */
     private bool $databaseSjiSiap = false;
 
@@ -47,10 +43,6 @@ trait MemakaiDatabaseSji
             $this->markTestSkipped('Database MySQL db_sji tidak tersedia.');
         }
 
-        if (Schema::hasTable('tbl_log_aktivitas')) {
-            $this->batasLogAktivitas = (int) DB::table('tbl_log_aktivitas')->max('id');
-        }
-
         $this->databaseSjiSiap = true;
         DB::beginTransaction();
     }
@@ -66,11 +58,6 @@ trait MemakaiDatabaseSji
         }
 
         $this->hapusDataUji();
-
-        // Log dari procedure yang ter-commit dan dari pembersihan di atas.
-        if ($this->batasLogAktivitas !== null) {
-            DB::table('tbl_log_aktivitas')->where('id', '>', $this->batasLogAktivitas)->delete();
-        }
 
         DB::statement('SET @app_user_id = NULL');
     }
