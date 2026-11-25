@@ -41,9 +41,10 @@ class UpdateKaryawanRequest extends FormRequest
             'id_jenis_layanan' => $isInternal
                 ? ['exclude']
                 : ['bail', 'filled', 'integer', Rule::exists('tbl_jenis_layanan', 'id')],
+            // Internal: tbl_karyawan.gaji_pokok (tidak berubah). Lapangan: tbl_komponen_gaji lewat GajiPokokLapanganService.
             'gaji_pokok' => $isInternal
                 ? ['bail', 'filled', 'numeric', 'min:0', 'max:9999999999.99']
-                : ['exclude'],
+                : StoreKaryawanRequest::aturanGajiPokokLapangan(),
             'no_ktp' => ['bail', 'required', 'digits:16', Rule::unique('tbl_karyawan', 'no_ktp')->ignore($idKaryawan)],
             'tempat_lahir' => ['nullable', 'string', 'max:50'],
             'tgl_lahir' => ['bail', 'required', 'date', 'before:today'],
