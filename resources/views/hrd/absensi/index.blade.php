@@ -194,16 +194,22 @@
         </div>
         <div class="card-body grid grid-cols-1 gap-4 md:grid-cols-12">
             <div class="md:col-span-4">
-                <label for="id_karyawan" class="form-label">Karyawan</label>
-                <select id="id_karyawan" name="id_karyawan" required @class(['form-input', 'form-input-error' => $errors->has('id_karyawan')])>
-                    <option value="">&mdash; Pilih karyawan &mdash;</option>
+                @php
+                    // Tombol "Catat" di daftar belum absen mengirim ?karyawan=<id>; isian awal = "Nama (NIP)".
+                    $karyawanAwal = $daftarKaryawan->firstWhere('id', (int) request('karyawan'));
+                @endphp
+                <label for="karyawan" class="form-label">Karyawan</label>
+                <input id="karyawan" name="karyawan" type="text" list="saran-karyawan-ketidakhadiran" required maxlength="150" autocomplete="off"
+                    value="{{ old('karyawan', $karyawanAwal ? $karyawanAwal->nama.' ('.$karyawanAwal->nip.')' : '') }}"
+                    placeholder="Ketik nama atau NIP karyawan"
+                    @class(['form-input', 'form-input-error' => $errors->has('karyawan')])>
+                <datalist id="saran-karyawan-ketidakhadiran">
                     @foreach ($daftarKaryawan as $karyawan)
-                        <option value="{{ $karyawan->id }}" @selected((string) old('id_karyawan', request('karyawan')) === (string) $karyawan->id)>
-                            {{ $karyawan->nama }} ({{ $karyawan->nip }}, {{ $karyawan->kategori }})
-                        </option>
+                        <option value="{{ $karyawan->nama }} ({{ $karyawan->nip }})">{{ $karyawan->kategori }}</option>
                     @endforeach
-                </select>
-                @error('id_karyawan') <p class="form-error">{{ $message }}</p> @enderror
+                </datalist>
+                <p class="form-hint">Ketik nama lengkap atau NIP, atau pilih dari saran yang muncul.</p>
+                @error('karyawan') <p class="form-error">{{ $message }}</p> @enderror
             </div>
             <div class="md:col-span-2">
                 <label for="tgl_ketidakhadiran" class="form-label">Tanggal</label>

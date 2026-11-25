@@ -35,6 +35,12 @@ class InputKetidakhadiranTest extends TestCase
      */
     private function kirim(array $timpa): TestResponse
     {
+        // Form kini menerima nama/NIP yang diketik; karyawan uji dikirim lewat NIP-nya.
+        if (isset($timpa['id_karyawan'])) {
+            $timpa['karyawan'] = DB::table('tbl_karyawan')->where('id', $timpa['id_karyawan'])->value('nip');
+            unset($timpa['id_karyawan']);
+        }
+
         return $this->from(route('hrd.absensi'))->post(route('hrd.absensi.ketidakhadiran'), [
             'tgl' => $this->hariIniDb(-1),
             'status_kehadiran' => 'Izin',
