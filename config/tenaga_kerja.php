@@ -113,14 +113,15 @@ return [
     /*
     | Aturan absensi berbasis shift & dokumentasi per jenis layanan (tbl_jenis_layanan.nama_layanan).
     |   buka_check_in_menit : check-in dibuka sekian menit sebelum jam mulai shift
-    |   interval_menit      : panjang satu periode monitoring berkala, dihitung dari JAM MULAI SHIFT
-    |   maks_upload         : unggahan per laporan/periode (1 utama + 1 koreksi)
-    |   layanan_berkala     : monitoring per jam (foto patroli / kebersihan)
-    |   layanan_perjalanan  : monitoring dinamis per tahapan perjalanan + P2H kendaraan
+    |   maks_upload         : unggahan per laporan (1 utama + 1 koreksi foto)
+    |   layanan_berkala     : laporan foto monitoring yang dapat dikirim kapan saja selama sesi (patroli / kebersihan)
+    |   layanan_perjalanan  : catatan perjalanan (keterangan + foto) + P2H kendaraan
+    | Toleransi keterlambatan (trigger trg_validasi_absen_masuk): telat 1–30 menit tetap Hadir dengan 0 menit
+    | terlambat; mulai 31 menit berstatus Terlambat dan SELURUH menit telat dicatat.
+    | jam_lembur dibulatkan ke bawah per jam penuh (trigger trg_auto_hitung_lembur), mis. 1 jam 50 menit = 1 jam.
     */
     'absensi' => [
         'buka_check_in_menit' => 30,
-        'interval_menit' => 60,
         'maks_upload' => 2,
         'layanan_berkala' => ['Satpam', 'Cleaning Service'],
         'layanan_perjalanan' => ['Driver'],

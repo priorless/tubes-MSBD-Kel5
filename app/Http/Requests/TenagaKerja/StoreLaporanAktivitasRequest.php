@@ -3,13 +3,11 @@
 namespace App\Http\Requests\TenagaKerja;
 
 use App\Http\Controllers\TenagaKerjaController;
-use App\Services\LaporanAktivitasService;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
- * Bentuk isian laporan aktivitas. Periode monitoring, sesi aktif, dan batas unggahan diputuskan
+ * Bentuk isian laporan aktivitas (foto + keterangan). Sesi aktif, nomor urut, dan batas unggahan diputuskan
  * LaporanAktivitasService dengan waktu server — tidak pernah dikirim dari form.
  */
 class StoreLaporanAktivitasRequest extends FormRequest
@@ -27,7 +25,6 @@ class StoreLaporanAktivitasRequest extends FormRequest
         return [
             'foto' => TenagaKerjaController::aturanFoto(),
             'keterangan' => ['required', 'string', 'min:3', 'max:500'],
-            'tahapan' => ['nullable', 'string', Rule::in(array_keys(LaporanAktivitasService::TAHAPAN_PERJALANAN))],
         ];
     }
 
@@ -42,7 +39,6 @@ class StoreLaporanAktivitasRequest extends FormRequest
             'keterangan.required' => 'Keterangan laporan wajib diisi.',
             'keterangan.min' => 'Keterangan laporan minimal :min karakter.',
             'keterangan.max' => 'Keterangan laporan maksimal :max karakter.',
-            'tahapan.in' => 'Pilih tahapan perjalanan yang valid.',
         ];
     }
 }

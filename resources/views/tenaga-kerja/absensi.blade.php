@@ -42,9 +42,7 @@
             <h1 class="tk-heading text-2xl font-extrabold text-gray-900 sm:text-3xl">
                 <span id="tkSapaan">Halo</span>, {{ $namaKaryawan }}
             </h1>
-            <p class="mt-1 text-sm text-gray-500">
-                Catat kehadiran, pantau aktivitas kerja, dan kelola jadwal shift Anda.
-            </p>
+           
         </div>
 
         {{-- Kotak Jam Server Ringkas di Kanan Atas --}}
@@ -75,7 +73,7 @@
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2.5">
                         <h2 class="card-title text-lg font-bold text-gray-900">Aksi Kehadiran</h2>
-                        <span class="text-[11px] text-gray-400 transition-opacity group-hover:opacity-0">&middot; Arahkan kursor untuk aturan</span>
+                        
                     </div>
                     <span class="badge" id="tkStatusBadge"><span id="tkStatusLabel">{{ $label[$status] }}</span></span>
                 </div>
@@ -90,9 +88,7 @@
                                     Check-in dibuka sejak <b>{{ $shiftAktif->bukaCheckIn()->format('H:i') }} WIB</b>.
                                 </p>
                             @else
-                                <p class="mt-1 text-sm text-gray-500">
-                                    Unggah foto selfie berlokasi saat Anda mulai bekerja.
-                                </p>
+                                
                             @endif
                         </div>
 
@@ -151,14 +147,7 @@
                     </div>
                 </div>
 
-                {{-- Keterangan Panjang: Sembunyi secara default, muncul saat hover ke kartu --}}
-                <div class="grid grid-rows-[0fr] opacity-0 transition-all duration-300 ease-out group-hover:mt-4 group-hover:grid-rows-[1fr] group-hover:opacity-100">
-                    <div class="overflow-hidden">
-                        <p class="rounded-lg bg-gray-50 px-3.5 py-2.5 text-xs leading-relaxed text-gray-500" id="tkInfoLokasi">
-                            Check-in dibuka {{ (int) config('tenaga_kerja.absensi.buka_check_in_menit', 30) }} menit sebelum shift dimulai dan hanya untuk shift Anda yang dijadwalkan Operasional. Wajib mengunggah foto wajah disertai keterangan tanggal, jam, dan lokasi.
-                        </p>
-                    </div>
-                </div>
+                
             </section>
 
             {{-- 2. Dokumentasi & Monitoring Aktivitas per Jam / Perjalanan --}}
@@ -359,13 +348,13 @@
         </div>
     </dialog>
 
-    {{-- ===================== Tukar shift: dipindah ke halaman tersendiri ===================== --}}
+    {{-- ===================== Backup shift: halaman tersendiri ===================== --}}
     <a href="{{ route('tenaga-kerja.tukar-shift.index') }}" class="tk-reveal card group flex items-center justify-between gap-4 p-5 transition hover:border-sji-biru hover:shadow-md">
         <div>
             <p class="tk-heading flex items-center gap-2 font-bold text-gray-800">
-                Tukar Shift dengan Rekan
+                Backup Shift dengan Rekan
             </p>
-            <p class="text-sm text-gray-500">Ajukan atau batalkan pertukaran shift dengan rekan satu layanan di lokasi yang sama</p>
+            <p class="text-sm text-gray-500">Minta rekan sejabatan menggantikan shift Anda, atau tanggapi permintaan rekan</p>
         </div>
         <span class="text-gray-400 transition group-hover:translate-x-1 group-hover:text-sji-biru">&rarr;</span>
     </a>

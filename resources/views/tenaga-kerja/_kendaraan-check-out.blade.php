@@ -9,12 +9,6 @@
         <p class="mt-1 text-sm text-gray-500">Isi setelah kendaraan kembali ke kantor. Foto diri diunggah setelah menekan tombol Check-out.</p>
     </div>
 
-    @unless ($monitoring['perjalananSelesai'])
-        <div class="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            Laporan perjalanan belum diselesaikan. Kirim laporan tahapan <b>{{ LaporanAktivitasService::TAHAPAN_PERJALANAN[LaporanAktivitasService::TAHAPAN_SELESAI] }}</b> sebelum check-out.
-        </div>
-    @endunless
-
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
             <span class="form-label">Kondisi akhir kendaraan <span class="text-red-600">*</span></span>

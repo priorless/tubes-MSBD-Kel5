@@ -127,46 +127,31 @@ class InvoiceKlienService
     }
 
     /**
-     * Tukar Shift (barter) yang disetujui Operasional untuk karyawan klien ini pada periode invoice.
-     * Tiap pertukaran menghasilkan dua catatan "A menggantikan B" (tanpa biaya tambahan).
+     * Backup shift yang disetujui Operasional pada jadwal karyawan klien ini selama periode invoice.
+     * Tiap pengajuan menghasilkan satu catatan "Rekan menggantikan Pengaju" (tanpa biaya tambahan).
      *
      * @return list<array{tanggal: string, teks: string}>
      */
     private function catatanTukarShift(int $idKlien, CarbonImmutable $awal, CarbonImmutable $akhir): array
     {
-        if (! Schema::hasTable('tbl_pertukaran_shift') || ! Schema::hasColumn('tbl_pertukaran_shift', 'tanggal_kerja_rekan')) {
+        if (! Schema::hasTable('tbl_pertukaran_shift') || ! Schema::hasColumn('tbl_jadwal_kerja', 'id_karyawan_pengganti')) {
             return [];
         }
 
-        $mulai = $awal->toDateString();
-        $selesai = $akhir->toDateString();
-
-        $daftar = DB::table('tbl_pertukaran_shift as ps')
+        $catatan = DB::table('tbl_pertukaran_shift as ps')
             ->join('tbl_jadwal_kerja as jp', 'jp.id', '=', 'ps.id_jadwal_pengaju')
             ->join('tbl_penempatan as pp', 'pp.id', '=', 'jp.id_penempatan')
             ->join('tbl_karyawan as kp', 'kp.id', '=', 'ps.id_karyawan_pengaju')
             ->join('tbl_karyawan as kr', 'kr.id', '=', 'ps.id_karyawan_rekan')
             ->where('ps.status', PertukaranShiftService::STATUS_DISETUJUI)
             ->where('pp.id_klien', $idKlien)
-            ->where(fn ($q) => $q->whereBetween('ps.tanggal_kerja', [$mulai, $selesai])
-                ->orWhereBetween('ps.tanggal_kerja_rekan', [$mulai, $selesai]))
-            ->get(['ps.tanggal_kerja', 'ps.tanggal_kerja_rekan', 'ps.snapshot_pengaju', 'ps.snapshot_rekan',
-                'kp.nama as nama_pengaju', 'kr.nama as nama_rekan']);
-
-        $catatan = [];
-        foreach ($daftar as $item) {
-            $tanggalRekan = (string) ($item->tanggal_kerja_rekan ?? $item->tanggal_kerja);
-            $tanggalPengaju = (string) $item->tanggal_kerja;
-
-            if ($tanggalRekan >= $mulai && $tanggalRekan <= $selesai) {
-                $catatan[] = ['tanggal' => $tanggalRekan, 'teks' => sprintf('%s menggantikan %s (%s)',
-                    $item->nama_pengaju, $item->nama_rekan, $this->pertukaranShift->labelShift($item->snapshot_rekan))];
-            }
-            if ($tanggalPengaju >= $mulai && $tanggalPengaju <= $selesai) {
-                $catatan[] = ['tanggal' => $tanggalPengaju, 'teks' => sprintf('%s menggantikan %s (%s)',
-                    $item->nama_rekan, $item->nama_pengaju, $this->pertukaranShift->labelShift($item->snapshot_pengaju))];
-            }
-        }
+            ->whereBetween('ps.tanggal_kerja', [$awal->toDateString(), $akhir->toDateString()])
+            ->get(['ps.tanggal_kerja', 'ps.snapshot_pengaju', 'kp.nama as nama_pengaju', 'kr.nama as nama_rekan'])
+            ->map(fn (object $item): array => [
+                'tanggal' => (string) $item->tanggal_kerja,
+                'teks' => sprintf('%s menggantikan %s (%s)', $item->nama_rekan, $item->nama_pengaju, $this->pertukaranShift->labelShift($item->snapshot_pengaju)),
+            ])
+            ->all();
 
         usort($catatan, fn (array $a, array $b): int => [$a['tanggal'], $a['teks']] <=> [$b['tanggal'], $b['teks']]);
 

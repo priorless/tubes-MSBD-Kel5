@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\MenanganiSignalDatabase;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hrd\StoreKaryawanRequest;
 use App\Http\Requests\Hrd\UpdateKaryawanRequest;
+use App\Models\User;
 use App\Services\GajiPokokLapanganService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +15,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -23,6 +25,38 @@ class KaryawanController extends Controller
 
     public function index(Request $request): View
     {
+        $periodeGaji = now();
+        $awalPeriode = $periodeGaji->copy()->startOfMonth()->toDateString();
+        $akhirPeriode = $periodeGaji->copy()->endOfMonth()->toDateString();
+        $komponenGajiSql = 'NULL';
+        $komponenGajiBindings = [];
+
+        if (Schema::hasTable('tbl_komponen_gaji') && Schema::hasColumn('tbl_komponen_gaji', 'gaji_pokok')) {
+            $komponenGajiSql = '(SELECT cg.gaji_pokok
+                FROM tbl_komponen_gaji cg
+                WHERE cg.id_karyawan = k.id AND cg.gaji_pokok IS NOT NULL
+                  AND cg.periode_tahun * 12 + cg.periode_bulan <= ?
+                ORDER BY cg.periode_tahun DESC, cg.periode_bulan DESC
+                LIMIT 1)';
+            $komponenGajiBindings[] = $periodeGaji->year * 12 + $periodeGaji->month;
+        }
+
+        $kontrakGajiSql = 'NULL';
+        $kontrakGajiBindings = [];
+
+        if (Schema::hasTable('tbl_kontrak') && Schema::hasTable('tbl_penempatan')) {
+            $kontrakGajiSql = '(SELECT c.gaji_pokok
+                FROM tbl_kontrak c
+                JOIN tbl_penempatan p ON p.id = c.id_penempatan
+                WHERE p.id_karyawan = k.id AND p.tgl_mulai <= ?
+                  AND (p.tgl_selesai IS NULL OR p.tgl_selesai >= ?)
+                ORDER BY p.tgl_mulai DESC, p.id DESC, c.id DESC
+                LIMIT 1)';
+            $kontrakGajiBindings = [$akhirPeriode, $awalPeriode];
+        }
+
+        $gajiTampilBindings = ['Internal', ...$komponenGajiBindings, ...$kontrakGajiBindings];
+
         $karyawan = DB::table('tbl_karyawan as k')
             ->leftJoin('tbl_jenis_layanan as jl', 'jl.id', '=', 'k.id_jenis_layanan')
             ->leftJoin('tbl_users as u', 'u.id_karyawan', '=', 'k.id')
@@ -34,6 +68,10 @@ class KaryawanController extends Controller
             ->when($request->filled('status'), fn ($query) => $query->where('k.status', $request->string('status')))
             ->orderByDesc('k.id')
             ->select('k.*', 'jl.nama_layanan', 'u.username')
+            ->selectRaw(
+                'CASE WHEN k.kategori = ? THEN k.gaji_pokok ELSE COALESCE('.$komponenGajiSql.', '.$kontrakGajiSql.') END AS gaji_pokok_tampil',
+                $gajiTampilBindings,
+            )
             ->paginate(15)
             ->withQueryString();
 
@@ -133,22 +171,20 @@ class KaryawanController extends Controller
     {
         $data = DB::table('tbl_karyawan')->where('id', $karyawan)->firstOrFail();
 
+        if (UpdateKaryawanRequest::punyaPenempatanAktif($karyawan)) {
+            return back()->with('error', "Karyawan {$data->nama} masih memiliki penempatan aktif. Selesaikan penempatannya terlebih dahulu.");
+        }
+
         try {
             DB::transaction(function () use ($karyawan): void {
-                DB::table('tbl_users')->where('id_karyawan', $karyawan)->delete();
-                DB::table('tbl_karyawan')->where('id', $karyawan)->delete();
+                DB::table('tbl_users')->where('id_karyawan', $karyawan)->update(['status' => User::StatusNonaktif]);
+                DB::table('tbl_karyawan')->where('id', $karyawan)->update(['status' => 'Nonaktif']);
             });
         } catch (QueryException $exception) {
-            if ($this->masihDirujuk($exception)) {
-                return back()->with('error', "Karyawan {$data->nama} tidak dapat dihapus karena sudah memiliki riwayat (sertifikat, penempatan, absensi, atau payroll).");
-            }
-
             return $this->kembaliDenganError($exception);
         }
 
-        $this->hapusBerkas($data->foto);
-
-        return redirect()->route('hrd.karyawan.index')->with('success', "Karyawan {$data->nama} berhasil dihapus.");
+        return redirect()->route('hrd.karyawan.index')->with('success', "Karyawan {$data->nama} berhasil dinonaktifkan.");
     }
 
     /**

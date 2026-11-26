@@ -250,6 +250,7 @@ class OperasionalController extends Controller
         }
 
         try {
+            // Pengajuan backup shift yang terdampak rotasi dibatalkan trigger trg_penempatan_batalkan_backup.
             DatabaseService::callRotasiKaryawan(
                 $validated['id_penempatan_lama'],
                 $validated['id_klien_baru'],

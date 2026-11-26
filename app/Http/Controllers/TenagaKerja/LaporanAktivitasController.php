@@ -14,8 +14,8 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 
 /**
- * Laporan aktivitas selama sesi absensi: monitoring per jam (Satpam & Cleaning Service)
- * dan laporan tahapan perjalanan (Driver). Pelapor selalu karyawan yang sedang login.
+ * Laporan aktivitas selama sesi absensi: monitoring kapan saja (Satpam & Cleaning Service)
+ * dan catatan perjalanan (Driver). Pelapor selalu karyawan yang sedang login.
  */
 class LaporanAktivitasController extends Controller
 {
@@ -30,7 +30,6 @@ class LaporanAktivitasController extends Controller
                 $tenagaKerja->namaLayanan($idKaryawan),
                 (string) $request->file('foto')->get(),
                 trim($validated['keterangan']),
-                $validated['tahapan'] ?? null,
             );
 
             return 'Laporan aktivitas berhasil dikirim.';
@@ -50,7 +49,7 @@ class LaporanAktivitasController extends Controller
                 filled($validated['keterangan'] ?? null) ? trim($validated['keterangan']) : null,
             );
 
-            return 'Foto koreksi berhasil diunggah. Kesempatan unggah untuk laporan ini sudah habis.';
+            return 'Koreksi foto berhasil diunggah.';
         });
     }
 

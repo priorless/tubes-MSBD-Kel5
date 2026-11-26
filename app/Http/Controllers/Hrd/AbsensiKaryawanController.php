@@ -51,6 +51,7 @@ class AbsensiKaryawanController extends Controller
                 'tab' => 'harian',
                 'tanggal' => $tanggal,
                 'absensi' => null,
+                'payrollDibuat' => [],
                 'ringkasan' => null,
                 'belumAbsen' => collect(),
                 'daftarLayanan' => $daftarLayanan,
@@ -73,11 +74,20 @@ class AbsensiKaryawanController extends Controller
             ->orderBy('jam_masuk')
             ->paginate(20)
             ->withQueryString();
+        $periode = Carbon::parse($tanggal);
+        $payrollDibuat = DB::table('tbl_payroll')
+            ->whereIn('id_karyawan', $absensi->getCollection()->pluck('id_karyawan')->unique())
+            ->where('periode_bulan', $periode->month)
+            ->where('periode_tahun', $periode->year)
+            ->pluck('id_karyawan')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
 
         return view('hrd.absensi.index', [
             'tab' => 'harian',
             'tanggal' => $tanggal,
             'absensi' => $absensi,
+            'payrollDibuat' => $payrollDibuat,
             'ringkasan' => $this->queryHarian($tanggal)->selectRaw("
                 COUNT(*) AS total,
                 COALESCE(SUM(status_kehadiran = 'Terlambat'), 0) AS terlambat,
@@ -90,6 +100,25 @@ class AbsensiKaryawanController extends Controller
         ]);
     }
 
+    public function show(Request $request, int $absensi): View
+    {
+        abort_unless(Schema::hasView('v_absensi_harian'), 503, 'Data absensi belum tersedia.');
+
+        $baris = DB::table('v_absensi_harian')->where('id_absensi', $absensi)->first();
+        abort_if($baris === null, 404);
+
+        $periode = Carbon::parse($baris->tgl);
+        $payrollDibuat = DB::table('tbl_payroll')
+            ->where('id_karyawan', $baris->id_karyawan)
+            ->where('periode_bulan', $periode->month)
+            ->where('periode_tahun', $periode->year)
+            ->exists();
+
+        return view('hrd.absensi.detail', [
+            'baris' => $baris,
+            'payrollDibuat' => $payrollDibuat,
+        ]);
+    }
     public function exportPdf(Request $request): Response
     {
         abort_unless(Schema::hasView('v_absensi_harian'), 503, 'Data absensi belum tersedia.');

@@ -5,6 +5,7 @@ namespace App\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class JadwalKerjaService
@@ -424,6 +425,14 @@ class JadwalKerjaService
             return $idJadwal;
         }
 
+        $this->pastikanTidakSedangDiajukanBackup($jadwalLama);
+
+        // Jadwal yang dijadikan Libur tidak lagi punya pengganti (backup shift ikut berakhir).
+        if (($nilaiJadwal['status'] ?? null) === 'Libur' && ($jadwalLama->id_karyawan_pengganti ?? null) !== null) {
+            $nilaiJadwal['id_karyawan_pengganti'] = null;
+            $dataRiwayat['id_karyawan_pengganti'] = null;
+        }
+
         DB::table('tbl_jadwal_kerja')
             ->where('id', $jadwalLama->id)
             ->update([
@@ -456,52 +465,23 @@ class JadwalKerjaService
     }
 
     /**
-     * Memindahkan satu jadwal ke tanggal baru sekaligus mengganti isi shift-nya, tanpa mengubah
-     * id_penempatan. Dipakai pertukaran shift; pemanggil wajib memastikan tanggal baru belum
-     * terisi jadwal lain pada penempatan yang sama (unique id_penempatan + tanggal_kerja).
-     *
-     * @param  array<string, mixed>  $nilaiJadwal
-     * @param  array<string, mixed>  $sumberRiwayat
+     * Jadwal yang sedang diajukan untuk backup shift (Menunggu) dikunci sampai pengajuannya selesai,
+     * agar rekan dan Operasional memutuskan shift yang sama dengan yang diajukan. Trigger
+     * trg_cek_jadwal_kerja_update menjaga aturan yang sama di database.
      */
-    public function tukarTanggalDanNilai(
-        object $jadwalLama,
-        string $tanggalBaru,
-        array $nilaiJadwal,
-        int $idUser,
-        array $sumberRiwayat = [],
-    ): void {
-        $sebelum = [
-            'id_penempatan' => (int) $jadwalLama->id_penempatan,
-            'tanggal_kerja' => (string) $jadwalLama->tanggal_kerja,
-            ...$this->snapshot($jadwalLama),
-        ];
+    private function pastikanTidakSedangDiajukanBackup(object $jadwal): void
+    {
+        $sedangDiajukan = Schema::hasTable('tbl_pertukaran_shift') && DB::table('tbl_pertukaran_shift')
+            ->where('id_jadwal_pengaju', $jadwal->id)
+            ->where('status', 'Menunggu')
+            ->exists();
 
-        $sesudah = [
-            'id_penempatan' => (int) $jadwalLama->id_penempatan,
-            'tanggal_kerja' => $tanggalBaru,
-            ...$nilaiJadwal,
-        ];
-
-        if ($sumberRiwayat !== []) {
-            $sesudah['sumber'] = $sumberRiwayat;
-        }
-
-        DB::table('tbl_jadwal_kerja')
-            ->where('id', $jadwalLama->id)
-            ->update([
-                ...$nilaiJadwal,
-                'tanggal_kerja' => $tanggalBaru,
-                'diubah_oleh' => $idUser,
-                'updated_at' => now(),
+        if ($sedangDiajukan) {
+            throw ValidationException::withMessages([
+                'jadwal' => 'Jadwal '.CarbonImmutable::parse((string) $jadwal->tanggal_kerja)->format('d/m/Y')
+                    .' sedang diajukan untuk backup shift. Proses pengajuan tersebut terlebih dahulu di tab Pengajuan Backup Shift.',
             ]);
-
-        $this->catatRiwayat(
-            (int) $jadwalLama->id,
-            'Diubah',
-            $sebelum,
-            $sesudah,
-            $idUser,
-        );
+        }
     }
 
     /**

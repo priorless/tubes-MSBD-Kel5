@@ -10,7 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Karyawan mengajukan tukar shift dari menu Tukar Shift. Pengaju selalu karyawan yang sedang login.
+ * Karyawan meminta rekan menggantikan (backup) satu jadwal Kerja miliknya. Pengaju selalu karyawan yang login.
  */
 class PengajuanTukarShiftController extends Controller
 {
@@ -19,7 +19,7 @@ class PengajuanTukarShiftController extends Controller
         $kembali = redirect()->route('tenaga-kerja.tukar-shift.index');
 
         if (! $pertukaranShiftService->tersedia()) {
-            return $kembali->with('gagal', 'Fitur tukar shift belum tersedia. Hubungi bagian Operasional.');
+            return $kembali->with('gagal', 'Fitur backup shift belum tersedia. Hubungi bagian Operasional.');
         }
 
         $validated = $request->validated();
@@ -27,15 +27,16 @@ class PengajuanTukarShiftController extends Controller
         try {
             $pertukaranShiftService->ajukan(
                 (int) KaryawanAktif::id(),
+                (int) $validated['id_jadwal'],
                 (int) $validated['id_karyawan_rekan'],
-                $validated['tanggal_kerja'],
                 trim($validated['alasan']),
-                $validated['tanggal_kerja_rekan'] ?? null,
             );
         } catch (ValidationException $exception) {
-            return $kembali->withInput()->with('gagal', $exception->validator->errors()->first());
+            return redirect()->route('tenaga-kerja.tukar-shift.index', ['id_jadwal' => $validated['id_jadwal']])
+                ->withInput()
+                ->with('gagal', $exception->validator->errors()->first());
         }
 
-        return $kembali->with('sukses', 'Pengajuan tukar shift terkirim dan menunggu persetujuan Operasional.');
+        return $kembali->with('sukses', 'Permintaan backup shift terkirim. Menunggu tanggapan rekan, lalu persetujuan Operasional.');
     }
 }

@@ -149,23 +149,6 @@ class KlienController extends Controller
         return redirect()->route($this->ruteKlien().'.show', $existingClient->id)->with('success', 'Data klien berhasil diperbarui.');
     }
 
-    public function destroy(int $klien): RedirectResponse
-    {
-        $existingClient = DB::table('tbl_klien')->where('id', $klien)->firstOrFail();
-
-        try {
-            DB::table('tbl_klien')->where('id', $existingClient->id)->delete();
-        } catch (QueryException $exception) {
-            if ((string) ($exception->errorInfo[0] ?? $exception->getCode()) !== '23000') {
-                throw $exception;
-            }
-
-            return back()->with('error', 'Klien tidak dapat dihapus karena masih digunakan pada data operasional.');
-        }
-
-        return redirect()->route($this->ruteKlien().'.index')->with('success', 'Data klien berhasil dihapus.');
-    }
-
     /**
      * Prefix nama route Data Klien sesuai modul yang membuka halaman. Controller ini dipakai bersama oleh
      * Operasional (operasional.klien.*) dan HRD (hrd.klien.*) agar data dan aturannya tetap satu sumber.

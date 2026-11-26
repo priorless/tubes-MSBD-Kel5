@@ -4,6 +4,7 @@ namespace Tests\Feature\TenagaKerja;
 
 use App\Models\Role;
 use App\Services\PertukaranShiftService;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\MemakaiDatabaseSji;
 use Tests\TestCase;
@@ -92,24 +93,31 @@ class JadwalAbsensiHarianTest extends TestCase
         $this->assertSame(2, (int) $absensi->jam_lembur);
     }
 
-    public function test_jadwal_hasil_pertukaran_shift_yang_disetujui_menjadi_acuan(): void
+    public function test_backup_shift_yang_disetujui_dikerjakan_rekan_pada_penempatan_pengaju(): void
     {
         [$idPengaju, $idPenempatanPengaju] = $this->karyawanDitempatkan();
         [$idRekan, $idPenempatanRekan] = $this->karyawanDitempatkan();
         $tanggal = $this->hariIniDb(2);
-        $this->buatJadwal($idPenempatanPengaju, $tanggal, 'Kerja', '07:00', '15:00');
-        $this->buatJadwal($idPenempatanRekan, $tanggal, 'Kerja', '15:00', '23:00');
+        $idJadwal = $this->buatJadwal($idPenempatanPengaju, $tanggal, 'Kerja', '07:00', '15:00');
+        $this->buatJadwal($idPenempatanRekan, $tanggal, 'Libur');
 
         $layanan = app(PertukaranShiftService::class);
-        $idPengajuan = $layanan->ajukan($idPengaju, $idRekan, $tanggal, 'Ada keperluan keluarga pada pagi hari.');
+        $idPengajuan = $layanan->ajukan($idPengaju, $idJadwal, $idRekan, 'Ada keperluan keluarga pada pagi hari.');
+        $layanan->tanggapiRekan($idPengajuan, $idRekan, true, null);
         $layanan->setujui($idPengajuan, $this->loginSebagai(Role::Operasional)->id);
 
-        $pengaju = $this->checkIn($idPengaju, $tanggal, '15:05:00');
-        $rekan = $this->checkIn($idRekan, $tanggal, '07:40:00');
+        $idAbsensiRekan = $this->buatAbsensi($idRekan, $tanggal, 'Hadir', ['jam_masuk' => '07:40:00', 'id_penempatan' => $idPenempatanPengaju]);
+        $rekan = DB::table('tbl_absensi')->where('id', $idAbsensiRekan)->first();
 
-        $this->assertSame('Hadir', $pengaju->status_kehadiran);
         $this->assertSame('Terlambat', $rekan->status_kehadiran);
         $this->assertSame(40, (int) $rekan->menit_terlambat);
+
+        try {
+            $this->checkIn($idPengaju, $tanggal, '07:00:00');
+            $this->fail('Pengaju yang sudah digantikan seharusnya tidak dapat absen.');
+        } catch (QueryException $e) {
+            $this->assertStringContainsString('sudah digantikan rekan', $e->getMessage());
+        }
     }
 
     public function test_view_absensi_harian_menampilkan_jadwal_efektif_dan_sumbernya(): void

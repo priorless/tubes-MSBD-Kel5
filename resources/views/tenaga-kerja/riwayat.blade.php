@@ -30,6 +30,40 @@
     @endforeach
 </div>
 
+{{-- ===================== Hari wajib (roster) vs kehadiran ===================== --}}
+@if ($kehadiran && $periodeHarian)
+    <section class="tk-reveal card mb-6 p-6">
+        <h2 class="card-title text-lg font-bold text-gray-900">
+            Hari Wajib Kerja vs Kehadiran
+            <span class="font-normal text-gray-400">({{ FormatKolom::namaBulan($periodeHarian['bulan']) }} {{ $periodeHarian['tahun'] }})</span>
+        </h2>
+        
+        <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-5">
+            @foreach ([
+                ['Hari Wajib', $kehadiran['hari_wajib'], 'text-sji-biru'],
+                ['Hadir', $kehadiran['hadir'], 'text-emerald-600'],
+                ['Izin / Sakit', $kehadiran['izin'] + $kehadiran['sakit'], 'text-sky-600'],
+                ['Alpha (Tanpa Keterangan)', $kehadiran['alpha'], 'text-red-500'],
+                ['Belum Berjalan', $kehadiran['belum_berjalan'], 'text-gray-500'],
+            ] as [$label, $nilai, $warnaAngka])
+                <div class="rounded-xl bg-gray-50 p-4">
+                    <p class="text-xs font-medium text-gray-500">{{ $label }}</p>
+                    <p class="mt-1 text-2xl font-bold {{ $warnaAngka }}">{{ $nilai }}</p>
+                </div>
+            @endforeach
+        </div>
+        @php $tanggalAlpha = collect($kehadiran['harian'])->where('keterangan_hadir', 'Alpha (tanpa keterangan)')->pluck('tanggal'); @endphp
+        @if ($tanggalAlpha->isNotEmpty())
+            <p class="mt-3 text-sm text-red-600">
+                Tanpa absensi pada: {{ $tanggalAlpha->map(fn ($t) => FormatKolom::tanggal($t, 'd M'))->implode(', ') }}.
+            </p>
+        @endif
+        @if ($kehadiran['hadir_luar_roster'] > 0)
+            <p class="mt-1 text-sm text-gray-500">{{ $kehadiran['hadir_luar_roster'] }} hari hadir di luar roster (jadwal penempatan).</p>
+        @endif
+    </section>
+@endif
+
 {{-- ===================== Filter per periode ===================== --}}
 <section class="tk-reveal card mb-6 p-6">
     <form method="GET" action="{{ route('tenaga-kerja.riwayat') }}" class="grid grid-cols-2 items-end gap-4 md:grid-cols-12" id="tkFormFilter">
@@ -51,10 +85,12 @@
             @if ($adaFilter)
                 <a href="{{ route('tenaga-kerja.riwayat') }}" class="btn-secondary">Reset</a>
             @endif
-            <a href="{{ route('tenaga-kerja.riwayat.unduh', array_filter(['tahun' => $tahun, 'bulan' => $bulan])) }}"
-               class="btn-secondary md:ml-auto" data-no-transisi>
-                Unduh CSV
-            </a>
+            @if ($periodeHarian)
+                <a href="{{ route('tenaga-kerja.riwayat.unduh', $periodeHarian) }}"
+                   class="btn-secondary md:ml-auto" data-no-transisi>
+                    Unduh Rekap PDF ({{ FormatKolom::namaBulan($periodeHarian['bulan']) }} {{ $periodeHarian['tahun'] }})
+                </a>
+            @endif
         </div>
     </form>
 </section>

@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Pengaju membatalkan pengajuan tukar shift miliknya yang masih Menunggu.
+ * Pengaju membatalkan permintaan backup shift miliknya yang masih Menunggu.
  * Pengajuan milik orang lain ditolak oleh service.
  */
 class PembatalanTukarShiftController extends Controller
@@ -20,7 +20,7 @@ class PembatalanTukarShiftController extends Controller
         $kembali = redirect()->route('tenaga-kerja.tukar-shift.index');
 
         if (! $pertukaranShiftService->tersedia()) {
-            return $kembali->with('gagal', 'Fitur tukar shift belum tersedia. Hubungi bagian Operasional.');
+            return $kembali->with('gagal', 'Fitur backup shift belum tersedia. Hubungi bagian Operasional.');
         }
 
         try {
@@ -29,6 +29,6 @@ class PembatalanTukarShiftController extends Controller
             return $kembali->with('gagal', $exception->validator->errors()->first());
         }
 
-        return $kembali->with('sukses', 'Pengajuan tukar shift dibatalkan. Jadwal Anda tetap seperti semula.');
+        return $kembali->with('sukses', 'Permintaan backup shift dibatalkan. Jadwal Anda tetap seperti semula.');
     }
 }

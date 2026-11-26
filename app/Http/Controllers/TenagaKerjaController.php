@@ -15,13 +15,16 @@ use App\Support\KaryawanAktif;
 use App\Support\KolomTidakDitemukan;
 use App\Support\LabelBpjs;
 use App\Support\ShiftAbsensi;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\View\View;
 
 /**
  * Modul Tenaga Kerja — Employee Self-Service (Orang 4).
@@ -62,15 +65,16 @@ class TenagaKerjaController extends Controller
 
     /**
      * Data shift & monitoring untuk halaman Absensi. Kegagalan di sini tidak boleh mengganggu absensi.
+     * Laporan monitoring (Berkala maupun Perjalanan) dapat dikirim kapan saja selama sesi berjalan.
      *
      * @return array{jenis: string|null, tersedia: bool, shift: ShiftAbsensi|null, statusJadwal: string|null,
-     *     pesanJadwal: string|null, jendela: string|null, periode: list<array<string, mixed>>, laporan: Collection<int, object>,
-     *     p2h: array{p2h: object, item: Collection<string, object>}|null, perjalananSelesai: bool, muatUlangPada: string|null}
+     *     pesanJadwal: string|null, jendela: string|null, laporan: Collection<int, object>,
+     *     p2h: array{p2h: object, item: Collection<string, object>}|null, muatUlangPada: string|null}
      */
     private function dataMonitoring(JadwalAbsensiService $jadwal, LaporanAktivitasService $laporan, JamServer $jam, int $idKaryawan, ?object $hariIni): array
     {
         $hasil = ['jenis' => null, 'tersedia' => false, 'shift' => null, 'statusJadwal' => null, 'pesanJadwal' => null, 'jendela' => null,
-            'periode' => [], 'laporan' => collect(), 'p2h' => null, 'perjalananSelesai' => true, 'muatUlangPada' => null];
+            'laporan' => collect(), 'p2h' => null, 'muatUlangPada' => null];
 
         try {
             $sekarang = $jam->sekarang();
@@ -96,18 +100,12 @@ class TenagaKerjaController extends Controller
                 }
             }
 
-            if ($hasil['tersedia'] && $idAbsensi !== null && $hasil['jenis'] === LaporanAktivitasService::JENIS_BERKALA) {
-                $hasil['periode'] = $laporan->periodeDenganLaporan($hariIni);
-                $berikutnya = collect($hasil['periode'])->first(fn (array $periode): bool => $periode['status'] !== JadwalAbsensiService::PERIODE_DITUTUP);
-                $hasil['muatUlangPada'] = $berikutnya === null ? null
-                    : ($berikutnya['status'] === JadwalAbsensiService::PERIODE_DIBUKA ? $berikutnya['selesai'] : $berikutnya['mulai'])->format('Y-m-d\TH:i:s');
+            if ($hasil['tersedia'] && $idAbsensi !== null && $hasil['jenis'] !== null) {
+                $hasil['laporan'] = $laporan->laporanAbsensi($idKaryawan, $idAbsensi);
             }
 
             if ($hasil['tersedia'] && $idAbsensi !== null && $hasil['jenis'] === LaporanAktivitasService::JENIS_PERJALANAN) {
-                $hasil['laporan'] = $laporan->laporanAbsensi($idKaryawan, $idAbsensi);
                 $hasil['p2h'] = $laporan->p2hAbsensi($idKaryawan, $idAbsensi);
-                $terakhir = $hasil['laporan']->last();
-                $hasil['perjalananSelesai'] = $terakhir === null || $terakhir->tahapan === LaporanAktivitasService::TAHAPAN_SELESAI;
             }
         } catch (QueryException) {
             $hasil['tersedia'] = false;
@@ -117,8 +115,9 @@ class TenagaKerjaController extends Controller
     }
 
     /**
-     * Check-in hanya untuk shift milik sendiri yang berlaku (bukan Libur / tanpa jadwal), mulai tepat
-     * 30 menit sebelum shift dimulai sampai shift berakhir — diperiksa dengan waktu server.
+     * Check-in hanya untuk shift yang berlaku bagi karyawan (miliknya sendiri atau backup shift yang ditugaskan
+     * kepadanya; bukan Libur / Digantikan / tanpa jadwal), mulai tepat 30 menit sebelum shift dimulai sampai
+     * shift berakhir — diperiksa dengan waktu server. Absensi dicatat pada penempatan shift tersebut.
      * Driver wajib melengkapi P2H (9 komponen) dan foto kendaraan; semuanya tersimpan dalam satu transaksi.
      */
     public function checkIn(Request $request, JadwalAbsensiService $jadwal, LaporanAktivitasService $laporan, FotoAbsensiService $fotoService, JamServer $jam): JsonResponse|RedirectResponse
@@ -144,7 +143,7 @@ class TenagaKerjaController extends Controller
                 };
             }
 
-            $this->db->checkIn($idKaryawan, $foto, $shift->tanggal, $lanjutan);
+            $this->db->checkIn($idKaryawan, $foto, $shift->tanggal, $lanjutan, $shift->idPenempatan);
         } catch (QueryException $e) {
             $this->hapusFotoTambahan($fotoService, $pathTambahan);
             // 1062 = UNIQUE (id_karyawan, tgl) — terjadi jika dua permintaan check-in
@@ -165,8 +164,8 @@ class TenagaKerjaController extends Controller
     }
 
     /**
-     * Check-out sesi aktif (minimal 30 menit setelah check-in — trigger database). Driver wajib foto kendaraan,
-     * kondisi akhir kendaraan, dan laporan perjalanan yang sudah diselesaikan. Setelah check-out monitoring berhenti.
+     * Check-out sesi aktif (minimal 30 menit setelah check-in — trigger database). Driver wajib foto kendaraan
+     * dan kondisi akhir kendaraan; catatan perjalanan tidak memblokir check-out. Setelah check-out monitoring berhenti.
      */
     public function checkOut(Request $request, LaporanAktivitasService $laporan, FotoAbsensiService $fotoService): JsonResponse|RedirectResponse
     {
@@ -188,7 +187,6 @@ class TenagaKerjaController extends Controller
             if ($idAbsensi !== null
                 && LaporanAktivitasService::jenisMonitoring($this->db->namaLayanan($idKaryawan)) === LaporanAktivitasService::JENIS_PERJALANAN) {
                 $akhir = $this->validasiDokumentasiKendaraan($request, awal: false);
-                $laporan->pastikanPerjalananSelesai($idKaryawan, $idAbsensi);
                 $jpegKendaraan = $fotoService->siapkan((string) $this->fotoDariRequest($request, 'foto_kendaraan'));
                 $lanjutan = function (int $idBaris, object $waktu) use ($laporan, $idKaryawan, $akhir, $jpegKendaraan, &$pathTambahan): void {
                     $pathTambahan[] = $laporan->simpanP2hAkhir($idBaris, $idKaryawan, $akhir['kondisi_akhir'],
@@ -225,18 +223,29 @@ class TenagaKerjaController extends Controller
     }
 
     /* =====================================================================
-     * Tukar Shift (Roker)
+     * Backup Shift (roker 1 arah) dan Jadwal Saya
      * ===================================================================== */
 
-    public function tukarShift(PertukaranShiftService $pertukaranShiftService)
+    /**
+     * Halaman Backup Shift: pilih jadwal sendiri -> pilih rekan pengganti yang tersedia, permintaan masuk
+     * (sebagai rekan), dan riwayat. Rekan dimuat ulang lewat parameter ?id_jadwal= agar tetap jalan tanpa JavaScript.
+     */
+    public function tukarShift(Request $request, PertukaranShiftService $pertukaranShiftService): View
     {
-        $idKaryawan = KaryawanAktif::id();
-        $data = ['tersedia' => false, 'opsi' => [], 'riwayat' => null, 'layananTukar' => $pertukaranShiftService];
+        $idKaryawan = (int) KaryawanAktif::id();
+        $idJadwal = $request->integer('id_jadwal') ?: null;
+        $data = ['tersedia' => false, 'jadwalSaya' => [], 'idJadwalDipilih' => null, 'calonRekan' => [],
+            'permintaanMasuk' => collect(), 'riwayat' => null, 'layananTukar' => $pertukaranShiftService];
 
         try {
             if ($pertukaranShiftService->tersedia()) {
                 $data['tersedia'] = true;
-                $data['opsi'] = $pertukaranShiftService->opsiPengajuan($idKaryawan);
+                $data['jadwalSaya'] = $pertukaranShiftService->jadwalDapatDiajukan($idKaryawan);
+                if ($idJadwal !== null && collect($data['jadwalSaya'])->contains('id', $idJadwal)) {
+                    $data['idJadwalDipilih'] = $idJadwal;
+                    $data['calonRekan'] = $pertukaranShiftService->calonRekan($idKaryawan, $idJadwal);
+                }
+                $data['permintaanMasuk'] = $pertukaranShiftService->permintaanMasuk($idKaryawan);
                 $data['riwayat'] = $pertukaranShiftService->riwayatKaryawan($idKaryawan);
             }
         } catch (QueryException $e) {
@@ -246,6 +255,27 @@ class TenagaKerjaController extends Controller
 
         return view('tenaga-kerja.tukar-shift', $data + $this->dataUmum());
     }
+
+    /** Jadwal Saya: roster ke depan (termasuk libur, backup, digantikan) dan riwayat perubahan jadwal. */
+    public function jadwal(JadwalAbsensiService $jadwal): View
+    {
+        $idKaryawan = (int) KaryawanAktif::id();
+        $hariIni = CarbonImmutable::now()->startOfDay();
+        $roster = [];
+        $perubahan = collect();
+
+        try {
+            $roster = $jadwal->rosterKaryawan($idKaryawan, $hariIni->toDateString(), $hariIni->addDays(self::HARI_JADWAL_KE_DEPAN - 1)->toDateString());
+            $perubahan = $this->db->perubahanJadwal($idKaryawan, $hariIni->subDays(30)->toDateString());
+        } catch (QueryException $e) {
+            session()->now('gagal', TenagaKerjaService::pesanError($e));
+        }
+
+        return view('tenaga-kerja.jadwal', ['roster' => $roster, 'perubahan' => $perubahan] + $this->dataUmum());
+    }
+
+    /** Jumlah hari roster yang ditampilkan di Jadwal Saya. */
+    private const int HARI_JADWAL_KE_DEPAN = 7;
 
     /** Primary key baris absensi (kolom sesuai config), atau null. */
     private function idBaris(?object $baris): ?int
@@ -410,7 +440,7 @@ class TenagaKerjaController extends Controller
         return $hasil;
     }
 
-    /** Balasan JSON (untuk tombol AJAX) atau redirect + notifikasi (tanpa JavaScript). */
+    /** Balasan JSON (untuk tombol AJAX) atau redirect + pesan hasil (tanpa JavaScript). */
     private function balasAbsensi(Request $request, bool $ok, string $pesan, ?object $baris = null): JsonResponse|RedirectResponse
     {
         if ($request->expectsJson()) {
@@ -466,8 +496,8 @@ class TenagaKerjaController extends Controller
 
     /**
      * Waktu check-in → ISO 8601, untuk penghitung durasi di browser.
-     * Tanggal diambil dari baris absensi itu sendiri (diisi CURDATE() database),
-     * BUKAN dari jam PHP, karena zona waktu aplikasi (UTC) berbeda dengan database.
+     * Tanggal diambil dari baris absensi itu sendiri (diisi CURDATE() database), sehingga shift malam
+     * yang lewat tengah malam tetap memakai tanggal shift-nya.
      */
     private function isoMasuk(?object $baris): ?string
     {
@@ -509,7 +539,7 @@ class TenagaKerjaController extends Controller
         ];
     }
 
-    public function riwayat(Request $request)
+    public function riwayat(Request $request, JadwalAbsensiService $jadwal)
     {
         [$tahun, $bulan] = $this->validasiPeriode($request);
         $id = KaryawanAktif::id();
@@ -520,6 +550,7 @@ class TenagaKerjaController extends Controller
         $kolomStatus = null;
         $harian = collect();
         $periodeHarian = null;
+        $kehadiran = null;
 
         try {
             $view = $this->db->tabel('rekap_absensi');
@@ -535,42 +566,53 @@ class TenagaKerjaController extends Controller
                 'bulan' => $bulan ?? (int) substr($sekarang, 5, 2),
             ];
             $harian = $this->db->absensiHarian($id, $periodeHarian['tahun'], $periodeHarian['bulan']);
+            $kehadiran = $jadwal->rekapKehadiran($id, $periodeHarian['tahun'], $periodeHarian['bulan'], substr($sekarang, 0, 10));
         } catch (QueryException $e) {
             session()->now('gagal', TenagaKerjaService::pesanError($e));
         } catch (KolomTidakDitemukan $e) {
             session()->now('gagal', $e->getMessage());
         }
 
-        return view('tenaga-kerja.riwayat', compact('riwayat', 'rekap', 'kolom', 'kolomStatus', 'tahun', 'bulan', 'harian', 'periodeHarian')
-            + $this->dataUmum());
+        return view('tenaga-kerja.riwayat', compact('riwayat', 'rekap', 'kolom', 'kolomStatus', 'tahun', 'bulan', 'harian',
+            'periodeHarian', 'kehadiran') + $this->dataUmum());
     }
 
-    /** Unduh riwayat absensi milik sendiri sebagai CSV (bisa dibuka di Excel). */
-    public function riwayatCsv(Request $request): StreamedResponse|RedirectResponse
+    /**
+     * Unduh rekap absensi bulanan sebagai PDF: kolom eksplisit, ringkasan hari wajib vs kehadiran,
+     * nama file rekap-absensi-{NIP}-{YYYY-MM}.pdf, waktu cetak WIB.
+     */
+    public function riwayatPdf(Request $request, JadwalAbsensiService $jadwal): Response|RedirectResponse
     {
-        [$tahun, $bulan] = $this->validasiPeriode($request);
-        $id = KaryawanAktif::id();
+        $valid = $request->validate([
+            'tahun' => 'required|integer|between:2000,2100',
+            'bulan' => 'required|integer|between:1,12',
+        ], [
+            'tahun.required' => 'Pilih tahun rekap yang akan diunduh.',
+            'bulan.required' => 'Pilih bulan rekap yang akan diunduh.',
+            'tahun.between' => 'Tahun harus antara 2000 dan 2100.',
+            'bulan.between' => 'Bulan harus antara 1 dan 12.',
+        ]);
+        $id = (int) KaryawanAktif::id();
+        $tahun = (int) $valid['tahun'];
+        $bulan = (int) $valid['bulan'];
 
         try {
-            $baris = $this->db->semuaRiwayatAbsensi($id, $tahun, $bulan);
-            $kolom = $this->kolomTampil($this->db->tabel('rekap_absensi'));
+            $karyawan = $this->db->karyawan($id);
+            $kehadiran = $jadwal->rekapKehadiran($id, $tahun, $bulan, substr($this->db->waktuServer(), 0, 10));
         } catch (QueryException $e) {
             return back()->with('gagal', TenagaKerjaService::pesanError($e));
-        } catch (KolomTidakDitemukan $e) {
-            return back()->with('gagal', $e->getMessage());
         }
 
-        $namaFile = 'riwayat-absensi-'.now()->format('Ymd-His').'.csv';
+        $nip = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($karyawan->nip ?? $id));
+        $periode = sprintf('%04d-%02d', $tahun, $bulan);
 
-        return response()->streamDownload(function () use ($baris, $kolom) {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8
-            fputcsv($out, array_map([FormatKolom::class, 'label'], $kolom), ';');
-            foreach ($baris as $b) {
-                fputcsv($out, array_map(fn ($k) => $b->{$k} ?? '', $kolom), ';');
-            }
-            fclose($out);
-        }, $namaFile, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return Pdf::loadView('tenaga-kerja.riwayat-pdf', [
+            'karyawan' => $karyawan,
+            'layanan' => $this->dataUmum()['layanan'],
+            'kehadiran' => $kehadiran,
+            'labelPeriode' => FormatKolom::namaBulan($bulan).' '.$tahun,
+            'dicetakPada' => CarbonImmutable::now()->format('d/m/Y H:i').' WIB',
+        ])->setPaper('a4', 'landscape')->download("rekap-absensi-{$nip}-{$periode}.pdf");
     }
 
     /* =====================================================================

@@ -11,10 +11,7 @@
 @section('content')
     <x-ui.page-header title="Absensi Karyawan" description="Pantau absensi harian karyawan lapangan dan rekap per periode." />
 
-    <nav class="mb-6 flex gap-2 border-b border-gray-200" aria-label="Bagian absensi karyawan">
-        <a href="{{ route('hrd.absensi', ['tab' => 'harian']) }}" @class(['border-b-2 px-4 py-3 text-sm font-medium', 'border-sji-biru text-sji-biru' => $tab === 'harian', 'border-transparent text-gray-500 hover:text-gray-700' => $tab !== 'harian']) @if ($tab === 'harian') aria-current="page" @endif>Absensi Harian</a>
-        <a href="{{ route('hrd.absensi', ['tab' => 'rekap']) }}" @class(['border-b-2 px-4 py-3 text-sm font-medium', 'border-sji-biru text-sji-biru' => $tab === 'rekap', 'border-transparent text-gray-500 hover:text-gray-700' => $tab !== 'rekap']) @if ($tab === 'rekap') aria-current="page" @endif>Rekap Absensi</a>
-    </nav>
+    @include('hrd.absensi._tab', ['tab' => $tab])
 
     @if ($tab === 'rekap')
         @include('hrd.absensi.rekap')
@@ -84,6 +81,8 @@
                                 <td>
                                     <span class="font-medium text-gray-800">{{ $baris->nama }}</span>
                                     <span class="block text-xs text-gray-500">{{ $baris->nip }} &middot; {{ $baris->nama_layanan ?? 'Internal' }}</span>
+                                    <span class="block text-xs text-gray-500">{{ FormatKolom::tanggal($baris->tgl, 'd/m/Y') }}</span>
+                                    <a href="{{ route('hrd.absensi.detail', ['absensi' => $baris->id_absensi] + request()->query()) }}" class="mt-2 inline-block text-xs font-medium text-sji-biru hover:underline">Lihat Detail Absensi</a>
                                 </td>
                                 <td>
                                     {{ $baris->nama_klien ?? '—' }}
@@ -107,8 +106,13 @@
                                     @else
                                         {{ FormatKolom::jam($baris->jam_keluar) }}
                                     @endif
-                                    @if ((int) $baris->jam_lembur > 0)
-                                        <span class="block font-sans text-xs text-gray-500" title="Bekerja melewati jadwal pulang penempatan">Lembur {{ (int) $baris->jam_lembur }} jam</span>
+                                    @if (filled($baris->jam_keluar))
+                                        <span class="block font-sans text-xs text-gray-500" title="Jumlah lembur dalam jam penuh">Lembur {{ (int) $baris->jam_lembur }} jam</span>
+                                        @if (in_array((int) $baris->id_karyawan, $payrollDibuat, true))
+                                            <span class="mt-1 block max-w-48 text-xs text-gray-500">Payroll periode ini sudah dibuat; koreksi ditutup.</span>
+                                        @endif
+                                    @else
+                                        <span class="text-xs text-gray-400">Menunggu check-out</span>
                                     @endif
                                 </td>
                                 <td>

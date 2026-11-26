@@ -71,14 +71,16 @@
                                     @can('update', $user)
                                         <a href="{{ route('users.edit', $user) }}" class="btn-secondary btn-sm">Ubah</a>
                                     @endcan
+                                    @if ($user->status === \App\Models\User::StatusAktif)
                                     @can('delete', $user)
                                         <form method="POST" action="{{ route('users.destroy', $user) }}"
-                                              onsubmit="return confirm(@js('Hapus akun '.$user->username.'? Tindakan ini tidak dapat dibatalkan.'))">
+                                              onsubmit="return confirm(@js('Nonaktifkan akun '.$user->username.'?'))">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn-outline-danger btn-sm">Hapus</button>
+                                            <button type="submit" class="btn-outline-danger btn-sm">Nonaktifkan</button>
                                         </form>
                                     @endcan
+                                    @endif
                                 </div>
                             </td>
                         </tr>

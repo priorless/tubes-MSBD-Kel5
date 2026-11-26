@@ -162,6 +162,6 @@ class AbsensiBerbasisShiftTest extends TestCase
             ->get(route('tenaga-kerja.absensi'))
             ->assertOk()
             ->assertSee('Check-in belum dibuka. Shift Anda hari ini 08:00–16:00; check-in dibuka pukul 07:30', false)
-            ->assertSee('Monitoring Aktivitas per Jam');
+            ->assertSee('Monitoring Aktivitas');
     }
 }

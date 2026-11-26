@@ -117,21 +117,20 @@ class InvoiceKlienDokumenTest extends TestCase
         $this->assertEquals(180000000, $dokumen['totalLampiran']['biaya_tenaga_kerja']);
     }
 
-    public function test_catatan_tukar_shift_menampilkan_siapa_menggantikan_siapa_tanpa_biaya_tambahan(): void
+    public function test_catatan_backup_shift_menampilkan_siapa_menggantikan_siapa_tanpa_biaya_tambahan(): void
     {
         $klien = $this->buatKlien(['management_fee' => 0]);
         [$andi, $penempatanAndi] = $this->karyawanDenganPayroll($klien, 4000000, [], ['nama' => 'Andi Uji']);
-        [$budi, $penempatanBudi] = $this->karyawanDenganPayroll($klien, 4000000, [], ['nama' => 'Budi Uji']);
+        [$budi] = $this->karyawanDenganPayroll($klien, 4000000, [], ['nama' => 'Budi Uji']);
         $this->karyawanBerjadwal = [$andi, $budi];
         $jadwalAndi = $this->jadwal($penempatanAndi, '2099-05-12', '08:00:00', '16:00:00', 'Pagi');
-        $jadwalBudi = $this->jadwal($penempatanBudi, '2099-05-13', '16:00:00', '00:00:00', 'Siang');
-        DB::table('tbl_pertukaran_shift')->insert([
-            'id_karyawan_pengaju' => $andi, 'id_karyawan_rekan' => $budi,
-            'id_jadwal_pengaju' => $jadwalAndi, 'id_jadwal_rekan' => $jadwalBudi,
-            'tanggal_kerja' => '2099-05-12', 'tanggal_kerja_rekan' => '2099-05-13',
+        $idPengajuan = DB::table('tbl_pertukaran_shift')->insertGetId([
+            'id_karyawan_pengaju' => $andi, 'id_karyawan_rekan' => $budi, 'id_jadwal_pengaju' => $jadwalAndi,
+            'tanggal_kerja' => '2099-05-12', 'alasan' => 'Uji catatan',
             'snapshot_pengaju' => json_encode(['status' => 'Kerja', 'jam_masuk' => '08:00:00', 'jam_pulang' => '16:00:00', 'nama_shift_snapshot' => 'Pagi']),
-            'snapshot_rekan' => json_encode(['status' => 'Kerja', 'jam_masuk' => '16:00:00', 'jam_pulang' => '00:00:00', 'nama_shift_snapshot' => 'Siang']),
-            'alasan' => 'Uji catatan', 'status' => 'Disetujui', 'status_rekan' => 'Diterima',
+        ]);
+        DB::table('tbl_pertukaran_shift')->where('id', $idPengajuan)->update([
+            'status' => 'Disetujui', 'status_rekan' => 'Diterima', 'ditanggapi_rekan_pada' => now(),
             'diproses_oleh' => $this->loginSebagai(Role::Operasional)->id, 'diproses_pada' => now(),
         ]);
 
@@ -141,10 +140,9 @@ class InvoiceKlienDokumenTest extends TestCase
 
         $this->assertSame([
             ['tanggal' => '12 Mei 2099', 'teks' => 'Budi Uji menggantikan Andi Uji (Pagi · 08:00–16:00)'],
-            ['tanggal' => '13 Mei 2099', 'teks' => 'Andi Uji menggantikan Budi Uji (Siang · 16:00–00:00)'],
         ], $dokumen['catatanTukarShift']);
-        $this->assertEquals(8000000, (float) $invoice->total_tagihan, 'Tukar shift tidak menambah tagihan');
-        $this->assertStringContainsString('Andi Uji menggantikan Budi Uji', view('keuangan.invoice.pdf', $dokumen)->render());
+        $this->assertEquals(8000000, (float) $invoice->total_tagihan, 'Backup shift tidak menambah tagihan');
+        $this->assertStringContainsString('Budi Uji menggantikan Andi Uji', view('keuangan.invoice.pdf', $dokumen)->render());
     }
 
     public function test_invoice_lama_tanpa_rincian_tidak_bisa_diunduh_sebagai_pdf(): void

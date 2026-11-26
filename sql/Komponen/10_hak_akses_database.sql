@@ -59,6 +59,9 @@ GRANT SELECT ON v_rekap_absensi_pribadi TO 'sji_role_hrd';
 GRANT SELECT ON tbl_laporan_aktivitas TO 'sji_role_hrd';
 GRANT SELECT ON tbl_p2h TO 'sji_role_hrd';
 GRANT SELECT ON tbl_p2h_item TO 'sji_role_hrd';
+-- Perbaikan lupa check-out: HRD memutuskan pengajuan dan mengisi jam_keluar (lembur dihitung trigger).
+GRANT SELECT, INSERT, UPDATE ON tbl_koreksi_check_out TO 'sji_role_hrd';
+GRANT UPDATE (jam_keluar) ON tbl_absensi TO 'sji_role_hrd';
 GRANT SELECT ON v_dashboard_eksekutif TO 'sji_role_hrd';
 GRANT EXECUTE ON FUNCTION fn_sisa_hari_dokumen TO 'sji_role_hrd';
 GRANT EXECUTE ON PROCEDURE sp_input_ketidakhadiran TO 'sji_role_hrd';
@@ -94,6 +97,7 @@ GRANT SELECT, UPDATE ON tbl_pertukaran_shift TO 'sji_role_operasional';
 -- JSON riwayat jadwal & snapshot tukar shift dalam bentuk kolom (Finalisasi Tahap 7).
 GRANT SELECT ON v_riwayat_jadwal_kerja TO 'sji_role_operasional';
 GRANT SELECT ON v_pertukaran_shift_snapshot TO 'sji_role_operasional';
+-- Penolakan otomatis pengajuan backup shift saat penempatan berakhir dijalankan trigger (hak definer).
 
 -- ------------------------------------------------------------
 -- Keuangan — payroll, invoice, buku kas

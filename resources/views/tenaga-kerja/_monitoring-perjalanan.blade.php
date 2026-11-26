@@ -1,5 +1,6 @@
 {{--
-    Monitoring dinamis Driver: laporan per tahapan perjalanan (tanpa kewajiban per jam) + ringkasan P2H.
+    Catatan perjalanan Driver: keterangan + foto kapan saja (tanpa tahapan dan tanpa kewajiban per jam) + ringkasan P2H.
+    Check-out tidak bergantung pada catatan perjalanan.
     Variabel: $monitoring, $status, $maksUpload, $hariIni.
 --}}
 @use('App\Services\LaporanAktivitasService')
@@ -12,10 +13,7 @@
 <section class="tk-reveal card p-6 xl:col-span-12" id="monitoring">
     <div class="mb-4">
         <h2 class="card-title">Laporan Perjalanan</h2>
-        <p class="mt-1 text-sm text-gray-500">
-            Buat laporan setiap tahapan pekerjaan (berangkat, tiba, bertugas, berpindah, selesai). Tidak ada kewajiban laporan per jam.
-            Waktu laporan dicatat otomatis oleh server. Setiap laporan maksimal {{ $maksUpload }} kali unggah foto (1 utama + 1 koreksi).
-        </p>
+        
     </div>
 
     @if ($status === 'belum')
@@ -27,14 +25,7 @@
                     <form method="POST" action="{{ route('tenaga-kerja.laporan.store') }}" enctype="multipart/form-data" class="grid grid-cols-1 gap-4 rounded-md bg-gray-50 p-4 md:grid-cols-2">
                         @csrf
                         <div>
-                            <label for="tkTahapan" class="form-label">Tahapan aktivitas <span class="text-red-600">*</span></label>
-                            <select id="tkTahapan" name="tahapan" class="form-input" required>
-                                <option value="">Pilih tahapan</option>
-                                @foreach (LaporanAktivitasService::TAHAPAN_PERJALANAN as $nilai => $label)
-                                    <option value="{{ $nilai }}" @selected(old('tahapan') === $nilai)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            <label for="tkKeteranganPerjalanan" class="form-label mt-3">Keterangan <span class="text-red-600">*</span></label>
+                            <label for="tkKeteranganPerjalanan" class="form-label">Keterangan / catatan <span class="text-red-600">*</span></label>
                             <textarea id="tkKeteranganPerjalanan" name="keterangan" rows="3" minlength="3" maxlength="500" required class="form-input"
                                       placeholder="mis. Berangkat dari kantor menuju PT ABC, Jl. Sudirman">{{ old('keterangan') }}</textarea>
                         </div>
@@ -47,7 +38,7 @@
                     <p class="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">Anda sudah check-out. Laporan perjalanan sesi ini sudah ditutup.</p>
                 @endif
 
-                <h3 class="mb-2 mt-6 text-sm font-semibold text-gray-700">Linimasa Perjalanan Hari Ini</h3>
+                <h3 class="mb-2 mt-6 text-sm font-semibold text-gray-700">Catatan Perjalanan Hari Ini</h3>
                 @if ($monitoring['laporan']->isEmpty())
                     <p class="text-sm text-gray-400">Belum ada laporan perjalanan.</p>
                 @else
@@ -57,8 +48,7 @@
                             <li class="relative rounded-md border border-gray-200 bg-white p-3">
                                 <span class="absolute top-4 -left-[1.4rem] size-3 rounded-full bg-sji-biru"></span>
                                 <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                    <p class="font-semibold text-gray-800">{{ $loop->iteration }}. {{ LaporanAktivitasService::TAHAPAN_PERJALANAN[$laporan->tahapan] ?? $laporan->tahapan }}</p>
-                                    <span class="text-xs text-gray-500">Sisa unggah: <b>{{ max(0, $sisa) }} dari {{ $maksUpload }}</b></span>
+                                    <p class="font-semibold text-gray-800">Catatan {{ $loop->iteration }}@if (filled($laporan->tahapan)) <span class="font-normal text-gray-500">&middot; {{ $laporan->tahapan }}</span>@endif</p>
                                 </div>
                                 @include('tenaga-kerja._foto-laporan', ['laporan' => $laporan])
                                 @if ($status === 'masuk' && $sisa > 0)

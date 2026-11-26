@@ -92,7 +92,7 @@ class LokasiAbsensiTest extends TestCase
         ];
 
         $this->mockLayanan(function (MockInterface $mock) use ($baris): void {
-            $mock->shouldReceive('checkIn')->once()->with(7, \Mockery::type('string'), '2026-11-15', null);
+            $mock->shouldReceive('checkIn')->once()->with(7, \Mockery::type('string'), '2026-11-15', null, 3);
             // Seperti TenagaKerjaService::kolom(): kandidat pertama yang BENAR-BENAR ada di tabel.
             $mock->shouldReceive('kolom')->andReturnUsing(fn (string $tabel, string $kunci) => collect(config("tenaga_kerja.kolom.$kunci", []))
                 ->first(fn (string $kandidat) => property_exists($baris, $kandidat)));

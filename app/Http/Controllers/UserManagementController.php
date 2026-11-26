@@ -111,13 +111,8 @@ class UserManagementController extends Controller
         Gate::authorize('delete', $user);
 
         try {
-            $user->delete();
+            $user->update(['status' => User::StatusNonaktif]);
         } catch (QueryException $exception) {
-            // 23000 = akun masih direferensikan data lain (mis. tbl_penempatan.dibuat_oleh).
-            if (($exception->errorInfo[0] ?? null) === '23000') {
-                return back()->with('error', "Akun {$user->username} tidak dapat dihapus karena sudah tercatat di data transaksi. Nonaktifkan akun ini sebagai gantinya.");
-            }
-
             if (DatabaseService::isPesanBisnis($exception)) {
                 return back()->with('error', DatabaseService::pesanError($exception));
             }
@@ -126,7 +121,7 @@ class UserManagementController extends Controller
         }
 
         return redirect()->route('users.index')
-            ->with('success', "Akun {$user->username} berhasil dihapus.");
+            ->with('success', "Akun {$user->username} berhasil dinonaktifkan.");
     }
 
     /**

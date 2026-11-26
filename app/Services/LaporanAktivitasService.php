@@ -4,8 +4,6 @@ namespace App\Services;
 
 use App\Support\AbsensiDitolak;
 use App\Support\JamServer;
-use Carbon\CarbonImmutable;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -13,12 +11,12 @@ use Throwable;
 
 /**
  * Dokumentasi selama sesi absensi, sesuai jenis layanan karyawan:
- *  - Berkala (Satpam, Cleaning Service): satu laporan foto per periode 1 jam dari jam mulai shift.
- *    Periode ditentukan SERVER dari waktu database, bukan dipilih pengguna.
- *  - Perjalanan (Driver): laporan per tahapan perjalanan, tanpa kewajiban per jam,
- *    ditambah P2H kendaraan saat check-in dan kondisi akhir kendaraan saat check-out.
+ *  - Berkala (Satpam, Cleaning Service): laporan foto + keterangan yang dapat dikirim KAPAN SAJA selama sesi,
+ *    tanpa batasan interval. periode_ke = nomor urut laporan pada sesi itu.
+ *  - Perjalanan (Driver): laporan foto + keterangan/catatan saja (tanpa tahapan), ditambah P2H kendaraan saat
+ *    check-in dan kondisi akhir kendaraan saat check-out. Check-out tidak bergantung pada laporan perjalanan.
  *
- * Setiap laporan maksimal 2 unggahan (utama + koreksi) dengan penghitung sendiri (jumlah_upload).
+ * Setiap laporan maksimal 2 unggahan (utama + koreksi foto) dengan penghitung sendiri (jumlah_upload).
  * Foto check-in/check-out dan foto kendaraan P2H disimpan terpisah dan TIDAK memakai penghitung ini.
  * Semua laporan terikat pada sesi absensi aktif milik karyawan yang login.
  */
@@ -27,17 +25,6 @@ class LaporanAktivitasService
     public const string JENIS_BERKALA = 'Berkala';
 
     public const string JENIS_PERJALANAN = 'Perjalanan';
-
-    /** @var array<string, string> nilai tersimpan => label tampilan */
-    public const array TAHAPAN_PERJALANAN = [
-        'Mulai Perjalanan' => 'Memulai perjalanan',
-        'Tiba di Lokasi' => 'Tiba di lokasi tujuan',
-        'Tugas di Lokasi' => 'Melakukan tugas di lokasi',
-        'Pindah Lokasi' => 'Berpindah ke lokasi berikutnya',
-        'Selesai Perjalanan' => 'Menyelesaikan tugas perjalanan',
-    ];
-
-    public const string TAHAPAN_SELESAI = 'Selesai Perjalanan';
 
     /** @var list<string> */
     public const array KONDISI = ['Baik', 'Perlu Perhatian', 'Rusak'];
@@ -57,7 +44,6 @@ class LaporanAktivitasService
 
     public function __construct(
         private FotoAbsensiService $foto,
-        private JadwalAbsensiService $jadwal,
         private TenagaKerjaService $tenagaKerja,
         private JamServer $jam,
     ) {}
@@ -94,24 +80,21 @@ class LaporanAktivitasService
      * ===================================================================== */
 
     /**
-     * Laporan baru pada sesi aktif. Berkala: periode yang sedang dibuka; Perjalanan: tahapan yang dipilih.
+     * Laporan baru pada sesi aktif, kapan saja selama sesi berlangsung.
      *
      * @throws AbsensiDitolak
      */
-    public function buatLaporan(int $idKaryawan, ?string $namaLayanan, string $isiFoto, string $keterangan, ?string $tahapan): int
+    public function buatLaporan(int $idKaryawan, ?string $namaLayanan, string $isiFoto, string $keterangan): int
     {
         $jenis = self::jenisMonitoring($namaLayanan)
             ?? throw new AbsensiDitolak('Jenis layanan Anda tidak memerlukan laporan aktivitas.');
-
-        if ($jenis === self::JENIS_PERJALANAN && ! array_key_exists((string) $tahapan, self::TAHAPAN_PERJALANAN)) {
-            throw new AbsensiDitolak('Pilih tahapan perjalanan yang valid.');
-        }
 
         $jpeg = $this->foto->siapkan($isiFoto);
         $path = null;
 
         try {
-            return DB::transaction(function () use ($idKaryawan, $jenis, $keterangan, $tahapan, $jpeg, &$path): int {
+            return DB::transaction(function () use ($idKaryawan, $jenis, $keterangan, $jpeg, &$path): int {
+                // Baris absensi terkunci FOR UPDATE, sehingga nomor urut laporan tidak bentrok.
                 $absensi = $this->absensiAktifTerkunci($idKaryawan);
                 $sekarang = $this->jam->sekarang();
                 $data = [
@@ -126,32 +109,13 @@ class LaporanAktivitasService
                 ];
 
                 if ($jenis === self::JENIS_BERKALA) {
-                    $periode = $this->periodeDibukaUntuk($absensi, $sekarang);
-
-                    if (DB::table('tbl_laporan_aktivitas')->where('id_absensi', $absensi->id)->where('periode_ke', $periode['ke'])->exists()) {
-                        throw new AbsensiDitolak("Laporan {$periode['ke']} sudah dikirim. Gunakan tombol Koreksi bila foto perlu diganti.");
-                    }
-
-                    $data += [
-                        'periode_ke' => $periode['ke'],
-                        'periode_mulai' => $periode['mulai']->format('Y-m-d H:i:s'),
-                        'periode_selesai' => $periode['selesai']->format('Y-m-d H:i:s'),
-                    ];
-                } else {
-                    $data['tahapan'] = $tahapan;
+                    $data['periode_ke'] = (int) DB::table('tbl_laporan_aktivitas')->where('id_absensi', $absensi->id)->max('periode_ke') + 1;
                 }
 
                 $path = $this->foto->pathBaru('laporan', $sekarang->toDateString());
                 $data['foto_utama'] = $path;
 
-                try {
-                    $id = (int) DB::table('tbl_laporan_aktivitas')->insertGetId($data);
-                } catch (QueryException $e) {
-                    if ((int) ($e->errorInfo[1] ?? 0) === 1062) {
-                        throw new AbsensiDitolak('Laporan periode ini sudah dikirim. Gunakan tombol Koreksi bila foto perlu diganti.');
-                    }
-                    throw $e;
-                }
+                $id = (int) DB::table('tbl_laporan_aktivitas')->insertGetId($data);
 
                 $this->foto->simpan($path, $jpeg);
 
@@ -166,7 +130,7 @@ class LaporanAktivitasService
     }
 
     /**
-     * Unggahan kedua (koreksi) untuk laporan yang sama. Setelah ini foto tidak dapat diganti lagi.
+     * Unggahan kedua (koreksi foto) untuk laporan yang sama selama sesi masih berjalan.
      *
      * @throws AbsensiDitolak
      */
@@ -193,13 +157,10 @@ class LaporanAktivitasService
                 }
 
                 if ((int) $laporan->jumlah_upload >= self::maksUpload()) {
-                    throw new AbsensiDitolak(sprintf('Batas unggahan laporan ini sudah habis (maksimal %d kali). Foto tidak dapat diganti lagi.', self::maksUpload()));
+                    throw new AbsensiDitolak(sprintf('Foto laporan ini sudah dikoreksi (maksimal %d unggahan). Kirim laporan baru bila perlu.', self::maksUpload()));
                 }
 
                 $sekarang = $this->jam->sekarang();
-                if ($laporan->jenis === self::JENIS_BERKALA && $sekarang->gte(CarbonImmutable::parse((string) $laporan->periode_selesai))) {
-                    throw new AbsensiDitolak("Periode laporan {$laporan->periode_ke} sudah ditutup. Laporan tidak dapat dikoreksi.");
-                }
 
                 $path = $this->foto->pathBaru('laporan', $sekarang->toDateString());
                 $diperbarui = DB::table('tbl_laporan_aktivitas')
@@ -215,7 +176,7 @@ class LaporanAktivitasService
 
                 if ($diperbarui !== 1) {
                     $path = null;
-                    throw new AbsensiDitolak('Batas unggahan laporan ini sudah habis. Foto tidak dapat diganti lagi.');
+                    throw new AbsensiDitolak('Foto laporan ini sudah dikoreksi. Kirim laporan baru bila perlu.');
                 }
 
                 $this->foto->simpan($path, $jpeg);
@@ -245,26 +206,6 @@ class LaporanAktivitasService
             ->orderBy('waktu_lapor')
             ->orderBy('id')
             ->get();
-    }
-
-    /**
-     * Periode monitoring berkala sebuah sesi beserta laporannya (untuk tampilan).
-     *
-     * @return list<array{ke: int, mulai: CarbonImmutable, selesai: CarbonImmutable, status: string, laporan: object|null}>
-     */
-    public function periodeDenganLaporan(object $absensi): array
-    {
-        $shift = $this->jadwal->shiftAbsensi($absensi);
-        if ($shift === null) {
-            return [];
-        }
-
-        $laporan = $this->laporanAbsensi((int) $absensi->id_karyawan, (int) $absensi->id)->keyBy('periode_ke');
-
-        return array_map(
-            fn (array $periode): array => $periode + ['laporan' => $laporan->get($periode['ke'])],
-            $this->jadwal->periodeMonitoring($shift, $this->jadwal->waktuKeluar($absensi), $this->jam->sekarang()),
-        );
     }
 
     /* =====================================================================
@@ -337,22 +278,6 @@ class LaporanAktivitasService
     }
 
     /**
-     * Driver wajib menuntaskan laporan perjalanan sebelum check-out: bila sudah ada laporan,
-     * laporan terakhir harus tahapan "Menyelesaikan tugas perjalanan".
-     *
-     * @throws AbsensiDitolak
-     */
-    public function pastikanPerjalananSelesai(int $idKaryawan, int $idAbsensi): void
-    {
-        $terakhir = $this->laporanAbsensi($idKaryawan, $idAbsensi)->last();
-
-        if ($terakhir !== null && $terakhir->tahapan !== self::TAHAPAN_SELESAI) {
-            throw new AbsensiDitolak('Laporan perjalanan belum diselesaikan. Kirim laporan tahapan "'
-                .self::TAHAPAN_PERJALANAN[self::TAHAPAN_SELESAI].'" sebelum check-out.');
-        }
-    }
-
-    /**
      * P2H sebuah sesi beserta itemnya, atau null.
      *
      * @return array{p2h: object, item: Collection<string, object>}|null
@@ -372,7 +297,7 @@ class LaporanAktivitasService
     }
 
     /* =====================================================================
-     * Sesi & periode
+     * Sesi
      * ===================================================================== */
 
     /**
@@ -398,28 +323,5 @@ class LaporanAktivitasService
         }
 
         return $absensi;
-    }
-
-    /**
-     * @return array{ke: int, mulai: CarbonImmutable, selesai: CarbonImmutable, status: string}
-     *
-     * @throws AbsensiDitolak
-     */
-    private function periodeDibukaUntuk(object $absensi, CarbonImmutable $sekarang): array
-    {
-        $shift = $this->jadwal->shiftAbsensi($absensi)
-            ?? throw new AbsensiDitolak('Jadwal shift untuk sesi absensi ini tidak ditemukan. Hubungi bagian Operasional.');
-
-        $periode = $this->jadwal->periodeDibuka($shift, $sekarang);
-        if ($periode !== null) {
-            return $periode;
-        }
-
-        $berikutnya = collect($this->jadwal->periodeMonitoring($shift, null, $sekarang))
-            ->firstWhere('status', JadwalAbsensiService::PERIODE_AKAN_DATANG);
-
-        throw new AbsensiDitolak($berikutnya !== null
-            ? "Belum ada periode laporan yang dibuka. Laporan {$berikutnya['ke']} dibuka pukul {$berikutnya['mulai']->format('H:i')}."
-            : 'Tidak ada periode laporan yang sedang dibuka.');
     }
 }
