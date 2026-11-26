@@ -121,17 +121,16 @@ class DataKlienHrdTest extends TestCase
         $this->assertDatabaseHas('tbl_klien', ['id' => 1, 'kode_klien' => 'KL001', 'nama_perusahaan' => 'PT Alpha Baru', 'status' => 'Nonaktif']);
     }
 
-    public function test_hrd_deletes_an_unused_client_and_returns_to_the_hrd_list(): void
+    public function test_hrd_cannot_delete_a_client(): void
     {
         $this->createTables();
         DB::table('tbl_klien')->insert(['id' => 5, ...$this->clientInput('KL005')]);
 
         $this->actingAs($this->hrd())
-            ->delete(route('hrd.klien.destroy', 5))
-            ->assertRedirect(route('hrd.klien.index'))
-            ->assertSessionHas('success', 'Data klien berhasil dihapus.');
+            ->delete('/hrd/klien/5')
+            ->assertStatus(405);
 
-        $this->assertDatabaseMissing('tbl_klien', ['id' => 5]);
+        $this->assertDatabaseHas('tbl_klien', ['id' => 5]);
     }
 
     #[TestWith([Role::Keuangan])]

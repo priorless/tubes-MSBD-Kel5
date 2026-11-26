@@ -10,7 +10,6 @@ use App\Http\Controllers\Hrd\AbsensiKaryawanController;
 use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
 use App\Http\Controllers\Hrd\KetidakhadiranController;
-
 use App\Http\Controllers\Hrd\KoreksiJamLemburController;
 use App\Http\Controllers\Hrd\MonitoringTenagaKerjaController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
@@ -104,7 +103,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
         Route::get('monitoring-tenaga-kerja', MonitoringTenagaKerjaController::class)->name('monitoring');
         // Data Klien: controller & tampilan yang sama dengan Operasional (satu sumber data tbl_klien).
-        Route::resource('klien', KlienController::class);
+        Route::resource('klien', KlienController::class)->except(['destroy']);
         Route::patch('klien/{klien}/status', [KlienController::class, 'updateStatus'])->whereNumber('klien')->name('klien.status');
     });
 
@@ -115,7 +114,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('beranda', BerandaOperasionalController::class)->name('beranda');
         Route::get('rekap', [RekapOperasionalController::class, 'index'])->name('rekap.index');
         Route::get('rekap/ekspor', [RekapOperasionalController::class, 'export'])->name('rekap.export');
-        Route::resource('klien', KlienController::class);
+        Route::resource('klien', KlienController::class)->except(['destroy']);
         Route::patch('klien/{klien}/status', [KlienController::class, 'updateStatus'])->whereNumber('klien')->name('klien.status');
         Route::get('jadwal-kerja', JadwalKerjaController::class)->name('jadwal-kerja');
         Route::get('jadwal-kerja/template-shift', [TemplateShiftController::class, 'index'])
