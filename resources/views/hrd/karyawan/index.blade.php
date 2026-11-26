@@ -100,12 +100,14 @@
                             <td>
                                 <div class="flex justify-end gap-2">
                                     <a href="{{ route('hrd.karyawan.edit', $item->id) }}" class="btn-secondary btn-sm">Ubah</a>
+                                    @if ($item->status !== 'Nonaktif')
                                     <form action="{{ route('hrd.karyawan.destroy', $item->id) }}" method="POST"
-                                          onsubmit="return confirm(@js('Hapus karyawan '.$item->nama.' beserta akun loginnya?'))">
+                                          onsubmit="return confirm(@js('Nonaktifkan karyawan '.$item->nama.' beserta akun loginnya?'))">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn-outline-danger btn-sm">Hapus</button>
+                                        <button type="submit" class="btn-outline-danger btn-sm">Nonaktifkan</button>
                                     </form>
+                                    @endif
                                 </div>
                             </td>
                         </tr>

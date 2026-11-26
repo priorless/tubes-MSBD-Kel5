@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\MenanganiSignalDatabase;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hrd\StoreKaryawanRequest;
 use App\Http\Requests\Hrd\UpdateKaryawanRequest;
+use App\Models\User;
 use App\Services\GajiPokokLapanganService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -14,8 +15,8 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class KaryawanController extends Controller
@@ -170,22 +171,20 @@ class KaryawanController extends Controller
     {
         $data = DB::table('tbl_karyawan')->where('id', $karyawan)->firstOrFail();
 
+        if (UpdateKaryawanRequest::punyaPenempatanAktif($karyawan)) {
+            return back()->with('error', "Karyawan {$data->nama} masih memiliki penempatan aktif. Selesaikan penempatannya terlebih dahulu.");
+        }
+
         try {
             DB::transaction(function () use ($karyawan): void {
-                DB::table('tbl_users')->where('id_karyawan', $karyawan)->delete();
-                DB::table('tbl_karyawan')->where('id', $karyawan)->delete();
+                DB::table('tbl_users')->where('id_karyawan', $karyawan)->update(['status' => User::StatusNonaktif]);
+                DB::table('tbl_karyawan')->where('id', $karyawan)->update(['status' => 'Nonaktif']);
             });
         } catch (QueryException $exception) {
-            if ($this->masihDirujuk($exception)) {
-                return back()->with('error', "Karyawan {$data->nama} tidak dapat dihapus karena sudah memiliki riwayat (sertifikat, penempatan, absensi, atau payroll).");
-            }
-
             return $this->kembaliDenganError($exception);
         }
 
-        $this->hapusBerkas($data->foto);
-
-        return redirect()->route('hrd.karyawan.index')->with('success', "Karyawan {$data->nama} berhasil dihapus.");
+        return redirect()->route('hrd.karyawan.index')->with('success', "Karyawan {$data->nama} berhasil dinonaktifkan.");
     }
 
     /**
