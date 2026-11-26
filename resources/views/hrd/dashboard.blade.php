@@ -15,11 +15,10 @@
     </x-ui.page-header>
 
     {{-- Ringkasan: satu strip seperti Beranda Operasional. Dokumen yang hampir kedaluwarsa diberi blok navy. --}}
-    <section class="op-headline mb-6" style="--kolom: 4" aria-label="Ringkasan HRD">
+    <section class="op-headline mb-6" style="--kolom: 3" aria-label="Ringkasan HRD">
         @foreach ([
             ['label' => 'Lapangan Tersedia', 'nilai' => (int) ($ringkasan->lapangan_siap ?? 0), 'keterangan' => 'Karyawan lapangan siap ditempatkan', 'tautan' => route('hrd.pool'), 'teks' => 'Lihat pool', 'perluTindakan' => false],
             ['label' => 'Lapangan Ditempatkan', 'nilai' => (int) ($ringkasan->lapangan_bertugas ?? 0), 'keterangan' => 'Karyawan lapangan bertugas di klien', 'tautan' => route('hrd.karyawan.index', ['kategori' => 'Lapangan', 'status' => 'Ditempatkan']), 'teks' => 'Lihat data', 'perluTindakan' => false],
-            ['label' => 'Staf Internal Aktif', 'nilai' => (int) ($ringkasan->internal_aktif ?? 0), 'keterangan' => 'Staf internal berstatus aktif', 'tautan' => route('hrd.karyawan.index', ['kategori' => 'Internal']), 'teks' => 'Lihat data', 'perluTindakan' => false],
             ['label' => 'Dokumen < '.$batasHari.' Hari', 'nilai' => (int) $jumlahDokumenHampirHabis, 'keterangan' => 'Dokumen yang akan habis dalam '.$batasHari.' hari', 'tautan' => route('hrd.sertifikat.index', ['hampir_habis' => 1]), 'teks' => 'Tinjau dokumen', 'perluTindakan' => $jumlahDokumenHampirHabis > 0],
         ] as $kartu)
             <div @class(['op-headline-item', 'is-perlu-tindakan' => $kartu['perluTindakan']])>

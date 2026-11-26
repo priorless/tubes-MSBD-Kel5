@@ -21,7 +21,7 @@ class DashboardController extends Controller
         return view('hrd.dashboard', [
             // Jumlah karyawan per status dibaca dari view ringkasan yang sudah ada di database.
             'ringkasan' => DB::table('v_dashboard_eksekutif')
-                ->first(['lapangan_bertugas', 'lapangan_siap', 'internal_aktif']),
+                ->first(['lapangan_bertugas', 'lapangan_siap']),
             'totalKaryawan' => DB::table('tbl_karyawan')->count(),
             'jumlahDokumenHampirHabis' => (clone $dokumenHampirHabis)->count(),
             'dokumenHampirHabis' => $dokumenHampirHabis->orderBy('sisa_hari')->limit(5)->get(),
