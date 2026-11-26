@@ -35,10 +35,12 @@ class GajiPokokKomponenTest extends TestCase
     protected function tearDown(): void
     {
         // Procedure payroll meng-commit transaksi test, sehingga komponen gaji uji ikut tersimpan.
-        while (DB::transactionLevel() > 0) {
-            DB::rollBack();
+        if ($this->databaseSjiSiap()) {
+            while (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+            DB::table('tbl_komponen_gaji')->whereIn('id_karyawan', $this->karyawanUji)->delete();
         }
-        DB::table('tbl_komponen_gaji')->whereIn('id_karyawan', $this->karyawanUji)->delete();
 
         $this->tearDownDatabaseSji();
         parent::tearDown();

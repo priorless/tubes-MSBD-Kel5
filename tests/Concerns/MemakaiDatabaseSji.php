@@ -47,6 +47,12 @@ trait MemakaiDatabaseSji
         DB::beginTransaction();
     }
 
+    /** true bila koneksi db_sji berhasil disiapkan (test tidak dilewati). */
+    protected function databaseSjiSiap(): bool
+    {
+        return $this->databaseSjiSiap;
+    }
+
     protected function tearDownDatabaseSji(): void
     {
         if (! $this->databaseSjiSiap) {
