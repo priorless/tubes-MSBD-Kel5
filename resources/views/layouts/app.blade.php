@@ -36,6 +36,7 @@
             ];
             $menu['Data Karyawan'] = [
                 ['Data Karyawan', 'hrd.karyawan.index', 'hrd.karyawan.*'],
+                ['Pool Karyawan', 'hrd.pool', 'hrd.pool'],
                 ['Absensi Karyawan', 'hrd.absensi', 'hrd.absensi'],
                 ['Sertifikat Karyawan', 'hrd.sertifikat.index', 'hrd.sertifikat.*'],
             ];
