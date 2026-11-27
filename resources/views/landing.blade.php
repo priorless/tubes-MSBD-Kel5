@@ -173,8 +173,6 @@
                             </div>
                         </div>
                     </div>
-                    <div class="lp-float lp-float-a"><span class="lp-float-ic">@include('partials.landing-ikon', ['ikon' => 'centang'])</span>Absensi tercatat</div>
-                    <div class="lp-float lp-float-b"><span class="lp-float-ic">@include('partials.landing-ikon', ['ikon' => 'dompet'])</span>Slip gaji tersedia</div>
                 </div>
             </div>
         </section>

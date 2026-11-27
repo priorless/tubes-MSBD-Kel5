@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BerandaController;
+use App\Http\Controllers\CatatanDriverController;
 use App\Http\Controllers\Ceo\KlienController as KlienCeoController;
 use App\Http\Controllers\Ceo\LogAktivitasController;
 use App\Http\Controllers\CeoController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Hrd\AbsensiKaryawanController;
 use App\Http\Controllers\Hrd\DashboardController as HrdDashboardController;
 use App\Http\Controllers\Hrd\KaryawanController;
 use App\Http\Controllers\Hrd\KetidakhadiranController;
+use App\Http\Controllers\Hrd\KoreksiCheckOutController;
 use App\Http\Controllers\Hrd\KoreksiJamLemburController;
 use App\Http\Controllers\Hrd\MonitoringTenagaKerjaController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
@@ -25,6 +27,7 @@ use App\Http\Controllers\Operasional\RekapOperasionalController;
 use App\Http\Controllers\Operasional\TemplateJadwalController;
 use App\Http\Controllers\Operasional\TemplateShiftController;
 use App\Http\Controllers\OperasionalController;
+use App\Http\Controllers\TenagaKerja\KoreksiCheckOutController as PengajuanKoreksiCheckOutController;
 use App\Http\Controllers\TenagaKerja\LaporanAktivitasController;
 use App\Http\Controllers\TenagaKerja\PembatalanTukarShiftController;
 use App\Http\Controllers\TenagaKerja\PengajuanTukarShiftController;
@@ -99,9 +102,12 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('absensi-karyawan/{absensi}', [AbsensiKaryawanController::class, 'show'])->whereNumber('absensi')->name('absensi.detail');
         Route::patch('absensi-karyawan/{absensi}/jam-lembur', KoreksiJamLemburController::class)->whereNumber('absensi')->name('absensi.jam-lembur');
         Route::post('absensi-karyawan/ketidakhadiran', KetidakhadiranController::class)->name('absensi.ketidakhadiran');
+        Route::get('koreksi-check-out', [KoreksiCheckOutController::class, 'index'])->name('koreksi-check-out.index');
+        Route::patch('koreksi-check-out/{koreksi}', [KoreksiCheckOutController::class, 'update'])->whereNumber('koreksi')->name('koreksi-check-out.update');
 
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
         Route::get('monitoring-tenaga-kerja', MonitoringTenagaKerjaController::class)->name('monitoring');
+        Route::get('catatan-driver', CatatanDriverController::class)->name('catatan-driver');
         // Data Klien: controller & tampilan yang sama dengan Operasional (satu sumber data tbl_klien).
         Route::resource('klien', KlienController::class)->except(['destroy']);
         Route::patch('klien/{klien}/status', [KlienController::class, 'updateStatus'])->whereNumber('klien')->name('klien.status');
@@ -114,6 +120,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('beranda', BerandaOperasionalController::class)->name('beranda');
         Route::get('rekap', [RekapOperasionalController::class, 'index'])->name('rekap.index');
         Route::get('rekap/ekspor', [RekapOperasionalController::class, 'export'])->name('rekap.export');
+        Route::get('catatan-driver', CatatanDriverController::class)->name('catatan-driver');
         Route::resource('klien', KlienController::class)->except(['destroy']);
         Route::patch('klien/{klien}/status', [KlienController::class, 'updateStatus'])->whereNumber('klien')->name('klien.status');
         Route::get('jadwal-kerja', JadwalKerjaController::class)->name('jadwal-kerja');
@@ -226,6 +233,9 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
 
             Route::get('/riwayat-absensi', 'riwayat')->name('riwayat');
             Route::get('/riwayat-absensi/unduh', 'riwayatPdf')->name('riwayat.unduh');
+
+            Route::get('/koreksi-check-out', [PengajuanKoreksiCheckOutController::class, 'index'])->name('koreksi-check-out.index');
+            Route::post('/koreksi-check-out', [PengajuanKoreksiCheckOutController::class, 'store'])->middleware('throttle:10,1')->name('koreksi-check-out.store');
 
             Route::get('/slip-gaji', 'slipGaji')->name('slip-gaji');
 

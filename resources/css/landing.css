@@ -1394,6 +1394,13 @@ html:has(body.lp) {
         transform: none;
     }
 
+    /* backdrop-filter membuat menu fixed terkurung di dalam header; matikan saat menu terbuka agar panel menutup layar. */
+    .lp-nav.is-menu-open {
+        background: var(--lp-white);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
     .lp-menu-link {
         padding: 16px 0;
         border-bottom: 1px solid var(--lp-line);

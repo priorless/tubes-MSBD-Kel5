@@ -22,7 +22,7 @@
             </div>
             <div>
                 <label for="id_klien" class="form-label">Klien</label>
-                <select id="id_klien" name="id_klien" class="form-input">
+                <select id="id_klien" name="id_klien" class="form-input" data-cari="Ketik nama klien...">
                     <option value="">Semua klien</option>
                     @foreach ($daftarKlien as $item)
                         <option value="{{ $item->id }}" @selected($filter['id_klien'] === (int) $item->id)>{{ $item->nama_perusahaan }}</option>

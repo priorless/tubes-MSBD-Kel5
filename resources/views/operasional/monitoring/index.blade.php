@@ -36,7 +36,7 @@
         <div class="card-body flex flex-col gap-4 md:flex-row md:items-end">
             <div class="md:w-64">
                 <label for="filter_klien" class="form-label">Klien</label>
-                <select id="filter_klien" name="id_klien" class="form-input" @disabled(! $filterTersedia)>
+                <select id="filter_klien" name="id_klien" class="form-input" data-cari="Ketik nama klien..." @disabled(! $filterTersedia)>
                     <option value="">Semua klien</option>
                     @foreach ($daftarKlien as $item)
                         <option value="{{ $item->id }}" @selected($filter['id_klien'] === (int) $item->id)>

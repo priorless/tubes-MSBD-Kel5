@@ -248,7 +248,7 @@ class MonitoringPageTest extends TestCase
             ->get(route('operasional.monitoring', ['id_klien' => 2]))
             ->assertOk()
             ->assertSeeText('Filter klien dan jenis layanan belum tersedia karena database belum dimigrasi.')
-            ->assertSee('<select id="filter_klien" name="id_klien" class="form-input" disabled>', false)
+            ->assertSee('<select id="filter_klien" name="id_klien" class="form-input" data-cari="Ketik nama klien..." disabled>', false)
             ->assertSeeText('Andi')
             ->assertSeeText('Citra');
     }

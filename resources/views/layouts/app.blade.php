@@ -38,10 +38,12 @@
                 ['Data Karyawan', 'hrd.karyawan.index', 'hrd.karyawan.*'],
                 ['Pool Karyawan', 'hrd.pool', 'hrd.pool'],
                 ['Absensi Karyawan', 'hrd.absensi', 'hrd.absensi'],
+                ['Koreksi Check-out', 'hrd.koreksi-check-out.index', 'hrd.koreksi-check-out.*'],
                 ['Sertifikat Karyawan', 'hrd.sertifikat.index', 'hrd.sertifikat.*'],
             ];
             $menu['Monitoring'] = [
                 ['Monitoring Tenaga Kerja', 'hrd.monitoring', 'hrd.monitoring'],
+                ['Catatan Driver', 'hrd.catatan-driver', 'hrd.catatan-driver'],
             ];
         }
 
@@ -57,6 +59,7 @@
                 ['Rotasi Karyawan', 'operasional.rotasi.create', 'operasional.rotasi.*'],
                 ['Jadwal Kerja', 'operasional.jadwal-kerja', 'operasional.jadwal-kerja*'],
                 ['Monitoring Sebaran', 'operasional.monitoring', 'operasional.monitoring'],
+                ['Catatan Driver', 'operasional.catatan-driver', 'operasional.catatan-driver'],
             ];
             $menu['Laporan'] = [
                 ['Rekap & Laporan', 'operasional.rekap.index', 'operasional.rekap.*'],
@@ -77,6 +80,7 @@
                 ['Jadwal Saya', 'tenaga-kerja.jadwal', 'tenaga-kerja.jadwal'],
                 ['Backup Shift', 'tenaga-kerja.tukar-shift.index', 'tenaga-kerja.tukar-shift.*'],
                 ['Riwayat Absensi', 'tenaga-kerja.riwayat', 'tenaga-kerja.riwayat*'],
+                ['Koreksi Check-out', 'tenaga-kerja.koreksi-check-out.index', 'tenaga-kerja.koreksi-check-out.*'],
                 ['Slip Gaji', 'tenaga-kerja.slip-gaji', 'tenaga-kerja.slip-gaji'],
                 ['Profil Saya', 'tenaga-kerja.profil', 'tenaga-kerja.profil'],
             ];
@@ -90,6 +94,8 @@
     // Ikon garis untuk setiap menu sidebar, dikelompokkan per role.
     $ikonDashboard = '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>';
     $ikonGedung = '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1"/><path d="M10 21v-3h4v3"/>';
+    $ikonCatatan = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/>';
+    $ikonKoreksi = '<path d="M12 8v4l2 2"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 4v5h5"/>';
     $ikonMenu = [
         'ceo.dashboard' => $ikonDashboard,
         'ceo.klien' => $ikonGedung,
@@ -101,7 +107,11 @@
         'hrd.sertifikat.index' => '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
         'hrd.klien.index' => $ikonGedung,
         'hrd.monitoring' => '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/>',
+        'hrd.catatan-driver' => $ikonCatatan,
+        'hrd.koreksi-check-out.index' => $ikonKoreksi,
+        'tenaga-kerja.koreksi-check-out.index' => $ikonKoreksi,
         'operasional.beranda' => $ikonDashboard,
+        'operasional.catatan-driver' => $ikonCatatan,
         'operasional.klien.index' => $ikonGedung,
         'operasional.penempatan.index' => '<circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="m16 11 2 2 4-4"/>',
         'operasional.rotasi.create' => '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',

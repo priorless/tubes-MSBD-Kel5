@@ -68,7 +68,7 @@
                     <div>
                         <label for="id_karyawan" class="form-label">Karyawan</label>
                         @if ($template === null)
-                            <select id="id_karyawan" name="id_karyawan" class="form-input">
+                            <select id="id_karyawan" name="id_karyawan" data-cari="Ketik NIP atau nama karyawan..." class="form-input">
                                 <option value="">Pilih karyawan</option>
                                 @foreach ($daftarKaryawan as $item)
                                     <option value="{{ $item->id }}" @selected((string) old('id_karyawan') === (string) $item->id)>{{ $item->nip }} &mdash; {{ $item->nama }}</option>
@@ -85,7 +85,7 @@
                     <div>
                         <label for="id_klien" class="form-label">Klien</label>
                         @if ($template === null)
-                            <select id="id_klien" name="id_klien" class="form-input">
+                            <select id="id_klien" name="id_klien" data-cari="Ketik nama klien..." class="form-input">
                                 <option value="">Pilih klien</option>
                                 @foreach ($daftarKlien as $item)
                                     <option value="{{ $item->id }}" @selected((string) old('id_klien') === (string) $item->id)>{{ $item->kode_klien }} &mdash; {{ $item->nama_perusahaan }}</option>

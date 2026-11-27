@@ -12,7 +12,6 @@
         'Lapangan Siap' => 'orang tersedia untuk ditempatkan',
         'Internal Aktif' => 'orang staf internal berstatus aktif',
         'Total Piutang' => 'Tagihan invoice klien berstatus Belum Lunas',
-        'Profit Bulan Berjalan' => 'Pemasukan dikurangi pengeluaran '.$labelPeriode,
     ];
 @endphp
 
@@ -29,18 +28,13 @@
         @foreach ($kpi as $kartu)
             @php
                 $perluTindakan = $kartu['label'] === 'Total Piutang' && $kartu['nilai'] > 0;
-                $kelasNilai = match (true) {
-                    $kartu['label'] === 'Profit Bulan Berjalan' && $kartu['nilai'] < 0 => 'is-negatif',
-                    $kartu['label'] === 'Profit Bulan Berjalan' => 'is-positif',
-                    default => null,
-                };
             @endphp
             <div @class(['op-headline-item', 'is-perlu-tindakan' => $perluTindakan])>
                 @if ($perluTindakan)
                     <span class="op-stempel">PERLU TINDAKAN</span>
                 @endif
                 <span class="stat-label">{{ $kartu['label'] }}</span>
-                <span @class(['op-headline-angka', 'is-nominal' => $kartu['uang'], $kelasNilai])>
+                <span @class(['op-headline-angka', 'is-nominal' => $kartu['uang']])>
                     {{ $kartu['uang'] ? $rupiah($kartu['nilai']) : number_format($kartu['nilai'], 0, ',', '.') }}
                 </span>
                 @isset($keteranganKpi[$kartu['label']])

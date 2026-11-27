@@ -13,7 +13,7 @@
     <x-ui.page-header title="Rekap & Laporan"
         :description="'Rekap kerja bulanan '.$namaBulan.': jadwal dari Operasional dibandingkan dengan kehadiran dari Absensi.'">
         @if ($rekap['baris']->isNotEmpty())
-            <a href="{{ route('operasional.rekap.export', $parameter) }}" class="btn-secondary">Unduh CSV</a>
+            <a href="{{ route('operasional.rekap.export', $parameter) }}" class="btn-secondary">Unduh PDF</a>
         @endif
     </x-ui.page-header>
 
@@ -24,7 +24,7 @@
         </div>
         <div>
             <label for="id_klien" class="form-label">Klien</label>
-            <select id="id_klien" name="id_klien" class="form-input">
+            <select id="id_klien" name="id_klien" class="form-input" data-cari="Ketik nama klien...">
                 <option value="">Semua klien</option>
                 @foreach ($daftarKlien as $item)
                     <option value="{{ $item->id }}" @selected($filter['id_klien'] === (int) $item->id)>{{ $item->nama_perusahaan }}</option>
@@ -33,7 +33,7 @@
         </div>
         <div>
             <label for="id_karyawan" class="form-label">Karyawan</label>
-            <select id="id_karyawan" name="id_karyawan" class="form-input">
+            <select id="id_karyawan" name="id_karyawan" class="form-input" data-cari="Ketik NIP atau nama karyawan...">
                 <option value="">Semua karyawan</option>
                 @foreach ($daftarKaryawan as $item)
                     <option value="{{ $item->id }}" @selected($filter['id_karyawan'] === (int) $item->id)>{{ $item->nip }} &mdash; {{ $item->nama }}</option>

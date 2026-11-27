@@ -27,7 +27,7 @@
                 <form method="GET" action="{{ route('operasional.jadwal-kerja') }}" class="grid grid-cols-1 items-end gap-4 md:grid-cols-[1fr_2fr_1fr_auto]">
                     <div>
                         <label for="id_klien" class="form-label">Pilih Klien</label>
-                        <select id="id_klien" name="id_klien" class="form-input" onchange="this.form.id_karyawan.value = ''; this.form.submit()">
+                        <select id="id_klien" name="id_klien" class="form-input" data-cari="Ketik nama klien..." onchange="this.form.id_karyawan.value = ''; this.form.submit()">
                             <option value="">Semua klien</option>
                             @foreach ($daftarKlienFilter as $item)
                                 <option value="{{ $item->id }}" @selected($idKlien === (int) $item->id)>{{ $item->nama_perusahaan }}</option>
@@ -36,7 +36,7 @@
                     </div>
                     <div>
                         <label for="id_karyawan" class="form-label">Pilih Karyawan</label>
-                        <select id="id_karyawan" name="id_karyawan" class="form-input">
+                        <select id="id_karyawan" name="id_karyawan" class="form-input" data-cari="Ketik NIP atau nama karyawan...">
                             <option value="">Pilih karyawan</option>
                             @foreach ($daftarKaryawan as $item)
                                 <option value="{{ $item->id }}" @selected($idKaryawan === (int) $item->id)>
@@ -301,7 +301,7 @@
                                         <fieldset id="bagian-template-bersama" class="grid grid-cols-1 gap-4 md:col-span-2 md:grid-cols-2" @if ($jenisTemplateAwal !== 'Bersama') hidden disabled @endif>
                                             <div>
                                                 <label for="id_klien_template" class="form-label">Klien</label>
-                                                <select id="id_klien_template" name="id_klien" class="form-input">
+                                                <select id="id_klien_template" name="id_klien" data-cari="Ketik nama klien..." class="form-input">
                                                     @foreach ($daftarKlienTemplate as $item)
                                                         <option value="{{ $item->id }}" @selected((string) old('id_klien', $penempatanAktif?->id_klien) === (string) $item->id)>{{ $item->nama_perusahaan }}</option>
                                                     @endforeach
