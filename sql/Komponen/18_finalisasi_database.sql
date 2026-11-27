@@ -690,14 +690,14 @@ LEFT JOIN tbl_users u ON u.id = r.diubah_oleh //
 CREATE OR REPLACE SQL SECURITY DEFINER VIEW v_pertukaran_shift_snapshot AS
 SELECT ps.id, ps.tanggal_kerja, ps.tanggal_kerja_rekan, ps.status, ps.status_rekan,
        ps.id_karyawan_pengaju, kp.nama AS nama_pengaju, ps.id_karyawan_rekan, kr.nama AS nama_rekan,
-       ps.snapshot_pengaju ->> '$.status' AS status_jadwal_pengaju,
-       ps.snapshot_pengaju ->> '$.jam_masuk' AS jam_masuk_pengaju,
-       ps.snapshot_pengaju ->> '$.jam_pulang' AS jam_pulang_pengaju,
-       NULLIF(ps.snapshot_pengaju ->> '$.nama_shift_snapshot', 'null') AS shift_pengaju,
-       ps.snapshot_rekan ->> '$.status' AS status_jadwal_rekan,
-       ps.snapshot_rekan ->> '$.jam_masuk' AS jam_masuk_rekan,
-       ps.snapshot_rekan ->> '$.jam_pulang' AS jam_pulang_rekan,
-       NULLIF(ps.snapshot_rekan ->> '$.nama_shift_snapshot', 'null') AS shift_rekan,
+       JSON_UNQUOTE(JSON_EXTRACT(ps.snapshot_pengaju, '$.status')) AS status_jadwal_pengaju,
+       JSON_UNQUOTE(JSON_EXTRACT(ps.snapshot_pengaju, '$.jam_masuk')) AS jam_masuk_pengaju,
+       JSON_UNQUOTE(JSON_EXTRACT(ps.snapshot_pengaju, '$.jam_pulang')) AS jam_pulang_pengaju,
+       NULLIF(JSON_UNQUOTE(JSON_EXTRACT(ps.snapshot_pengaju, '$.nama_shift_snapshot')), 'null') AS shift_pengaju,
+       JSON_UNQUOTE(JSON_EXTRACT(ps.snapshot_rekan, '$.status')) AS status_jadwal_rekan,
+       JSON_UNQUOTE(JSON_EXTRACT(ps.snapshot_rekan, '$.jam_masuk')) AS jam_masuk_rekan,
+       JSON_UNQUOTE(JSON_EXTRACT(ps.snapshot_rekan, '$.jam_pulang')) AS jam_pulang_rekan,
+       NULLIF(JSON_UNQUOTE(JSON_EXTRACT(ps.snapshot_rekan, '$.nama_shift_snapshot')), 'null') AS shift_rekan,
        ps.created_at
 FROM tbl_pertukaran_shift ps
 JOIN tbl_karyawan kp ON kp.id = ps.id_karyawan_pengaju

@@ -386,7 +386,7 @@ DELIMITER ;
 DELIMITER //
 
 ALTER TABLE tbl_laporan_aktivitas
-  DROP CHECK chk_laporan_jenis,
+  DROP CONSTRAINT chk_laporan_jenis,
   ADD CONSTRAINT chk_laporan_jenis CHECK (
     (jenis = 'Berkala' AND periode_ke IS NOT NULL AND tahapan IS NULL)
     OR (jenis = 'Perjalanan' AND periode_ke IS NULL AND periode_mulai IS NULL AND periode_selesai IS NULL)

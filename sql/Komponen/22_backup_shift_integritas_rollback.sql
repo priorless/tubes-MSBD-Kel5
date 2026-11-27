@@ -9,7 +9,7 @@
 DELIMITER //
 
 ALTER TABLE tbl_laporan_aktivitas
-  DROP CHECK chk_laporan_jenis,
+  DROP CONSTRAINT chk_laporan_jenis,
   ADD CONSTRAINT chk_laporan_jenis CHECK (
     (jenis = 'Berkala' AND periode_ke IS NOT NULL AND periode_mulai IS NOT NULL AND periode_selesai IS NOT NULL)
     OR (jenis = 'Perjalanan' AND periode_ke IS NULL AND tahapan IS NOT NULL)
@@ -20,7 +20,7 @@ DELIMITER ;
 -- [TAHAP 6]
 DELIMITER //
 
-ALTER TABLE tbl_koreksi_check_out DROP CHECK chk_koreksi_check_out_diproses //
+ALTER TABLE tbl_koreksi_check_out DROP CONSTRAINT chk_koreksi_check_out_diproses //
 
 DELIMITER ;
 
@@ -185,7 +185,7 @@ CREATE TRIGGER trg_cek_jadwal_kerja_update BEFORE UPDATE ON tbl_jadwal_kerja FOR
   CALL sp_cek_jadwal_kerja(OLD.id, NEW.id_penempatan, NEW.tanggal_kerja, NEW.status, NEW.jam_masuk, NEW.jam_pulang);
 END //
 
-ALTER TABLE tbl_jadwal_kerja DROP CHECK chk_jadwal_pengganti_kerja //
+ALTER TABLE tbl_jadwal_kerja DROP CONSTRAINT chk_jadwal_pengganti_kerja //
 
 DELIMITER ;
 
@@ -196,7 +196,7 @@ DROP TRIGGER IF EXISTS trg_pertukaran_shift_insert //
 DROP TRIGGER IF EXISTS trg_pertukaran_shift_update //
 DROP PROCEDURE IF EXISTS sp_cek_pertukaran_shift //
 
-ALTER TABLE tbl_pertukaran_shift DROP CHECK chk_pertukaran_rekan, DROP CHECK chk_pertukaran_diproses //
+ALTER TABLE tbl_pertukaran_shift DROP CONSTRAINT chk_pertukaran_rekan, DROP CONSTRAINT chk_pertukaran_diproses //
 
 DROP VIEW IF EXISTS v_pertukaran_shift_snapshot //
 

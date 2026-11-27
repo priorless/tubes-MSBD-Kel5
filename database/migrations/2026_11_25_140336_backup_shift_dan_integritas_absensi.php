@@ -37,7 +37,7 @@ return new class extends Migration
         if ($mysql) {
             DB::statement('DROP VIEW IF EXISTS v_pertukaran_shift_snapshot');
             if (SqlKomponen::constraintAda('tbl_pertukaran_shift', 'chk_pertukaran_diproses')) {
-                DB::statement('ALTER TABLE tbl_pertukaran_shift DROP CHECK chk_pertukaran_diproses');
+                DB::statement('ALTER TABLE tbl_pertukaran_shift DROP CONSTRAINT chk_pertukaran_diproses');
             }
 
             // Data lama ditulis Laravel dengan zona UTC; sejak perubahan ini semua waktu memakai WIB.
