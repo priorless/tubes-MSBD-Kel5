@@ -8,6 +8,7 @@ use App\Support\KaryawanAktif;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -20,11 +21,21 @@ class BerkasDokumenController extends Controller
     /** Disk privat bukti pengajuan ketidakhadiran (sama dengan berkas sertifikat). */
     public const string DISK = SertifikatController::DISK;
 
+    /**
+     * Berkas sertifikat: tampil di browser, atau diunduh dengan ?unduh=1 (nama file: sertifikat-NIP-nama-dokumen.ext).
+     */
     public function sertifikat(Request $request, int $sertifikat): StreamedResponse
     {
-        $baris = DB::table('tbl_sertifikat')->where('id', $sertifikat)->first(['id_karyawan', 'file_upload as path']);
+        $baris = DB::table('tbl_sertifikat as s')
+            ->join('tbl_karyawan as k', 'k.id', '=', 's.id_karyawan')
+            ->where('s.id', $sertifikat)
+            ->first(['s.id_karyawan', 's.file_upload as path', 's.nama_dokumen', 'k.nip']);
 
-        return $this->kirim($request, $baris);
+        $namaUnduh = $baris !== null && $request->boolean('unduh')
+            ? 'sertifikat-'.Str::slug($baris->nip.' '.$baris->nama_dokumen).'.'.pathinfo((string) $baris->path, PATHINFO_EXTENSION)
+            : null;
+
+        return $this->kirim($request, $baris, $namaUnduh);
     }
 
     public function ketidakhadiran(Request $request, int $pengajuan): StreamedResponse
@@ -34,7 +45,10 @@ class BerkasDokumenController extends Controller
         return $this->kirim($request, $baris);
     }
 
-    private function kirim(Request $request, ?object $baris): StreamedResponse
+    /**
+     * @param  string|null  $namaUnduh  diisi = dikirim sebagai lampiran (unduh), null = tampil di browser
+     */
+    private function kirim(Request $request, ?object $baris, ?string $namaUnduh = null): StreamedResponse
     {
         abort_if($baris === null, 404);
 
@@ -46,9 +60,13 @@ class BerkasDokumenController extends Controller
         $disk = Storage::disk(self::DISK);
         abort_if(blank($baris->path) || ! $disk->exists($baris->path), 404);
 
-        return $disk->response($baris->path, null, [
+        $header = [
             'Cache-Control' => 'private, max-age=3600',
             'X-Content-Type-Options' => 'nosniff',
-        ]);
+        ];
+
+        return $namaUnduh !== null
+            ? $disk->download($baris->path, $namaUnduh, $header)
+            : $disk->response($baris->path, null, $header);
     }
 }

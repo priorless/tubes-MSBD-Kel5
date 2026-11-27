@@ -57,6 +57,8 @@
                             <td>
                                 @if ($item->file_upload)
                                     <a href="{{ route('sertifikat.berkas', $item->id) }}" target="_blank" rel="noopener" class="font-medium text-sji-biru hover:underline">Lihat</a>
+                                    <span class="text-gray-300">&middot;</span>
+                                    <a href="{{ route('sertifikat.berkas', ['sertifikat' => $item->id, 'unduh' => 1]) }}" class="font-medium text-sji-biru hover:underline">Unduh</a>
                                 @else
                                     <span class="text-gray-400">&mdash;</span>
                                 @endif
