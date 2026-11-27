@@ -119,7 +119,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('pengajuan-ketidakhadiran', [PengajuanKetidakhadiranController::class, 'index'])->name('ketidakhadiran.index');
         Route::patch('pengajuan-ketidakhadiran/{pengajuan}', [PengajuanKetidakhadiranController::class, 'update'])->whereNumber('pengajuan')->name('ketidakhadiran.update');
 
-        Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
+        Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
+            ->whereNumber('sertifikat');
         Route::get('monitoring-tenaga-kerja', MonitoringTenagaKerjaController::class)->name('monitoring');
         Route::get('catatan-driver', CatatanDriverController::class)->name('catatan-driver');
         // Data Klien: controller & tampilan yang sama dengan Operasional (satu sumber data tbl_klien).

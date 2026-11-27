@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hrd;
 use App\Http\Controllers\Concerns\MenanganiSignalDatabase;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hrd\StoreSertifikatRequest;
+use App\Http\Requests\Hrd\UpdateSertifikatRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,6 +77,48 @@ class SertifikatController extends Controller
         }
 
         return redirect()->route('hrd.sertifikat.index')->with('success', 'Dokumen sertifikat berhasil ditambahkan.');
+    }
+
+    public function edit(int $sertifikat): View
+    {
+        return view('hrd.sertifikat.edit', [
+            'sertifikat' => DB::table('tbl_sertifikat as s')
+                ->join('tbl_karyawan as k', 'k.id', '=', 's.id_karyawan')
+                ->where('s.id', $sertifikat)
+                ->select('s.*', 'k.nip', 'k.nama')
+                ->firstOrFail(),
+        ]);
+    }
+
+    /**
+     * Memperbarui baris sertifikat yang sama (id tetap). Berkas baru disimpan di disk privat lebih dulu;
+     * berkas lama baru dihapus setelah data tersimpan, sehingga kegagalan tidak menghilangkan berkas lama.
+     */
+    public function update(UpdateSertifikatRequest $request, int $sertifikat): RedirectResponse
+    {
+        $dataLama = DB::table('tbl_sertifikat')->where('id', $sertifikat)->firstOrFail();
+        $pathBaru = $request->file('file_upload')?->store('sertifikat', self::DISK);
+
+        try {
+            DB::table('tbl_sertifikat')->where('id', $sertifikat)->update([
+                ...Arr::except($request->validated(), ['file_upload']),
+                ...($pathBaru !== null ? ['file_upload' => $pathBaru] : []),
+            ]);
+        } catch (QueryException $exception) {
+            if ($pathBaru !== null) {
+                Storage::disk(self::DISK)->delete($pathBaru);
+            }
+
+            $pesan = $this->pesanSignalDatabase($exception) ?? throw $exception;
+
+            return back()->withInput()->with('error', $pesan);
+        }
+
+        if ($pathBaru !== null && filled($dataLama->file_upload)) {
+            Storage::disk(self::DISK)->delete($dataLama->file_upload);
+        }
+
+        return redirect()->route('hrd.sertifikat.index')->with('success', 'Dokumen sertifikat berhasil diperbarui.');
     }
 
     public function destroy(int $sertifikat): RedirectResponse

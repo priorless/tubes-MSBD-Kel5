@@ -63,7 +63,8 @@
                                     <span class="text-gray-400">&mdash;</span>
                                 @endif
                             </td>
-                            <td class="text-right">
+                            <td class="whitespace-nowrap text-right">
+                                <a href="{{ route('hrd.sertifikat.edit', $item->id) }}" class="btn-secondary btn-sm">Edit</a>
                                 <form action="{{ route('hrd.sertifikat.destroy', $item->id) }}" method="POST" class="inline" onsubmit="return confirm('Hapus dokumen ini?')">
                                     @csrf
                                     @method('DELETE')
