@@ -46,12 +46,12 @@
                                         <button type="button"
                                                 class="size-9 shrink-0 cursor-zoom-in overflow-hidden rounded-full transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sji-biru"
                                                 data-foto-karyawan
-                                                data-foto-url="{{ asset('storage/'.$item->foto) }}"
+                                                data-foto-url="{{ route('karyawan.foto', $item->id) }}"
                                                 data-foto-nama="{{ $item->nama }}"
                                                 aria-haspopup="dialog"
                                                 aria-controls="fotoKaryawanModal"
                                                 aria-label="Lihat foto {{ $item->nama }}">
-                                            <img src="{{ asset('storage/'.$item->foto) }}" alt="" class="size-9 rounded-full object-cover">
+                                            <img src="{{ route('karyawan.foto', $item->id) }}" alt="" class="size-9 rounded-full object-cover">
                                         </button>
                                     @else
                                         <span class="flex size-9 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-500">{{ mb_substr($item->nama, 0, 1) }}</span>

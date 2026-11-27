@@ -78,6 +78,10 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
     Route::get('/sertifikat/{sertifikat}/berkas', [BerkasDokumenController::class, 'sertifikat'])
         ->whereNumber('sertifikat')
         ->name('sertifikat.berkas');
+    // Foto profil karyawan (disk privat): hanya karyawan pemilik atau HRD — dicek di controller.
+    Route::get('/karyawan/{karyawan}/foto', [BerkasDokumenController::class, 'fotoKaryawan'])
+        ->whereNumber('karyawan')
+        ->name('karyawan.foto');
     Route::get('/ketidakhadiran/{pengajuan}/bukti', [BerkasDokumenController::class, 'ketidakhadiran'])
         ->whereNumber('pengajuan')
         ->name('ketidakhadiran.bukti');

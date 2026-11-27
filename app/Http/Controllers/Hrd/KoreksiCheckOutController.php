@@ -41,7 +41,7 @@ class KoreksiCheckOutController extends Controller
                 $query->where(fn ($sub) => $sub->where('k.nama', 'like', $pola)->orWhere('k.nip', 'like', $pola));
             })
             ->orderBy($status === 'Menunggu' ? 'kc.created_at' : 'kc.diproses_pada', $status === 'Menunggu' ? 'asc' : 'desc')
-            ->select('kc.*', 'a.tgl', 'a.jam_masuk', 'k.nama', 'k.nip', 'pemroses.nama as nama_pemroses')
+            ->select('kc.*', 'a.tgl', 'a.jam_masuk', 'k.nama', 'k.nip', 'k.status as status_karyawan', 'pemroses.nama as nama_pemroses')
             ->paginate(20)
             ->withQueryString();
 

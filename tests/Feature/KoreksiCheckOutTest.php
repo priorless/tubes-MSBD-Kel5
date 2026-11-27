@@ -128,6 +128,7 @@ class KoreksiCheckOutTest extends TestCase
             $table->increments('id');
             $table->string('nip');
             $table->string('nama');
+            $table->string('status')->default('Ditempatkan');
         });
         Schema::create('tbl_absensi', function (Blueprint $table): void {
             $table->increments('id');

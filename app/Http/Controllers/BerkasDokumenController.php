@@ -38,6 +38,14 @@ class BerkasDokumenController extends Controller
         return $this->kirim($request, $baris, $namaUnduh);
     }
 
+    /** Foto profil karyawan (disk privat). Pemilik = karyawan itu sendiri. */
+    public function fotoKaryawan(Request $request, int $karyawan): StreamedResponse
+    {
+        $baris = DB::table('tbl_karyawan')->where('id', $karyawan)->first(['id as id_karyawan', 'foto as path']);
+
+        return $this->kirim($request, $baris);
+    }
+
     public function ketidakhadiran(Request $request, int $pengajuan): StreamedResponse
     {
         $baris = DB::table('tbl_pengajuan_ketidakhadiran')->where('id', $pengajuan)->first(['id_karyawan', 'file_bukti as path']);

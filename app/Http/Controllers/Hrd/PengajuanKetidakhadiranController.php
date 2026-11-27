@@ -40,7 +40,7 @@ class PengajuanKetidakhadiranController extends Controller
                 $query->where(fn ($sub) => $sub->where('k.nama', 'like', $pola)->orWhere('k.nip', 'like', $pola));
             })
             ->orderBy($status === 'Menunggu' ? 'pk.tgl_mulai' : 'pk.diproses_pada', $status === 'Menunggu' ? 'asc' : 'desc')
-            ->select('pk.*', 'k.nama', 'k.nip', 'pemroses.nama as nama_pemroses')
+            ->select('pk.*', 'k.nama', 'k.nip', 'k.status as status_karyawan', 'pemroses.nama as nama_pemroses')
             ->paginate(20)
             ->withQueryString();
 

@@ -23,6 +23,15 @@ class KaryawanController extends Controller
 {
     use MenanganiSignalDatabase;
 
+    /**
+     * Disk privat foto profil karyawan (sama dengan berkas sertifikat): foto hanya dibuka lewat route karyawan.foto
+     * (pemilik atau HRD), tidak lagi lewat URL publik /storage.
+     */
+    public const string DISK_FOTO = SertifikatController::DISK;
+
+    /** Folder foto profil di disk; path yang tersimpan di tbl_karyawan.foto tidak berubah saat dipindah dari disk public. */
+    public const string FOLDER_FOTO = 'foto-karyawan';
+
     public function index(Request $request): View
     {
         $periodeGaji = now();
@@ -96,7 +105,7 @@ class KaryawanController extends Controller
     {
         $validated = $request->validated();
         $dataKaryawan = Arr::except($validated, ['foto', 'gaji_pokok']);
-        $pathFoto = $request->file('foto')?->store('foto-karyawan', 'public');
+        $pathFoto = $request->file('foto')?->store(self::FOLDER_FOTO, self::DISK_FOTO);
 
         try {
             DB::transaction(function () use ($dataKaryawan, $pathFoto, $validated, $gajiPokok): void {
@@ -140,7 +149,7 @@ class KaryawanController extends Controller
         $validated = $request->validated();
         $gajiLapangan = $dataLama->kategori === 'Lapangan' ? ($validated['gaji_pokok'] ?? null) : null;
         $dataBaru = Arr::except($validated, $dataLama->kategori === 'Lapangan' ? ['foto', 'gaji_pokok'] : ['foto']);
-        $pathFotoBaru = $request->file('foto')?->store('foto-karyawan', 'public');
+        $pathFotoBaru = $request->file('foto')?->store(self::FOLDER_FOTO, self::DISK_FOTO);
 
         if ($pathFotoBaru !== null) {
             $dataBaru['foto'] = $pathFotoBaru;
@@ -233,9 +242,13 @@ class KaryawanController extends Controller
         return back()->withInput()->with('error', $pesan);
     }
 
+    /**
+     * Hapus foto dari disk privat; salinan lama di disk public (sebelum dipindahkan) ikut dihapus bila masih ada.
+     */
     private function hapusBerkas(?string $path): void
     {
         if ($path !== null && $path !== '') {
+            Storage::disk(self::DISK_FOTO)->delete($path);
             Storage::disk('public')->delete($path);
         }
     }

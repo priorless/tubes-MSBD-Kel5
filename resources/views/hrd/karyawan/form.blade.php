@@ -209,7 +209,7 @@
                     </div>
                     <div class="card-body space-y-3">
                         <img id="pratinjau_foto" alt="Pratinjau foto karyawan"
-                            src="{{ $karyawan?->foto ? asset('storage/'.$karyawan->foto) : '' }}"
+                            src="{{ $karyawan?->foto ? route('karyawan.foto', $karyawan->id) : '' }}"
                             @class(['mx-auto max-h-52 rounded-lg border border-gray-200 object-cover', 'hidden' => ! $karyawan?->foto])>
                         <label for="foto" class="form-label">Pilih foto</label>
                         <input id="foto" name="foto" type="file" accept="image/png,image/jpeg"

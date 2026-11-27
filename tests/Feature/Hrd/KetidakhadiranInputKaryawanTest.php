@@ -9,6 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\Concerns\CreatesSjiAuthTables;
 use Tests\TestCase;
 
@@ -41,6 +42,12 @@ class KetidakhadiranInputKaryawanTest extends TestCase
             $table->string('nama');
             $table->string('kategori');
             $table->string('status')->default('Aktif');
+        });
+        Schema::create('tbl_payroll', function (Blueprint $table): void {
+            $table->increments('id');
+            $table->unsignedInteger('id_karyawan');
+            $table->unsignedTinyInteger('periode_bulan');
+            $table->unsignedSmallInteger('periode_tahun');
         });
 
         $this->idAndi = (int) DB::table('tbl_karyawan')->insertGetId(['nip' => 'SJI001', 'nama' => 'Andi Lapangan', 'kategori' => 'Lapangan']);
@@ -124,6 +131,38 @@ class KetidakhadiranInputKaryawanTest extends TestCase
             ->assertRedirect(route('hrd.absensi'))
             ->assertSessionHasErrors(['karyawan' => $pesan])
             ->assertSessionHasInput('karyawan', $isian);
+    }
+
+    #[TestWith(['Izin'])]
+    #[TestWith(['Sakit'])]
+    #[TestWith(['Alpha'])]
+    public function test_absence_is_rejected_when_payroll_for_that_period_already_exists(string $status): void
+    {
+        DB::table('tbl_payroll')->insert(['id_karyawan' => $this->idAndi, 'periode_bulan' => 11, 'periode_tahun' => 2026]);
+
+        // Ditolak sebelum procedure dipanggil: bila sempat dipanggil, SQLite melempar QueryException (bukan redirect).
+        $this->from(route('hrd.absensi'))
+            ->post(route('hrd.absensi.ketidakhadiran'), [...$this->payload('SJI001'), 'status_kehadiran' => $status])
+            ->assertRedirect(route('hrd.absensi'))
+            ->assertSessionHasErrors(['tgl' => 'Ketidakhadiran tidak dapat dicatat karena payroll periode tanggal ini sudah dibuat.'])
+            ->assertSessionHasInput('karyawan', 'SJI001');
+    }
+
+    public function test_payroll_of_another_employee_or_period_does_not_block_the_absence(): void
+    {
+        DB::table('tbl_payroll')->insert([
+            ['id_karyawan' => $this->idBudi, 'periode_bulan' => 11, 'periode_tahun' => 2026],
+            ['id_karyawan' => $this->idAndi, 'periode_bulan' => 10, 'periode_tahun' => 2026],
+        ]);
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->post(route('hrd.absensi.ketidakhadiran'), $this->payload('SJI001'));
+            $this->fail('sp_input_ketidakhadiran tidak dipanggil.');
+        } catch (QueryException $exception) {
+            $this->assertSame(self::PANGGIL_SP, $exception->getSql());
+            $this->assertSame([$this->idAndi, '2026-11-24', 'Sakit', 'Surat dokter'], $exception->getBindings());
+        }
     }
 
     public function test_status_and_date_rules_are_unchanged(): void

@@ -50,6 +50,9 @@
                                 <td>
                                     <p class="font-medium">{{ $baris->nama }}</p>
                                     <p class="text-xs text-gray-400">{{ $baris->nip }}</p>
+                                    @if ($baris->status_karyawan === 'Nonaktif')
+                                        <span class="badge badge-danger mt-1" title="Periksa apakah tanggal absensi sebelum karyawan dinonaktifkan">Karyawan Nonaktif</span>
+                                    @endif
                                 </td>
                                 <td class="whitespace-nowrap">
                                     <a href="{{ route('hrd.absensi.detail', $baris->id_absensi) }}" class="text-sji-biru hover:underline">{{ $tanggal($baris->tgl) }}</a>

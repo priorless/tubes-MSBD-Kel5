@@ -51,6 +51,9 @@
                                 <td>
                                     <p class="font-medium">{{ $baris->nama }}</p>
                                     <p class="text-xs text-gray-400">{{ $baris->nip }}</p>
+                                    @if ($baris->status_karyawan === 'Nonaktif')
+                                        <span class="badge badge-danger mt-1" title="Periksa apakah tanggal pengajuan sebelum karyawan dinonaktifkan">Karyawan Nonaktif</span>
+                                    @endif
                                 </td>
                                 <td class="font-medium">{{ $baris->jenis }}</td>
                                 <td class="whitespace-nowrap tabular-nums">
