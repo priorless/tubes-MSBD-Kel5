@@ -294,7 +294,9 @@ class TenagaKerjaService
                 }
 
                 $waktu = $this->waktuTransaksi();
-                $query = DB::table($tabel)->where($kolomId, $idKaryawan)->whereNull($kolomKeluar);
+                // Hanya sesi yang sudah check-in; baris Izin/Sakit/Cuti/Alpha (tanpa jam masuk) tidak bisa di-check-out.
+                $query = DB::table($tabel)->where($kolomId, $idKaryawan)->whereNull($kolomKeluar)
+                    ->whereNotNull($this->kolomWajib($tabel, 'jam_masuk'));
                 $query = $idAktif !== false
                     ? $query->where($kolomPk, $idAktif)
                     : $query->whereRaw('DATE(`'.$this->kolomTanggalAbsensi().'`) = ?', [$waktu->tgl]);

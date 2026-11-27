@@ -22,21 +22,24 @@ class SertifikatController extends Controller
      */
     public const BATAS_HARI_PERINGATAN = 30;
 
+    /**
+     * Disk privat berkas sertifikat: berkas hanya dibuka lewat route sertifikat.berkas (pemilik atau HRD).
+     */
+    public const string DISK = 'local';
+
     public function index(Request $request): View
     {
-        $sertifikat = DB::table('tbl_sertifikat as s')
-            ->join('tbl_karyawan as k', 'k.id', '=', 's.id_karyawan')
-            ->select('s.*', 'k.nip', 'k.nama')
-            ->selectRaw('fn_sisa_hari_dokumen(s.tgl_kadaluarsa) AS sisa_hari')
-            ->when($request->boolean('hampir_habis'), fn ($query) => $query->whereRaw('fn_sisa_hari_dokumen(s.tgl_kadaluarsa) < ?', [self::BATAS_HARI_PERINGATAN]))
+        // Status & sisa hari dihitung view v_sertifikat_karyawan dari tgl_kadaluarsa (tidak disimpan di tabel).
+        $sertifikat = DB::table('v_sertifikat_karyawan')
+            ->when($request->boolean('hampir_habis'), fn ($query) => $query->where('sisa_hari', '<', self::BATAS_HARI_PERINGATAN))
             ->when($request->filled('q'), function ($query) use ($request): void {
                 $kataKunci = '%'.$request->string('q').'%';
-                $query->where(fn ($sub) => $sub->where('k.nama', 'like', $kataKunci)
-                    ->orWhere('k.nip', 'like', $kataKunci)
-                    ->orWhere('s.nama_dokumen', 'like', $kataKunci));
+                $query->where(fn ($sub) => $sub->where('nama', 'like', $kataKunci)
+                    ->orWhere('nip', 'like', $kataKunci)
+                    ->orWhere('nama_dokumen', 'like', $kataKunci));
             })
             ->orderBy('sisa_hari')
-            ->orderBy('k.nama')
+            ->orderBy('nama')
             ->paginate(15)
             ->withQueryString();
 
@@ -55,7 +58,7 @@ class SertifikatController extends Controller
 
     public function store(StoreSertifikatRequest $request): RedirectResponse
     {
-        $pathBerkas = $request->file('file_upload')?->store('sertifikat', 'public');
+        $pathBerkas = $request->file('file_upload')?->store('sertifikat', self::DISK);
 
         try {
             DB::table('tbl_sertifikat')->insert([
@@ -64,7 +67,7 @@ class SertifikatController extends Controller
             ]);
         } catch (QueryException $exception) {
             if ($pathBerkas !== null) {
-                Storage::disk('public')->delete($pathBerkas);
+                Storage::disk(self::DISK)->delete($pathBerkas);
             }
 
             $pesan = $this->pesanSignalDatabase($exception) ?? throw $exception;
@@ -88,7 +91,7 @@ class SertifikatController extends Controller
         }
 
         if ($data->file_upload) {
-            Storage::disk('public')->delete($data->file_upload);
+            Storage::disk(self::DISK)->delete($data->file_upload);
         }
 
         return redirect()->route('hrd.sertifikat.index')->with('success', 'Dokumen sertifikat berhasil dihapus.');

@@ -42,7 +42,7 @@
             @foreach ([
                 ['Hari Wajib', $kehadiran['hari_wajib'], 'text-sji-biru'],
                 ['Hadir', $kehadiran['hadir'], 'text-emerald-600'],
-                ['Izin / Sakit', $kehadiran['izin'] + $kehadiran['sakit'], 'text-sky-600'],
+                ['Izin / Sakit / Cuti', $kehadiran['izin'] + $kehadiran['sakit'] + $kehadiran['cuti'], 'text-sky-600'],
                 ['Alpha (Tanpa Keterangan)', $kehadiran['alpha'], 'text-red-500'],
                 ['Belum Berjalan', $kehadiran['belum_berjalan'], 'text-gray-500'],
             ] as [$label, $nilai, $warnaAngka])

@@ -27,6 +27,20 @@ trait MenanganiSignalDatabase
     }
 
     /**
+     * Teks asli SIGNAL SQLSTATE '45000' (tanpa awalan), untuk ditampilkan di bawah field form; null bila bukan SIGNAL.
+     */
+    protected function teksSignalDatabase(QueryException $exception): ?string
+    {
+        if ($this->sqlStateDari($exception) !== '45000') {
+            return null;
+        }
+
+        $pesan = trim((string) preg_replace('/^\d+\s+/', '', (string) ($exception->errorInfo[2] ?? '')));
+
+        return $pesan === '' ? 'Operasi ditolak oleh aturan database.' : $pesan;
+    }
+
+    /**
      * Apakah exception disebabkan nilai unik yang sudah dipakai (MySQL 1062).
      */
     protected function dataDuplikat(QueryException $exception): bool

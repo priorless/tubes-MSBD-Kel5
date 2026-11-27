@@ -4,6 +4,7 @@ namespace Tests\Concerns;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 /**
@@ -91,6 +92,9 @@ trait MemakaiDatabaseSji
             ->where(fn ($q) => $q->whereIn('id_karyawan', $karyawan ?: [0])->orWhereIn('id_klien', $klien ?: [0]))
             ->pluck('id')->all();
 
+        if (Schema::hasTable('tbl_pengajuan_ketidakhadiran')) {
+            DB::table('tbl_pengajuan_ketidakhadiran')->whereIn('id_karyawan', $karyawan ?: [0])->delete();
+        }
         DB::table('tbl_absensi')->whereIn('id_karyawan', $karyawan ?: [0])->delete();
         DB::table('tbl_payroll')->whereIn('id_karyawan', $karyawan ?: [0])->delete();
         DB::table('tbl_invoice')->whereIn('id_klien', $klien ?: [0])->delete();

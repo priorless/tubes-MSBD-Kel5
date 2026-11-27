@@ -66,6 +66,7 @@
                 'Terlambat' => $kehadiran['terlambat'],
                 'Izin' => $kehadiran['izin'],
                 'Sakit' => $kehadiran['sakit'],
+                'Cuti' => $kehadiran['cuti'],
                 'Alpha (Tanpa Keterangan)' => $kehadiran['alpha'],
                 'Belum Berjalan' => $kehadiran['belum_berjalan'],
             ] as $label => $nilai)

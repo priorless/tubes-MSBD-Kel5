@@ -5,7 +5,7 @@
 @use('App\Support\FormatKolom')
 
 @php
-    $warnaKehadiran = ['Hadir' => 'success', 'Terlambat' => 'warning', 'Izin' => 'info', 'Sakit' => 'info', 'Alpha' => 'danger'];
+    $warnaKehadiran = ['Hadir' => 'success', 'Terlambat' => 'warning', 'Izin' => 'info', 'Sakit' => 'info', 'Cuti' => 'info', 'Alpha' => 'danger'];
 @endphp
 
 @section('content')

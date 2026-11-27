@@ -288,7 +288,7 @@ class KeuanganKomponenGajiController extends Controller
                 $hariPenempatan = (int) DB::selectOne('SELECT fn_hari_penempatan(?, NULL, ?, ?) AS jumlah', [$karyawan->id, $awal, $akhir])->jumlah;
                 $hariWajib = (int) round((int) $kontrak->hari_kerja_per_bulan * $hariPenempatan / $hariBulan);
                 $hariMasuk = DB::table('tbl_absensi')->where('id_karyawan', $karyawan->id)
-                    ->whereBetween('tgl', [$awal, $akhir])->whereIn('status_kehadiran', ['Hadir', 'Terlambat', 'Sakit'])->count();
+                    ->whereBetween('tgl', [$awal, $akhir])->whereIn('status_kehadiran', ['Hadir', 'Terlambat', 'Sakit', 'Cuti'])->count();
                 $hariAbsen = max(0, $hariWajib - $hariMasuk);
                 // Gaji pokok sebulan dari Komponen Gaji (bila sudah diinput), selain itu gaji kontrak.
                 $tarif = ($gajiBulanan ?? (float) $kontrak->gaji_pokok) / (int) $kontrak->hari_kerja_per_bulan;

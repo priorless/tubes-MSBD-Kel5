@@ -18,7 +18,7 @@ Dokumen ini menjelaskan strategi backup database aplikasi PT Satu Jaya Indonesia
 **Mengapa `--routines --triggers --events`.** Logika bisnis db_sji banyak berada di dalam database:
 - function dan procedure, misalnya `sp_generate_payroll_bulanan`, `sp_generate_invoice_klien`, dan `fn_hari_wajib_roster`;
 - trigger, misalnya `trg_auto_hitung_lembur`, `trg_cek_jadwal_kerja_*`, dan trigger log aktivitas;
-- event `ev_update_status_sertifikat`.
+- event `ev_tandai_alpha_otomatis` (Alpha otomatis untuk shift tanpa check-in). Event lama `ev_update_status_sertifikat` sudah dihapus di `sql/Komponen/23` karena status sertifikat kini dihitung view.
 
 Tanpa opsi-opsi ini, hasil restore hanya berisi tabel, dan aplikasi tidak berjalan benar.
 

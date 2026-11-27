@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Hrd;
 
+use App\Http\Controllers\Concerns\MenanganiSignalDatabase;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -16,6 +18,8 @@ use Illuminate\View\View;
  */
 class KoreksiCheckOutController extends Controller
 {
+    use MenanganiSignalDatabase;
+
     /** @var list<string> */
     public const array STATUS = ['Menunggu', 'Disetujui', 'Ditolak'];
 
@@ -60,6 +64,26 @@ class KoreksiCheckOutController extends Controller
             'catatan_keputusan.max' => 'Catatan maksimal 500 karakter.',
         ]);
 
+        try {
+            $this->putuskan($request, $koreksi, $valid);
+        } catch (QueryException $exception) {
+            // Batas wajar jam keluar diperiksa ulang trigger trg_koreksi_check_out_update saat disetujui.
+            throw ValidationException::withMessages([
+                'keputusan' => $this->teksSignalDatabase($exception) ?? throw $exception,
+            ]);
+        }
+
+        return redirect()->route('hrd.koreksi-check-out.index')
+            ->with('success', $valid['keputusan'] === 'Disetujui'
+                ? 'Koreksi disetujui. Jam keluar absensi sudah diperbarui.'
+                : 'Pengajuan koreksi ditolak.');
+    }
+
+    /**
+     * @param  array{keputusan: string, catatan_keputusan?: string|null}  $valid
+     */
+    private function putuskan(Request $request, int $koreksi, array $valid): void
+    {
         DB::transaction(function () use ($request, $koreksi, $valid): void {
             $baris = DB::table('tbl_koreksi_check_out')->where('id', $koreksi)->lockForUpdate()->first();
             abort_if($baris === null, 404);
@@ -80,11 +104,6 @@ class KoreksiCheckOutController extends Controller
                 'updated_at' => now(),
             ]);
         });
-
-        return redirect()->route('hrd.koreksi-check-out.index')
-            ->with('success', $valid['keputusan'] === 'Disetujui'
-                ? 'Koreksi disetujui. Jam keluar absensi sudah diperbarui.'
-                : 'Pengajuan koreksi ditolak.');
     }
 
     /**

@@ -1,8 +1,11 @@
 -- ============================================================
 -- sql/final/04_procedure.sql — Stored procedure
--- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–10. DEFINER dihapus agar bisa diimpor
--- di komputer lain. Urutan impor: lihat sql/README.md.
+-- Diekspor dari database db_sji (MySQL 8) setelah migration terakhir (sql/Komponen/24). DEFINER dihapus agar bisa
+-- diimpor di komputer lain. Urutan impor: lihat sql/README.md.
 -- ============================================================
+
+-- Charset koneksi saat impor: klien mysql di Windows memakai cp850 bila tidak diatur.
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 DELIMITER //
 
@@ -62,18 +65,21 @@ END //
 
 DROP PROCEDURE IF EXISTS `sp_cek_jadwal_kerja` //
 CREATE PROCEDURE `sp_cek_jadwal_kerja`(IN p_id INT, IN p_id_penempatan INT, IN p_tanggal DATE, IN p_status VARCHAR(5),
-                                     IN p_jam_masuk TIME, IN p_jam_pulang TIME)
+                                     IN p_jam_masuk TIME, IN p_jam_pulang TIME, IN p_id_pengganti INT)
 BEGIN
   DECLARE v_id_karyawan INT;
   DECLARE v_mulai DATE;
   DECLARE v_selesai DATE;
+  DECLARE v_layanan INT;
+  DECLARE v_pekerja INT;
   DECLARE v_awal DATETIME;
   DECLARE v_akhir DATETIME;
   DECLARE v_bentrok DATE;
   DECLARE v_pesan VARCHAR(255);
 
-  SELECT id_karyawan, tgl_mulai, tgl_selesai INTO v_id_karyawan, v_mulai, v_selesai
-  FROM tbl_penempatan WHERE id = p_id_penempatan;
+  SELECT p.id_karyawan, p.tgl_mulai, p.tgl_selesai, k.id_jenis_layanan INTO v_id_karyawan, v_mulai, v_selesai, v_layanan
+  FROM tbl_penempatan p JOIN tbl_karyawan k ON k.id = p.id_karyawan
+  WHERE p.id = p_id_penempatan;
 
   IF v_id_karyawan IS NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Penempatan tidak ditemukan.';
@@ -82,9 +88,36 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tanggal jadwal harus berada dalam masa penempatan.';
   END IF;
 
+  -- Pengganti (backup shift): jenis layanan sama, penempatan aktif pada tanggal itu, dan tidak sedang bekerja
+  -- di shift lain pada tanggal yang sama (satu karyawan hanya punya satu absensi per tanggal).
+  IF p_id_pengganti IS NOT NULL THEN
+    IF p_id_pengganti = v_id_karyawan THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengganti shift tidak boleh karyawan pemilik jadwal.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM tbl_karyawan WHERE id = p_id_pengganti AND id_jenis_layanan = v_layanan) THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengganti shift harus memiliki jabatan/jenis layanan yang sama.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM tbl_penempatan p
+                   WHERE p.id_karyawan = p_id_pengganti AND p.status = 'Aktif'
+                     AND p.tgl_mulai <= p_tanggal AND (p.tgl_selesai IS NULL OR p.tgl_selesai >= p_tanggal)) THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengganti shift tidak memiliki penempatan aktif pada tanggal tersebut.';
+    END IF;
+  END IF;
+
+  SET v_pekerja = COALESCE(p_id_pengganti, v_id_karyawan);
+
   IF p_status = 'Kerja' THEN
     IF p_jam_masuk IS NULL OR p_jam_pulang IS NULL THEN
       SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pilih jam tersimpan atau isi jam masuk dan jam pulang terlebih dahulu.';
+    END IF;
+
+    -- Shift backup tidak boleh berbagi tanggal dengan shift Kerja lain milik pekerja yang sama.
+    IF EXISTS (SELECT 1 FROM tbl_jadwal_kerja j JOIN tbl_penempatan p ON p.id = j.id_penempatan
+               WHERE COALESCE(j.id_karyawan_pengganti, p.id_karyawan) = v_pekerja
+                 AND (p_id IS NULL OR j.id <> p_id)
+                 AND j.status = 'Kerja' AND j.tanggal_kerja = p_tanggal
+                 AND (j.id_karyawan_pengganti IS NOT NULL OR p_id_pengganti IS NOT NULL)) THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Karyawan sudah memiliki shift Kerja (termasuk backup shift) pada tanggal tersebut.';
     END IF;
 
     -- Shift lewat tengah malam (jam pulang <= jam masuk) berakhir keesokan harinya, jadi jadwal H-1 dan H+1 ikut diperiksa.
@@ -94,8 +127,8 @@ BEGIN
     SELECT j.tanggal_kerja INTO v_bentrok
     FROM tbl_jadwal_kerja j
     JOIN tbl_penempatan p ON p.id = j.id_penempatan
-    WHERE p.id_karyawan = v_id_karyawan
-      AND j.id_penempatan <> p_id_penempatan
+    WHERE COALESCE(j.id_karyawan_pengganti, p.id_karyawan) = v_pekerja
+      AND NOT (j.id_penempatan = p_id_penempatan AND j.id_karyawan_pengganti IS NULL AND p_id_pengganti IS NULL)
       AND (p_id IS NULL OR j.id <> p_id)
       AND j.status = 'Kerja'
       AND j.jam_masuk IS NOT NULL AND j.jam_pulang IS NOT NULL
@@ -110,6 +143,97 @@ BEGIN
                            DATE_FORMAT(v_bentrok, '%d-%m-%Y'), '.');
       SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_pesan;
     END IF;
+  END IF;
+END //
+
+DROP PROCEDURE IF EXISTS `sp_cek_koreksi_check_out` //
+CREATE PROCEDURE `sp_cek_koreksi_check_out`(IN p_id_absensi INT, IN p_jam_keluar TIME)
+BEGIN
+  DECLARE v_masuk TIME;
+  DECLARE v_pulang TIME;
+  DECLARE v_durasi INT;
+  DECLARE v_sampai_pulang INT;
+  DECLARE v_batas INT;
+  DECLARE v_pesan VARCHAR(255);
+
+  SET v_masuk = (SELECT jam_masuk FROM tbl_absensi WHERE id = p_id_absensi);
+  IF v_masuk IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Absensi ini tidak memiliki jam check-in sehingga jam keluarnya tidak dapat dikoreksi.';
+  END IF;
+  IF p_jam_keluar IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jam keluar koreksi wajib diisi.';
+  END IF;
+
+  -- Durasi kerja memakai putaran 24 jam yang sama dengan trg_auto_hitung_lembur (shift lewat tengah malam).
+  SET v_durasi = FLOOR(MOD(TIME_TO_SEC(p_jam_keluar) - TIME_TO_SEC(v_masuk) + 86400, 86400) / 60);
+  SET v_pulang = (SELECT fn_jadwal_absensi(id_penempatan, tgl, 'pulang') FROM tbl_absensi WHERE id = p_id_absensi);
+
+  IF v_pulang IS NULL THEN
+    -- Tanpa jadwal: sama dengan jendela sesi aktif fn_id_absensi_aktif (16 jam).
+    SET v_batas = 960;
+  ELSE
+    SET v_sampai_pulang = FLOOR(MOD(TIME_TO_SEC(v_pulang) - TIME_TO_SEC(v_masuk) + 86400, 86400) / 60);
+    -- Check-in setelah jadwal pulang (data lama) tidak dianggap punya sisa jam kerja.
+    IF v_sampai_pulang > 960 THEN
+      SET v_sampai_pulang = 0;
+    END IF;
+    -- Maksimal 4 jam lembur per hari setelah jadwal pulang.
+    SET v_batas = v_sampai_pulang + 240;
+  END IF;
+
+  IF v_durasi < 30 OR v_durasi > v_batas THEN
+    SET v_pesan = CONCAT('Jam keluar harus antara ',
+                         TIME_FORMAT(SEC_TO_TIME(MOD(TIME_TO_SEC(v_masuk) + 1800, 86400)), '%H:%i'), ' dan ',
+                         TIME_FORMAT(SEC_TO_TIME(MOD(TIME_TO_SEC(v_masuk) + v_batas * 60, 86400)), '%H:%i'),
+                         IF(v_pulang IS NULL,
+                            ' (minimal 30 menit, maksimal 16 jam setelah check-in).',
+                            CONCAT(' (minimal 30 menit setelah check-in, maksimal 4 jam setelah jadwal pulang ',
+                                   TIME_FORMAT(v_pulang, '%H:%i'), ').')));
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_pesan;
+  END IF;
+END //
+
+DROP PROCEDURE IF EXISTS `sp_cek_penempatan_absensi` //
+CREATE PROCEDURE `sp_cek_penempatan_absensi`(IN p_id_karyawan INT, IN p_id_penempatan INT, IN p_tgl DATE)
+BEGIN
+  DECLARE v_pemilik INT DEFAULT NULL;
+
+  IF p_id_penempatan IS NOT NULL THEN
+    SET v_pemilik = (SELECT id_karyawan FROM tbl_penempatan WHERE id = p_id_penempatan);
+
+    IF v_pemilik = p_id_karyawan THEN
+      IF EXISTS (SELECT 1 FROM tbl_jadwal_kerja
+                 WHERE id_penempatan = p_id_penempatan AND tanggal_kerja = p_tgl AND id_karyawan_pengganti IS NOT NULL) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Shift pada tanggal ini sudah digantikan rekan (backup shift), absensi tidak dapat dicatat.';
+      END IF;
+    ELSEIF NOT EXISTS (SELECT 1 FROM tbl_jadwal_kerja
+                       WHERE id_penempatan = p_id_penempatan AND tanggal_kerja = p_tgl AND id_karyawan_pengganti = p_id_karyawan) THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Penempatan pada absensi bukan milik karyawan ini dan bukan shift backup yang ditugaskan kepadanya.';
+    END IF;
+  END IF;
+END //
+
+DROP PROCEDURE IF EXISTS `sp_cek_pertukaran_shift` //
+CREATE PROCEDURE `sp_cek_pertukaran_shift`(IN p_id_jadwal INT, IN p_id_pengaju INT, IN p_id_rekan INT, IN p_tanggal DATE)
+BEGIN
+  DECLARE v_pemilik INT DEFAULT NULL;
+  DECLARE v_tanggal DATE DEFAULT NULL;
+  DECLARE v_layanan INT DEFAULT NULL;
+
+  SELECT p.id_karyawan, j.tanggal_kerja INTO v_pemilik, v_tanggal
+  FROM tbl_jadwal_kerja j JOIN tbl_penempatan p ON p.id = j.id_penempatan
+  WHERE j.id = p_id_jadwal;
+
+  IF v_pemilik IS NULL OR v_pemilik <> p_id_pengaju THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jadwal yang diajukan bukan milik karyawan pengaju.';
+  END IF;
+  IF v_tanggal <> p_tanggal THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tanggal kerja pengajuan tidak sesuai dengan tanggal jadwal.';
+  END IF;
+
+  SET v_layanan = (SELECT id_jenis_layanan FROM tbl_karyawan WHERE id = p_id_pengaju);
+  IF v_layanan IS NULL OR NOT EXISTS (SELECT 1 FROM tbl_karyawan WHERE id = p_id_rekan AND id_jenis_layanan = v_layanan) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Rekan pengganti harus memiliki jabatan/jenis layanan yang sama dengan pengaju.';
   END IF;
 END //
 
@@ -334,15 +458,22 @@ BEGIN
           LIMIT 1;
         END;
 
+        -- Gaji pokok sebulan diinput Keuangan di Komponen Gaji (dari sekretaris); nilai terakhir yang berlaku
+        -- sampai periode ini dipakai. Bila belum pernah diinput, tetap memakai gaji pada kontrak penempatan.
+        IF v_gaji_kontrak IS NOT NULL THEN
+          SET v_gaji_kontrak = COALESCE(fn_gaji_pokok_berlaku(v_id, p_bulan, p_tahun), v_gaji_kontrak);
+        END IF;
+
         -- Penempatan tanpa kontrak: dilewati (tidak menghentikan karyawan lain).
         IF v_gaji_kontrak IS NOT NULL AND v_hari_kerja > 0 THEN
           SET v_tarif = v_gaji_kontrak / v_hari_kerja;
           -- Hari wajib = hari Kerja di roster + hari tanpa jadwal (prorata kontrak seperti rumus lama).
           SET v_hari_wajib = fn_hari_wajib_roster(v_id, NULL, v_awal, v_akhir, v_hari_kerja);
           -- Absensi pada tanggal Libur di roster tidak dihitung hari masuk biasa (dibayar lewat upah_backup).
+          -- Sakit dan Cuti (cuti berbayar yang disetujui HRD) dihitung hari masuk, sehingga tidak dipotong.
           SET v_hari_masuk = (SELECT COUNT(*) FROM tbl_absensi a
                               WHERE a.id_karyawan = v_id AND a.tgl BETWEEN v_awal AND v_akhir
-                                AND a.status_kehadiran IN ('Hadir', 'Terlambat', 'Sakit')
+                                AND a.status_kehadiran IN ('Hadir', 'Terlambat', 'Sakit', 'Cuti')
                                 AND NOT (fn_status_roster(v_id, a.tgl) <=> 'Libur'));
           SET v_hari_libur_kerja = (SELECT COUNT(*) FROM tbl_absensi a
                                     WHERE a.id_karyawan = v_id AND a.tgl BETWEEN v_awal AND v_akhir
@@ -430,6 +561,7 @@ BEGIN
   DECLARE v_kategori VARCHAR(10);
   DECLARE v_status_karyawan VARCHAR(20);
   DECLARE v_pen_id INT;
+  DECLARE v_id_alpha INT DEFAULT NULL;
 
   IF p_status IS NULL OR p_status NOT IN ('Izin', 'Sakit', 'Alpha') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Status ketidakhadiran hanya boleh Izin, Sakit, atau Alpha';
@@ -450,23 +582,31 @@ BEGIN
   IF v_status_karyawan = 'Nonaktif' THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Karyawan berstatus Nonaktif tidak dapat dicatat ketidakhadirannya';
   END IF;
-  IF EXISTS (SELECT 1 FROM tbl_absensi WHERE id_karyawan = p_id_karyawan AND tgl = p_tgl) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Karyawan sudah memiliki catatan absensi pada tanggal tersebut';
+
+  -- Alpha tanpa check-in (termasuk Alpha otomatis) boleh diganti keterangan yang sebenarnya (Izin/Sakit).
+  SET v_id_alpha = (SELECT id FROM tbl_absensi
+                    WHERE id_karyawan = p_id_karyawan AND tgl = p_tgl AND status_kehadiran = 'Alpha' AND jam_masuk IS NULL);
+  IF v_id_alpha IS NOT NULL AND p_status <> 'Alpha' THEN
+    UPDATE tbl_absensi SET status_kehadiran = p_status, keterangan = NULLIF(TRIM(p_keterangan), '') WHERE id = v_id_alpha;
+  ELSE
+    IF EXISTS (SELECT 1 FROM tbl_absensi WHERE id_karyawan = p_id_karyawan AND tgl = p_tgl) THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Karyawan sudah memiliki catatan absensi pada tanggal tersebut';
+    END IF;
+
+    SET v_pen_id = (
+      SELECT id FROM tbl_penempatan
+      WHERE id_karyawan = p_id_karyawan
+        AND tgl_mulai <= p_tgl AND (tgl_selesai IS NULL OR tgl_selesai >= p_tgl)
+      ORDER BY tgl_mulai DESC, id DESC
+      LIMIT 1);
+
+    IF v_kategori = 'Lapangan' AND v_pen_id IS NULL THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Karyawan Lapangan tidak memiliki penempatan pada tanggal tersebut';
+    END IF;
+
+    INSERT INTO tbl_absensi (id_karyawan, id_penempatan, tgl, status_kehadiran, keterangan)
+    VALUES (p_id_karyawan, v_pen_id, p_tgl, p_status, NULLIF(TRIM(p_keterangan), ''));
   END IF;
-
-  SET v_pen_id = (
-    SELECT id FROM tbl_penempatan
-    WHERE id_karyawan = p_id_karyawan
-      AND tgl_mulai <= p_tgl AND (tgl_selesai IS NULL OR tgl_selesai >= p_tgl)
-    ORDER BY tgl_mulai DESC, id DESC
-    LIMIT 1);
-
-  IF v_kategori = 'Lapangan' AND v_pen_id IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Karyawan Lapangan tidak memiliki penempatan pada tanggal tersebut';
-  END IF;
-
-  INSERT INTO tbl_absensi (id_karyawan, id_penempatan, tgl, status_kehadiran, keterangan)
-  VALUES (p_id_karyawan, v_pen_id, p_tgl, p_status, NULLIF(TRIM(p_keterangan), ''));
 END //
 
 DROP PROCEDURE IF EXISTS `sp_rotasi_karyawan` //
@@ -600,6 +740,140 @@ BEGIN
       AND NOT EXISTS (SELECT 1 FROM tbl_penempatan
                       WHERE id_karyawan = v_karyawan AND status = 'Aktif');
   COMMIT;
+END //
+
+DROP PROCEDURE IF EXISTS `sp_setujui_pengajuan_ketidakhadiran` //
+CREATE PROCEDURE `sp_setujui_pengajuan_ketidakhadiran`(IN p_id INT, IN p_diproses_oleh INT)
+BEGIN
+  DECLARE v_karyawan INT DEFAULT NULL;
+  DECLARE v_kategori VARCHAR(10);
+  DECLARE v_jenis VARCHAR(10);
+  DECLARE v_mulai DATE;
+  DECLARE v_selesai DATE;
+  DECLARE v_status VARCHAR(10) DEFAULT NULL;
+  DECLARE v_alasan VARCHAR(500);
+  DECLARE v_tgl DATE;
+  DECLARE v_pen INT;
+  DECLARE v_id_alpha INT;
+  DECLARE v_jumlah INT DEFAULT 0;
+  DECLARE v_pesan VARCHAR(255);
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN SET @sji_pengajuan_disetujui = NULL; RESIGNAL; END;
+
+  IF p_diproses_oleh IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pemroses pengajuan wajib diisi.';
+  END IF;
+
+  SELECT id_karyawan, jenis, tgl_mulai, tgl_selesai, status, alasan
+  INTO v_karyawan, v_jenis, v_mulai, v_selesai, v_status, v_alasan
+  FROM tbl_pengajuan_ketidakhadiran WHERE id = p_id
+  FOR UPDATE;
+
+  IF v_status IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengajuan ketidakhadiran tidak ditemukan.';
+  END IF;
+  IF v_status <> 'Menunggu' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengajuan ini sudah diproses sebelumnya dan tidak dapat diproses lagi.';
+  END IF;
+
+  SET v_kategori = (SELECT kategori FROM tbl_karyawan WHERE id = v_karyawan);
+
+  -- Tahap periksa: tidak ada baris yang ditulis bila satu tanggal saja bermasalah.
+  -- Hari Libur di roster (termasuk jadwal yang digantikan rekan) dan hari tanpa penempatan dilewati.
+  -- Alpha tanpa check-in (termasuk Alpha otomatis) bukan halangan: barisnya diganti jenis pengajuan.
+  SET v_tgl = v_mulai;
+  WHILE v_tgl <= v_selesai DO
+    SET v_pen = (SELECT id FROM tbl_penempatan
+                 WHERE id_karyawan = v_karyawan AND tgl_mulai <= v_tgl AND (tgl_selesai IS NULL OR tgl_selesai >= v_tgl)
+                 ORDER BY tgl_mulai DESC, id DESC LIMIT 1);
+    IF NOT (fn_status_roster(v_karyawan, v_tgl) <=> 'Libur') AND (v_pen IS NOT NULL OR v_kategori = 'Internal') THEN
+      IF EXISTS (SELECT 1 FROM tbl_absensi WHERE id_karyawan = v_karyawan AND tgl = v_tgl
+                 AND NOT (status_kehadiran = 'Alpha' AND jam_masuk IS NULL)) THEN
+        SET v_pesan = CONCAT('Karyawan sudah memiliki catatan absensi pada ', DATE_FORMAT(v_tgl, '%d-%m-%Y'),
+                             '. Pengajuan tidak dapat disetujui.');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_pesan;
+      END IF;
+      -- Payroll yang sudah dibuat tidak dihitung ulang, jadi absensi periodenya tidak boleh berubah lagi.
+      IF EXISTS (SELECT 1 FROM tbl_payroll WHERE id_karyawan = v_karyawan
+                 AND periode_bulan = MONTH(v_tgl) AND periode_tahun = YEAR(v_tgl)) THEN
+        SET v_pesan = CONCAT('Payroll periode ', DATE_FORMAT(v_tgl, '%m/%Y'),
+                             ' karyawan ini sudah dibuat. Pengajuan tidak dapat disetujui.');
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_pesan;
+      END IF;
+      SET v_jumlah = v_jumlah + 1;
+    END IF;
+    SET v_tgl = v_tgl + INTERVAL 1 DAY;
+  END WHILE;
+
+  IF v_jumlah = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tidak ada hari kerja dalam rentang pengajuan (semua Libur atau di luar masa penempatan).';
+  END IF;
+
+  -- Tahap catat.
+  SET v_tgl = v_mulai;
+  WHILE v_tgl <= v_selesai DO
+    SET v_pen = (SELECT id FROM tbl_penempatan
+                 WHERE id_karyawan = v_karyawan AND tgl_mulai <= v_tgl AND (tgl_selesai IS NULL OR tgl_selesai >= v_tgl)
+                 ORDER BY tgl_mulai DESC, id DESC LIMIT 1);
+    IF NOT (fn_status_roster(v_karyawan, v_tgl) <=> 'Libur') AND (v_pen IS NOT NULL OR v_kategori = 'Internal') THEN
+      SET v_id_alpha = (SELECT id FROM tbl_absensi
+                        WHERE id_karyawan = v_karyawan AND tgl = v_tgl AND status_kehadiran = 'Alpha' AND jam_masuk IS NULL);
+      IF v_id_alpha IS NOT NULL THEN
+        UPDATE tbl_absensi
+        SET status_kehadiran = v_jenis, keterangan = LEFT(CONCAT('Pengajuan #', p_id, ': ', v_alasan), 255)
+        WHERE id = v_id_alpha;
+      ELSE
+        INSERT INTO tbl_absensi (id_karyawan, id_penempatan, tgl, status_kehadiran, keterangan)
+        VALUES (v_karyawan, v_pen, v_tgl, v_jenis, LEFT(CONCAT('Pengajuan #', p_id, ': ', v_alasan), 255));
+      END IF;
+    END IF;
+    SET v_tgl = v_tgl + INTERVAL 1 DAY;
+  END WHILE;
+
+  SET @sji_pengajuan_disetujui = p_id;
+  UPDATE tbl_pengajuan_ketidakhadiran
+  SET status = 'Disetujui', diproses_oleh = p_diproses_oleh, diproses_pada = NOW(), updated_at = NOW()
+  WHERE id = p_id;
+  SET @sji_pengajuan_disetujui = NULL;
+END //
+
+DROP PROCEDURE IF EXISTS `sp_tandai_alpha_otomatis` //
+CREATE PROCEDURE `sp_tandai_alpha_otomatis`(IN p_waktu DATETIME)
+BEGIN
+  IF p_waktu IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Waktu acuan Alpha otomatis wajib diisi.';
+  END IF;
+
+  -- Satu pekerja bisa punya lebih dari satu shift Kerja pada tanggal yang sama (penempatan berbeda, jam tidak
+  -- bertabrakan). Absensi hanya satu baris per tanggal, jadi Alpha dicatat setelah shift TERAKHIR berakhir
+  -- (sampai saat itu ia masih bisa check-in), pada penempatan shift pertamanya.
+  INSERT INTO tbl_absensi (id_karyawan, id_penempatan, tgl, status_kehadiran, keterangan)
+  SELECT s.id_pekerja,
+         CAST(SUBSTRING_INDEX(GROUP_CONCAT(s.id_penempatan ORDER BY s.mulai, s.id_penempatan), ',', 1) AS UNSIGNED),
+         s.tanggal_kerja,
+         'Alpha',
+         CONCAT('Alpha otomatis: tidak check-in sampai shift berakhir pukul ', TIME_FORMAT(MAX(s.selesai), '%H:%i'), '.')
+  FROM (
+    SELECT COALESCE(j.id_karyawan_pengganti, p.id_karyawan) AS id_pekerja,
+           j.id_penempatan,
+           j.tanggal_kerja,
+           TIMESTAMP(j.tanggal_kerja, j.jam_masuk) AS mulai,
+           TIMESTAMP(IF(j.jam_pulang <= j.jam_masuk, j.tanggal_kerja + INTERVAL 1 DAY, j.tanggal_kerja), j.jam_pulang) AS selesai
+    FROM tbl_jadwal_kerja j
+    JOIN tbl_penempatan p ON p.id = j.id_penempatan
+    WHERE j.status = 'Kerja'
+      AND j.jam_masuk IS NOT NULL AND j.jam_pulang IS NOT NULL
+      AND j.tanggal_kerja BETWEEN DATE(p_waktu) - INTERVAL 8 DAY AND DATE(p_waktu)
+      AND j.tanggal_kerja >= p.tgl_mulai
+      AND (p.tgl_selesai IS NULL OR j.tanggal_kerja <= p.tgl_selesai)
+  ) s
+  JOIN tbl_karyawan k ON k.id = s.id_pekerja
+  WHERE k.status NOT IN ('Nonaktif', 'Cuti')
+    AND NOT EXISTS (SELECT 1 FROM tbl_absensi a WHERE a.id_karyawan = s.id_pekerja AND a.tgl = s.tanggal_kerja)
+    AND NOT EXISTS (SELECT 1 FROM tbl_payroll py WHERE py.id_karyawan = s.id_pekerja
+                    AND py.periode_bulan = MONTH(s.tanggal_kerja) AND py.periode_tahun = YEAR(s.tanggal_kerja))
+  GROUP BY s.id_pekerja, s.tanggal_kerja
+  HAVING MAX(s.selesai) <= p_waktu
+     AND MAX(s.selesai) > p_waktu - INTERVAL 7 DAY;
 END //
 
 DROP PROCEDURE IF EXISTS `sp_update_status_bayar` //

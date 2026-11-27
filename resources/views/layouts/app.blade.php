@@ -39,6 +39,7 @@
                 ['Pool Karyawan', 'hrd.pool', 'hrd.pool'],
                 ['Absensi Karyawan', 'hrd.absensi', 'hrd.absensi'],
                 ['Koreksi Check-out', 'hrd.koreksi-check-out.index', 'hrd.koreksi-check-out.*'],
+                ['Pengajuan Izin/Cuti', 'hrd.ketidakhadiran.index', 'hrd.ketidakhadiran.*'],
                 ['Sertifikat Karyawan', 'hrd.sertifikat.index', 'hrd.sertifikat.*'],
             ];
             $menu['Monitoring'] = [
@@ -80,7 +81,8 @@
                 ['Jadwal Saya', 'tenaga-kerja.jadwal', 'tenaga-kerja.jadwal'],
                 ['Backup Shift', 'tenaga-kerja.tukar-shift.index', 'tenaga-kerja.tukar-shift.*'],
                 ['Riwayat Absensi', 'tenaga-kerja.riwayat', 'tenaga-kerja.riwayat*'],
-                ['Koreksi Check-out', 'tenaga-kerja.koreksi-check-out.index', 'tenaga-kerja.koreksi-check-out.*'],
+                ['Izin / Sakit / Cuti', 'tenaga-kerja.ketidakhadiran.index', 'tenaga-kerja.ketidakhadiran.*'],
+                ['Sertifikat Saya', 'tenaga-kerja.sertifikat', 'tenaga-kerja.sertifikat'],
                 ['Slip Gaji', 'tenaga-kerja.slip-gaji', 'tenaga-kerja.slip-gaji'],
                 ['Profil Saya', 'tenaga-kerja.profil', 'tenaga-kerja.profil'],
             ];
@@ -96,6 +98,7 @@
     $ikonGedung = '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1"/><path d="M10 21v-3h4v3"/>';
     $ikonCatatan = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/>';
     $ikonKoreksi = '<path d="M12 8v4l2 2"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 4v5h5"/>';
+    $ikonKetidakhadiran = '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m10 14 4 4M14 14l-4 4"/>';
     $ikonMenu = [
         'ceo.dashboard' => $ikonDashboard,
         'ceo.klien' => $ikonGedung,
@@ -109,7 +112,9 @@
         'hrd.monitoring' => '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/>',
         'hrd.catatan-driver' => $ikonCatatan,
         'hrd.koreksi-check-out.index' => $ikonKoreksi,
-        'tenaga-kerja.koreksi-check-out.index' => $ikonKoreksi,
+        'hrd.ketidakhadiran.index' => $ikonKetidakhadiran,
+        'tenaga-kerja.ketidakhadiran.index' => $ikonKetidakhadiran,
+        'tenaga-kerja.sertifikat' => '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
         'operasional.beranda' => $ikonDashboard,
         'operasional.catatan-driver' => $ikonCatatan,
         'operasional.klien.index' => $ikonGedung,

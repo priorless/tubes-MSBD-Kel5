@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BerandaController;
+use App\Http\Controllers\BerkasDokumenController;
 use App\Http\Controllers\CatatanDriverController;
 use App\Http\Controllers\Ceo\KlienController as KlienCeoController;
 use App\Http\Controllers\Ceo\LogAktivitasController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Hrd\KetidakhadiranController;
 use App\Http\Controllers\Hrd\KoreksiCheckOutController;
 use App\Http\Controllers\Hrd\KoreksiJamLemburController;
 use App\Http\Controllers\Hrd\MonitoringTenagaKerjaController;
+use App\Http\Controllers\Hrd\PengajuanKetidakhadiranController;
 use App\Http\Controllers\Hrd\PoolKaryawanController;
 use App\Http\Controllers\Hrd\SertifikatController;
 use App\Http\Controllers\KeuanganController;
@@ -30,7 +32,9 @@ use App\Http\Controllers\OperasionalController;
 use App\Http\Controllers\TenagaKerja\KoreksiCheckOutController as PengajuanKoreksiCheckOutController;
 use App\Http\Controllers\TenagaKerja\LaporanAktivitasController;
 use App\Http\Controllers\TenagaKerja\PembatalanTukarShiftController;
+use App\Http\Controllers\TenagaKerja\PengajuanKetidakhadiranController as PengajuanKetidakhadiranKaryawanController;
 use App\Http\Controllers\TenagaKerja\PengajuanTukarShiftController;
+use App\Http\Controllers\TenagaKerja\SertifikatSayaController;
 use App\Http\Controllers\TenagaKerja\TanggapanBackupShiftController;
 use App\Http\Controllers\TenagaKerjaController;
 use App\Http\Controllers\UserManagementController;
@@ -70,6 +74,14 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         ->whereIn('jenis', ['awal', 'akhir'])
         ->name('absensi.p2h.foto');
 
+    // Berkas sertifikat & bukti ketidakhadiran (disk privat): hanya karyawan pemilik atau HRD — dicek di controller.
+    Route::get('/sertifikat/{sertifikat}/berkas', [BerkasDokumenController::class, 'sertifikat'])
+        ->whereNumber('sertifikat')
+        ->name('sertifikat.berkas');
+    Route::get('/ketidakhadiran/{pengajuan}/bukti', [BerkasDokumenController::class, 'ketidakhadiran'])
+        ->whereNumber('pengajuan')
+        ->name('ketidakhadiran.bukti');
+
     /* =====================================================================
      * Manajemen User (CEO & HRD)
      * ===================================================================== */
@@ -104,6 +116,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::post('absensi-karyawan/ketidakhadiran', KetidakhadiranController::class)->name('absensi.ketidakhadiran');
         Route::get('koreksi-check-out', [KoreksiCheckOutController::class, 'index'])->name('koreksi-check-out.index');
         Route::patch('koreksi-check-out/{koreksi}', [KoreksiCheckOutController::class, 'update'])->whereNumber('koreksi')->name('koreksi-check-out.update');
+        Route::get('pengajuan-ketidakhadiran', [PengajuanKetidakhadiranController::class, 'index'])->name('ketidakhadiran.index');
+        Route::patch('pengajuan-ketidakhadiran/{pengajuan}', [PengajuanKetidakhadiranController::class, 'update'])->whereNumber('pengajuan')->name('ketidakhadiran.update');
 
         Route::resource('sertifikat', SertifikatController::class)->only(['index', 'create', 'store', 'destroy']);
         Route::get('monitoring-tenaga-kerja', MonitoringTenagaKerjaController::class)->name('monitoring');
@@ -236,6 +250,15 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
 
             Route::get('/koreksi-check-out', [PengajuanKoreksiCheckOutController::class, 'index'])->name('koreksi-check-out.index');
             Route::post('/koreksi-check-out', [PengajuanKoreksiCheckOutController::class, 'store'])->middleware('throttle:10,1')->name('koreksi-check-out.store');
+
+            // Izin/Sakit/Cuti diajukan karyawan, diputuskan HRD.
+            Route::get('/ketidakhadiran', [PengajuanKetidakhadiranKaryawanController::class, 'index'])->name('ketidakhadiran.index');
+            Route::post('/ketidakhadiran', [PengajuanKetidakhadiranKaryawanController::class, 'store'])->middleware('throttle:10,1')->name('ketidakhadiran.store');
+            Route::patch('/ketidakhadiran/{pengajuan}/batalkan', [PengajuanKetidakhadiranKaryawanController::class, 'batalkan'])
+                ->whereNumber('pengajuan')->middleware('throttle:10,1')->name('ketidakhadiran.batalkan');
+
+            // Sertifikat Saya: hanya lihat; penambahan sertifikat dilakukan HRD.
+            Route::get('/sertifikat', SertifikatSayaController::class)->name('sertifikat');
 
             Route::get('/slip-gaji', 'slipGaji')->name('slip-gaji');
 

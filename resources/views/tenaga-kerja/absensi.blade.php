@@ -141,14 +141,22 @@
                     <div class="flex items-center gap-4 rounded-xl bg-emerald-50/70 p-4">
                         <div class="flex size-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xl font-bold text-emerald-600">&#10003;</div>
                         <div>
-                            <p class="tk-heading text-sm font-bold text-gray-800">Absensi hari ini selesai</p>
-                            <p class="mt-0.5 text-xs text-gray-500">Terima kasih atas kerja keras Anda hari ini, sampai jumpa besok!</p>
+                            @if ($hariIni && $kolomMasuk && blank($hariIni->{$kolomMasuk} ?? null) && in_array($statusDb, ['Izin', 'Sakit', 'Cuti', 'Alpha'], true))
+                                <p class="tk-heading text-sm font-bold text-gray-800">Hari ini Anda tercatat {{ $statusDb }}</p>
+                                <p class="mt-0.5 text-xs text-gray-500">Tidak perlu check-in. Hubungi HRD bila catatan ini tidak sesuai.</p>
+                            @else
+                                <p class="tk-heading text-sm font-bold text-gray-800">Absensi hari ini selesai</p>
+                                <p class="mt-0.5 text-xs text-gray-500">Terima kasih atas kerja keras Anda hari ini, sampai jumpa besok!</p>
+                            @endif
                         </div>
                     </div>
                 </div>
 
                 
             </section>
+
+            {{-- Lupa check-out hari sebelumnya (tampil hanya bila ada) --}}
+            @include('tenaga-kerja._lupa-check-out')
 
             {{-- 2. Dokumentasi & Monitoring Aktivitas per Jam / Perjalanan --}}
             @if ($jenisMonitoring && $monitoring['tersedia'])

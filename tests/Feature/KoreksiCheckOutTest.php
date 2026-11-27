@@ -29,15 +29,11 @@ class KoreksiCheckOutTest extends TestCase
         ]);
     }
 
-    public function test_employee_sees_only_past_attendance_without_check_out(): void
+    public function test_old_correction_page_redirects_to_attendance_page(): void
     {
         $this->actingAs($this->karyawan())
             ->get(route('tenaga-kerja.koreksi-check-out.index'))
-            ->assertOk()
-            ->assertSee('value="1"', false)
-            ->assertDontSee('value="2"', false)
-            ->assertDontSee('value="3"', false)
-            ->assertDontSee('value="4"', false);
+            ->assertRedirect(route('tenaga-kerja.absensi').'#lupa-check-out');
     }
 
     public function test_employee_submits_correction_once(): void
@@ -46,7 +42,7 @@ class KoreksiCheckOutTest extends TestCase
         $data = ['id_absensi' => 1, 'jam_keluar' => '17:15', 'alasan' => 'Baterai HP habis'];
 
         $this->actingAs($karyawan)->post(route('tenaga-kerja.koreksi-check-out.store'), $data)
-            ->assertRedirect(route('tenaga-kerja.koreksi-check-out.index'));
+            ->assertRedirect(route('tenaga-kerja.absensi'));
 
         $this->assertDatabaseHas('tbl_koreksi_check_out', ['id_absensi' => 1, 'jam_keluar' => '17:15:00', 'status' => 'Menunggu', 'diajukan_oleh' => $karyawan->id]);
 

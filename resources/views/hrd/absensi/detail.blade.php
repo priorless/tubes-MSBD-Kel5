@@ -19,7 +19,7 @@
                 <h2 class="card-title">{{ $baris->nama }}</h2>
                 <p class="text-sm text-gray-500">{{ $baris->nip }} &middot; {{ $baris->nama_layanan ?? 'Internal' }}</p>
             </div>
-            <span class="badge badge-{{ ['Hadir' => 'success', 'Terlambat' => 'warning', 'Izin' => 'info', 'Sakit' => 'info', 'Alpha' => 'danger'][$baris->status_kehadiran] ?? 'secondary' }}">{{ $baris->status_kehadiran }}</span>
+            <span class="badge badge-{{ ['Hadir' => 'success', 'Terlambat' => 'warning', 'Izin' => 'info', 'Sakit' => 'info', 'Cuti' => 'info', 'Alpha' => 'danger'][$baris->status_kehadiran] ?? 'secondary' }}">{{ $baris->status_kehadiran }}</span>
         </div>
 
         <div class="card-body space-y-6">

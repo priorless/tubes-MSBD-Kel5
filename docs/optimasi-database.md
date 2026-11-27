@@ -12,7 +12,7 @@ Dokumen ini adalah bukti optimasi Tahap 5 finalisasi database. Isinya: query yan
 |---|---|---|
 | `idx_penempatan_karyawan_status` | `tbl_penempatan (id_karyawan, status)` | Mencari penempatan aktif seorang karyawan, dan payroll per karyawan |
 | `idx_penempatan_klien_status_mulai` | `tbl_penempatan (id_klien, status, tgl_mulai)` | Monitoring sebaran per klien dan invoice per klien |
-| `idx_sertifikat_kadaluarsa_status` | `tbl_sertifikat (tgl_kadaluarsa, status)` | Event harian `ev_update_status_sertifikat` |
+| `idx_sertifikat_kadaluarsa_status` | `tbl_sertifikat (tgl_kadaluarsa, status)` | Event harian `ev_update_status_sertifikat` (diganti `idx_sertifikat_kadaluarsa (tgl_kadaluarsa)` di `sql/Komponen/23`, lihat Q4) |
 
 Sebelumnya sudah diperiksa bahwa belum ada indeks dengan kolom yang sama. Indeks yang ada saat itu hanya `PRIMARY`, `idx_penempatan_status (status)`, dan indeks FK satu kolom.
 
@@ -102,6 +102,8 @@ SELECT id, id_klien, tgl_mulai FROM tbl_penempatan WHERE id_karyawan = 12345 AND
 **Hasil: membaik.** Sebelumnya MySQL membaca semua penempatan milik karyawan itu, lalu menyaring `status` satu per satu (`Using where`, filtered 50%). Sekarang kedua kondisi dijawab langsung oleh indeks (`ref const,const`), dan yang dibaca hanya 1 baris yang memang dicari. Perbedaannya makin terasa kalau seorang karyawan punya banyak riwayat penempatan.
 
 ### Q4 — Event harian status sertifikat
+
+> **Catatan sesudah `sql/Komponen/23`:** kolom `tbl_sertifikat.status` dan event ini sudah dihapus. Status kini dihitung view `v_sertifikat_karyawan` dari `tgl_kadaluarsa`, jadi tidak ada lagi `UPDATE` harian. Indeks diganti `idx_sertifikat_kadaluarsa (tgl_kadaluarsa)` untuk filter "sisa < 30 hari". Pengukuran di bawah dipertahankan sebagai riwayat.
 
 Ini isi event `ev_update_status_sertifikat`.
 

@@ -1,8 +1,11 @@
 -- ============================================================
 -- sql/final/01_tabel.sql — Struktur tabel
--- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–10. DEFINER dihapus agar bisa diimpor
--- di komputer lain. Urutan impor: lihat sql/README.md.
+-- Diekspor dari database db_sji (MySQL 8) setelah migration terakhir (sql/Komponen/24). DEFINER dihapus agar bisa
+-- diimpor di komputer lain. Urutan impor: lihat sql/README.md.
 -- ============================================================
+
+-- Charset koneksi saat impor: klien mysql di Windows memakai cp850 bila tidak diatur.
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -88,7 +91,7 @@ CREATE TABLE `tbl_absensi` (
   `tgl` date NOT NULL,
   `jam_masuk` time DEFAULT NULL,
   `jam_keluar` time DEFAULT NULL,
-  `status_kehadiran` enum('Hadir','Terlambat','Izin','Sakit','Alpha') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Hadir',
+  `status_kehadiran` enum('Hadir','Terlambat','Izin','Sakit','Cuti','Alpha') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Hadir',
   `menit_terlambat` smallint unsigned NOT NULL DEFAULT '0',
   `jam_lembur` int NOT NULL DEFAULT '0',
   `keterangan` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -96,6 +99,7 @@ CREATE TABLE `tbl_absensi` (
   `foto_keluar` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_absensi_karyawan_tgl` (`id_karyawan`,`tgl`),
+  UNIQUE KEY `uq_absensi_id_karyawan` (`id`,`id_karyawan`),
   KEY `idx_absensi_tgl` (`tgl`),
   KEY `fk_absensi_penempatan` (`id_penempatan`),
   CONSTRAINT `fk_absensi_karyawan` FOREIGN KEY (`id_karyawan`) REFERENCES `tbl_karyawan` (`id`),
@@ -205,6 +209,7 @@ CREATE TABLE `tbl_jadwal_kerja` (
   `jam_masuk` time DEFAULT NULL,
   `jam_pulang` time DEFAULT NULL,
   `durasi_menit` smallint unsigned DEFAULT NULL,
+  `id_karyawan_pengganti` int DEFAULT NULL,
   `dibuat_oleh` int DEFAULT NULL,
   `diubah_oleh` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
@@ -215,10 +220,13 @@ CREATE TABLE `tbl_jadwal_kerja` (
   KEY `fk_jadwal_template_shift` (`id_template_shift`),
   KEY `fk_jadwal_kerja_dibuat_oleh` (`dibuat_oleh`),
   KEY `fk_jadwal_kerja_diubah_oleh` (`diubah_oleh`),
+  KEY `idx_jadwal_pengganti_tanggal` (`id_karyawan_pengganti`,`tanggal_kerja`),
   CONSTRAINT `fk_jadwal_kerja_dibuat_oleh` FOREIGN KEY (`dibuat_oleh`) REFERENCES `tbl_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_jadwal_kerja_diubah_oleh` FOREIGN KEY (`diubah_oleh`) REFERENCES `tbl_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_jadwal_penempatan` FOREIGN KEY (`id_penempatan`) REFERENCES `tbl_penempatan` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `fk_jadwal_template_shift` FOREIGN KEY (`id_template_shift`) REFERENCES `tbl_template_shift` (`id`) ON DELETE RESTRICT
+  CONSTRAINT `fk_jadwal_pengganti` FOREIGN KEY (`id_karyawan_pengganti`) REFERENCES `tbl_karyawan` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_jadwal_template_shift` FOREIGN KEY (`id_template_shift`) REFERENCES `tbl_template_shift` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `chk_jadwal_pengganti_kerja` CHECK (((`id_karyawan_pengganti` is null) or (`status` = _utf8mb4'Kerja')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `tbl_jadwal_kerja_riwayat` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
@@ -294,7 +302,7 @@ CREATE TABLE `tbl_klien` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_klien_kode` (`kode_klien`),
   FULLTEXT KEY `ft_klien_nama_perusahaan` (`nama_perusahaan`),
-  CONSTRAINT `chk_klien_bpjs` CHECK (((((`bpjs_metode` is null) and (`bpjs_nilai` is null)) or ((`bpjs_metode` = _utf8mb4'Persentase') and (`bpjs_nilai` > 0) and (`bpjs_nilai` <= 100)) or ((`bpjs_metode` = _utf8mb4'Nominal') and (`bpjs_nilai` > 0))) is true)),
+  CONSTRAINT `chk_klien_bpjs` CHECK ((((`bpjs_metode` is null) and (`bpjs_nilai` is null)) or ((coalesce(`bpjs_metode`,_utf8mb4'') = _utf8mb4'Persentase') and (coalesce(`bpjs_nilai`,0) > 0) and (coalesce(`bpjs_nilai`,0) <= 100)) or ((coalesce(`bpjs_metode`,_utf8mb4'') = _utf8mb4'Nominal') and (coalesce(`bpjs_nilai`,0) > 0)))),
   CONSTRAINT `chk_klien_management_fee` CHECK (((`management_fee` is null) or (`management_fee` between 0 and 100)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `tbl_komponen_gaji` (
@@ -302,6 +310,7 @@ CREATE TABLE `tbl_komponen_gaji` (
   `id_karyawan` int NOT NULL,
   `periode_bulan` tinyint unsigned NOT NULL,
   `periode_tahun` smallint unsigned NOT NULL,
+  `gaji_pokok` decimal(12,2) DEFAULT NULL,
   `tunjangan` decimal(12,2) NOT NULL DEFAULT '0.00',
   `potongan_pinjaman` decimal(12,2) NOT NULL DEFAULT '0.00',
   `created_at` timestamp NULL DEFAULT NULL,
@@ -321,6 +330,30 @@ CREATE TABLE `tbl_kontrak` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_kontrak_penempatan` (`id_penempatan`),
   CONSTRAINT `fk_kontrak_pen` FOREIGN KEY (`id_penempatan`) REFERENCES `tbl_penempatan` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `tbl_koreksi_check_out` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `id_absensi` int NOT NULL,
+  `id_absensi_menunggu` int unsigned GENERATED ALWAYS AS ((case when (`status` = _utf8mb4'Menunggu') then `id_absensi` end)) VIRTUAL,
+  `jam_keluar` time NOT NULL,
+  `alasan` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('Menunggu','Disetujui','Ditolak') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Menunggu',
+  `catatan_keputusan` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `diajukan_oleh` int NOT NULL,
+  `diproses_oleh` int DEFAULT NULL,
+  `diproses_pada` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_koreksi_check_out_menunggu` (`id_absensi_menunggu`),
+  KEY `idx_koreksi_check_out_status` (`status`,`created_at`),
+  KEY `fk_koreksi_check_out_absensi` (`id_absensi`),
+  KEY `fk_koreksi_check_out_pengaju` (`diajukan_oleh`),
+  KEY `fk_koreksi_check_out_pemroses` (`diproses_oleh`),
+  CONSTRAINT `fk_koreksi_check_out_absensi` FOREIGN KEY (`id_absensi`) REFERENCES `tbl_absensi` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_koreksi_check_out_pemroses` FOREIGN KEY (`diproses_oleh`) REFERENCES `tbl_users` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_koreksi_check_out_pengaju` FOREIGN KEY (`diajukan_oleh`) REFERENCES `tbl_users` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `chk_koreksi_check_out_diproses` CHECK ((((`status` = _utf8mb4'Menunggu') and (`diproses_oleh` is null) and (`diproses_pada` is null)) or ((`status` <> _utf8mb4'Menunggu') and (`diproses_oleh` is not null) and (`diproses_pada` is not null))))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `tbl_laporan_aktivitas` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
@@ -342,9 +375,11 @@ CREATE TABLE `tbl_laporan_aktivitas` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_laporan_absensi_periode` (`id_absensi`,`periode_ke`),
   KEY `idx_laporan_karyawan_waktu` (`id_karyawan`,`waktu_lapor`),
+  KEY `idx_laporan_absensi_karyawan` (`id_absensi`,`id_karyawan`),
   CONSTRAINT `fk_laporan_absensi` FOREIGN KEY (`id_absensi`) REFERENCES `tbl_absensi` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_laporan_absensi_karyawan` FOREIGN KEY (`id_absensi`, `id_karyawan`) REFERENCES `tbl_absensi` (`id`, `id_karyawan`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `fk_laporan_karyawan` FOREIGN KEY (`id_karyawan`) REFERENCES `tbl_karyawan` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `chk_laporan_jenis` CHECK ((((`jenis` = _utf8mb4'Berkala') and (`periode_ke` is not null) and (`periode_mulai` is not null) and (`periode_selesai` is not null)) or ((`jenis` = _utf8mb4'Perjalanan') and (`periode_ke` is null) and (`tahapan` is not null)))),
+  CONSTRAINT `chk_laporan_jenis` CHECK ((((`jenis` = _utf8mb4'Berkala') and (`periode_ke` is not null) and (`tahapan` is null)) or ((`jenis` = _utf8mb4'Perjalanan') and (`periode_ke` is null) and (`periode_mulai` is null) and (`periode_selesai` is null)))),
   CONSTRAINT `chk_laporan_jumlah_upload` CHECK ((`jumlah_upload` between 1 and 2)),
   CONSTRAINT `chk_laporan_koreksi` CHECK (((`jumlah_upload` = 2) = (`foto_koreksi` is not null)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -391,7 +426,9 @@ CREATE TABLE `tbl_p2h` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_p2h_absensi` (`id_absensi`),
   KEY `fk_p2h_karyawan` (`id_karyawan`),
+  KEY `idx_p2h_absensi_karyawan` (`id_absensi`,`id_karyawan`),
   CONSTRAINT `fk_p2h_absensi` FOREIGN KEY (`id_absensi`) REFERENCES `tbl_absensi` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_p2h_absensi_karyawan` FOREIGN KEY (`id_absensi`, `id_karyawan`) REFERENCES `tbl_absensi` (`id`, `id_karyawan`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `fk_p2h_karyawan` FOREIGN KEY (`id_karyawan`) REFERENCES `tbl_karyawan` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `tbl_p2h_item` (
@@ -418,12 +455,12 @@ CREATE TABLE `tbl_payroll` (
   `id_klien_bpjs` int DEFAULT NULL,
   `bpjs_metode` enum('Persentase','Nominal') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `bpjs_nilai` decimal(12,2) DEFAULT NULL,
-  `potongan_bpjs` decimal(12,2) NOT NULL DEFAULT '0.00',
   `total_gaji` decimal(12,2) NOT NULL,
   `status_bayar` enum('Belum Dibayar','Sudah Lunas') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Belum Dibayar',
   `tgl_bayar` date DEFAULT NULL,
   `komponen_tunjangan` decimal(12,2) NOT NULL DEFAULT '0.00',
   `upah_backup` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `potongan_bpjs` decimal(12,2) NOT NULL DEFAULT '0.00',
   `potongan_pinjaman` decimal(12,2) NOT NULL DEFAULT '0.00',
   `pph21` decimal(12,2) NOT NULL DEFAULT '0.00',
   PRIMARY KEY (`id`),
@@ -448,26 +485,45 @@ CREATE TABLE `tbl_penempatan` (
   PRIMARY KEY (`id`),
   KEY `idx_penempatan_status` (`status`),
   KEY `fk_pen_user` (`dibuat_oleh`),
-  KEY `fk_pen_karyawan` (`id_karyawan`),
-  KEY `fk_pen_klien` (`id_klien`),
   KEY `idx_penempatan_karyawan_status` (`id_karyawan`,`status`),
   KEY `idx_penempatan_klien_status_mulai` (`id_klien`,`status`,`tgl_mulai`),
   CONSTRAINT `fk_pen_karyawan` FOREIGN KEY (`id_karyawan`) REFERENCES `tbl_karyawan` (`id`),
   CONSTRAINT `fk_pen_klien` FOREIGN KEY (`id_klien`) REFERENCES `tbl_klien` (`id`),
   CONSTRAINT `fk_pen_user` FOREIGN KEY (`dibuat_oleh`) REFERENCES `tbl_users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `tbl_pengajuan_ketidakhadiran` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `id_karyawan` int NOT NULL,
+  `jenis` enum('Izin','Sakit','Cuti') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tgl_mulai` date NOT NULL,
+  `tgl_selesai` date NOT NULL,
+  `alasan` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_bukti` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('Menunggu','Disetujui','Ditolak','Dibatalkan') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Menunggu',
+  `catatan_keputusan` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `diproses_oleh` int DEFAULT NULL,
+  `diproses_pada` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_pengajuan_ketidakhadiran_karyawan` (`id_karyawan`,`tgl_mulai`),
+  KEY `idx_pengajuan_ketidakhadiran_status` (`status`,`created_at`),
+  KEY `fk_pengajuan_ketidakhadiran_pemroses` (`diproses_oleh`),
+  CONSTRAINT `fk_pengajuan_ketidakhadiran_karyawan` FOREIGN KEY (`id_karyawan`) REFERENCES `tbl_karyawan` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_pengajuan_ketidakhadiran_pemroses` FOREIGN KEY (`diproses_oleh`) REFERENCES `tbl_users` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `chk_pengajuan_ketidakhadiran_diproses` CHECK ((((`status` = _utf8mb4'Menunggu') and (`diproses_oleh` is null) and (`diproses_pada` is null)) or ((`status` = _utf8mb4'Disetujui') and (`diproses_oleh` is not null) and (`diproses_pada` is not null)) or ((`status` = _utf8mb4'Ditolak') and (`diproses_oleh` is not null) and (`diproses_pada` is not null) and (`catatan_keputusan` is not null)) or ((`status` = _utf8mb4'Dibatalkan') and (`diproses_oleh` is null) and (`diproses_pada` is not null)))),
+  CONSTRAINT `chk_pengajuan_ketidakhadiran_tanggal` CHECK (((`tgl_selesai` >= `tgl_mulai`) and ((to_days(`tgl_selesai`) - to_days(`tgl_mulai`)) < 31)))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `tbl_pertukaran_shift` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `id_karyawan_pengaju` int NOT NULL,
   `id_karyawan_rekan` int NOT NULL,
   `id_jadwal_pengaju` int unsigned NOT NULL,
-  `id_jadwal_rekan` int unsigned NOT NULL,
+  `id_jadwal_aktif` int unsigned GENERATED ALWAYS AS ((case when (`status` in (_utf8mb4'Menunggu',_utf8mb4'Disetujui')) then `id_jadwal_pengaju` end)) VIRTUAL,
   `tanggal_kerja` date NOT NULL,
-  `tanggal_kerja_rekan` date DEFAULT NULL,
   `snapshot_pengaju` json NOT NULL,
-  `snapshot_rekan` json NOT NULL,
   `alasan` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` enum('Menunggu','Disetujui','Ditolak') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Menunggu',
+  `status` enum('Menunggu','Disetujui','Ditolak','Dibatalkan','Kedaluwarsa') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Menunggu',
   `status_rekan` enum('Menunggu','Diterima','Ditolak') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Menunggu',
   `catatan_rekan` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `ditanggapi_rekan_pada` timestamp NULL DEFAULT NULL,
@@ -477,19 +533,19 @@ CREATE TABLE `tbl_pertukaran_shift` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_pertukaran_jadwal_aktif` (`id_jadwal_aktif`),
   KEY `idx_pertukaran_status_tanggal` (`status`,`tanggal_kerja`),
   KEY `idx_pertukaran_pengaju` (`id_karyawan_pengaju`,`created_at`),
-  KEY `fk_pertukaran_rekan` (`id_karyawan_rekan`),
   KEY `fk_pertukaran_jadwal_pengaju` (`id_jadwal_pengaju`),
-  KEY `fk_pertukaran_jadwal_rekan` (`id_jadwal_rekan`),
   KEY `fk_pertukaran_shift_diproses_oleh` (`diproses_oleh`),
+  KEY `idx_pertukaran_rekan` (`id_karyawan_rekan`,`created_at`),
   CONSTRAINT `fk_pertukaran_jadwal_pengaju` FOREIGN KEY (`id_jadwal_pengaju`) REFERENCES `tbl_jadwal_kerja` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `fk_pertukaran_jadwal_rekan` FOREIGN KEY (`id_jadwal_rekan`) REFERENCES `tbl_jadwal_kerja` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_pertukaran_pengaju` FOREIGN KEY (`id_karyawan_pengaju`) REFERENCES `tbl_karyawan` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_pertukaran_rekan` FOREIGN KEY (`id_karyawan_rekan`) REFERENCES `tbl_karyawan` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_pertukaran_shift_diproses_oleh` FOREIGN KEY (`diproses_oleh`) REFERENCES `tbl_users` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `chk_pertukaran_beda_karyawan` CHECK ((`id_karyawan_pengaju` <> `id_karyawan_rekan`)),
-  CONSTRAINT `chk_pertukaran_diproses` CHECK ((((`status` = _utf8mb4'Menunggu') and (`diproses_oleh` is null) and (`diproses_pada` is null)) or ((`status` <> _utf8mb4'Menunggu') and (`diproses_oleh` is not null) and (`diproses_pada` is not null))))
+  CONSTRAINT `chk_pertukaran_diproses` CHECK ((((`status` = _utf8mb4'Menunggu') and (`diproses_oleh` is null) and (`diproses_pada` is null)) or ((`status` = _utf8mb4'Disetujui') and (`diproses_oleh` is not null) and (`diproses_pada` is not null)) or ((`status` = _utf8mb4'Dibatalkan') and (`diproses_pada` is not null)) or ((`status` = _utf8mb4'Ditolak') and (`diproses_pada` is not null) and ((`diproses_oleh` is not null) or (`status_rekan` = _utf8mb4'Ditolak'))) or ((`status` = _utf8mb4'Kedaluwarsa') and (`diproses_oleh` is null) and (`diproses_pada` is not null)))),
+  CONSTRAINT `chk_pertukaran_rekan` CHECK ((((`status_rekan` = _utf8mb4'Menunggu') = (`ditanggapi_rekan_pada` is null)) and ((`status_rekan` <> _utf8mb4'Ditolak') or (`status` = _utf8mb4'Ditolak')) and ((`status` <> _utf8mb4'Disetujui') or (`status_rekan` = _utf8mb4'Diterima'))))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `tbl_roles` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -506,11 +562,11 @@ CREATE TABLE `tbl_sertifikat` (
   `tgl_terbit` date NOT NULL,
   `tgl_kadaluarsa` date NOT NULL,
   `file_upload` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` enum('Aktif','Kadaluarsa') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Aktif',
   PRIMARY KEY (`id`),
   KEY `fk_sert_karyawan` (`id_karyawan`),
-  KEY `idx_sertifikat_kadaluarsa_status` (`tgl_kadaluarsa`,`status`),
-  CONSTRAINT `fk_sert_karyawan` FOREIGN KEY (`id_karyawan`) REFERENCES `tbl_karyawan` (`id`)
+  KEY `idx_sertifikat_kadaluarsa` (`tgl_kadaluarsa`),
+  CONSTRAINT `fk_sert_karyawan` FOREIGN KEY (`id_karyawan`) REFERENCES `tbl_karyawan` (`id`),
+  CONSTRAINT `chk_sertifikat_tanggal` CHECK ((`tgl_kadaluarsa` > `tgl_terbit`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `tbl_template_jadwal` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,

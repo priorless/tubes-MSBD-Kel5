@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\TenagaKerja\KoreksiCheckOutController;
 use App\Services\FotoAbsensiService;
 use App\Services\JadwalAbsensiService;
 use App\Services\LaporanAktivitasService;
@@ -59,6 +60,13 @@ class TenagaKerjaController extends Controller
 
         $data['foto'] = $this->urlFoto($data['hariIni']);
         $data['monitoring'] = $this->dataMonitoring($jadwal, $laporan, $jam, $id, $data['hariIni']);
+
+        // Lupa check-out hari sebelumnya diajukan langsung dari halaman ini. Kegagalan tidak boleh mengganggu absensi.
+        try {
+            $data += KoreksiCheckOutController::dataHalamanAbsensi((int) $id);
+        } catch (QueryException) {
+            $data += ['lupaCheckOut' => collect(), 'pengajuanKoreksi' => collect()];
+        }
 
         return view('tenaga-kerja.absensi', $data + $this->dataUmum() + $this->kolomAbsensi());
     }
@@ -467,13 +475,21 @@ class TenagaKerjaController extends Controller
         return redirect()->route('tenaga-kerja.absensi')->with($ok ? 'sukses' : 'gagal', $pesan);
     }
 
-    /** belum | masuk | selesai — hanya membaca isi baris dari database. */
+    /**
+     * belum | masuk | selesai — hanya membaca isi baris dari database.
+     * Baris tanpa jam masuk (Izin/Sakit/Cuti/Alpha yang dicatat HRD atau pengajuan yang disetujui) = selesai:
+     * hari itu tidak ada sesi kerja yang bisa di-check-out.
+     */
     private function statusAbsensi(?object $hariIni): string
     {
         if (! $hariIni) {
             return 'belum';
         }
-        $kolomKeluar = $this->kolomAbsensi()['kolomKeluar'];
+        ['kolomMasuk' => $kolomMasuk, 'kolomKeluar' => $kolomKeluar] = $this->kolomAbsensi();
+
+        if ($kolomMasuk && blank($hariIni->{$kolomMasuk} ?? null)) {
+            return 'selesai';
+        }
 
         return $kolomKeluar && filled($hariIni->{$kolomKeluar} ?? null) ? 'selesai' : 'masuk';
     }

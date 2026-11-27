@@ -1,21 +1,13 @@
 -- ============================================================
 -- sql/final/05_trigger.sql — Trigger
--- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–10. DEFINER dihapus agar bisa diimpor
--- di komputer lain. Urutan impor: lihat sql/README.md.
+-- Diekspor dari database db_sji (MySQL 8) setelah migration terakhir (sql/Komponen/24). DEFINER dihapus agar bisa
+-- diimpor di komputer lain. Urutan impor: lihat sql/README.md.
 -- ============================================================
 
-DELIMITER //
+-- Charset koneksi saat impor: klien mysql di Windows memakai cp850 bila tidak diatur.
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-DROP TRIGGER IF EXISTS `trg_cegah_absen_ganda` //
-CREATE TRIGGER `trg_cegah_absen_ganda` BEFORE INSERT ON `tbl_absensi` FOR EACH ROW BEGIN
-  DECLARE v_ada INT;
-  SELECT COUNT(*) INTO v_ada FROM tbl_absensi
-  WHERE id_karyawan = NEW.id_karyawan AND tgl = NEW.tgl;
-  IF v_ada > 0 THEN
-    SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Karyawan sudah absen pada tanggal ini';
-  END IF;
-END //
+DELIMITER //
 
 DROP TRIGGER IF EXISTS `trg_validasi_absen_masuk` //
 CREATE TRIGGER `trg_validasi_absen_masuk` BEFORE INSERT ON `tbl_absensi` FOR EACH ROW BEGIN
@@ -60,6 +52,11 @@ CREATE TRIGGER `trg_validasi_absen_masuk` BEFORE INSERT ON `tbl_absensi` FOR EAC
   END IF;
 END //
 
+DROP TRIGGER IF EXISTS `trg_cek_penempatan_absensi_insert` //
+CREATE TRIGGER `trg_cek_penempatan_absensi_insert` BEFORE INSERT ON `tbl_absensi` FOR EACH ROW BEGIN
+  CALL sp_cek_penempatan_absensi(NEW.id_karyawan, NEW.id_penempatan, NEW.tgl);
+END //
+
 DROP TRIGGER IF EXISTS `trg_auto_hitung_lembur` //
 CREATE TRIGGER `trg_auto_hitung_lembur` BEFORE UPDATE ON `tbl_absensi` FOR EACH ROW BEGIN
   DECLARE v_durasi INT;
@@ -85,6 +82,13 @@ CREATE TRIGGER `trg_auto_hitung_lembur` BEFORE UPDATE ON `tbl_absensi` FOR EACH 
   END IF;
 END //
 
+DROP TRIGGER IF EXISTS `trg_cek_penempatan_absensi_update` //
+CREATE TRIGGER `trg_cek_penempatan_absensi_update` BEFORE UPDATE ON `tbl_absensi` FOR EACH ROW BEGIN
+  IF NOT (NEW.id_karyawan <=> OLD.id_karyawan) OR NOT (NEW.id_penempatan <=> OLD.id_penempatan) OR NOT (NEW.tgl <=> OLD.tgl) THEN
+    CALL sp_cek_penempatan_absensi(NEW.id_karyawan, NEW.id_penempatan, NEW.tgl);
+  END IF;
+END //
+
 DROP TRIGGER IF EXISTS `trg_mutasi_invoice_lunas` //
 CREATE TRIGGER `trg_mutasi_invoice_lunas` AFTER UPDATE ON `tbl_invoice` FOR EACH ROW BEGIN
   IF NOT (NEW.status <=> OLD.status) THEN
@@ -96,12 +100,26 @@ END //
 
 DROP TRIGGER IF EXISTS `trg_cek_jadwal_kerja_insert` //
 CREATE TRIGGER `trg_cek_jadwal_kerja_insert` BEFORE INSERT ON `tbl_jadwal_kerja` FOR EACH ROW BEGIN
-  CALL sp_cek_jadwal_kerja(NULL, NEW.id_penempatan, NEW.tanggal_kerja, NEW.status, NEW.jam_masuk, NEW.jam_pulang);
+  IF NEW.id_karyawan_pengganti IS NOT NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengganti shift hanya dapat ditetapkan melalui pengajuan backup shift yang disetujui.';
+  END IF;
+  CALL sp_cek_jadwal_kerja(NULL, NEW.id_penempatan, NEW.tanggal_kerja, NEW.status, NEW.jam_masuk, NEW.jam_pulang, NULL);
 END //
 
 DROP TRIGGER IF EXISTS `trg_cek_jadwal_kerja_update` //
 CREATE TRIGGER `trg_cek_jadwal_kerja_update` BEFORE UPDATE ON `tbl_jadwal_kerja` FOR EACH ROW BEGIN
-  CALL sp_cek_jadwal_kerja(OLD.id, NEW.id_penempatan, NEW.tanggal_kerja, NEW.status, NEW.jam_masuk, NEW.jam_pulang);
+  IF EXISTS (SELECT 1 FROM tbl_pertukaran_shift WHERE id_jadwal_pengaju = OLD.id AND status = 'Menunggu')
+     AND (NOT (NEW.status <=> OLD.status) OR NOT (NEW.jam_masuk <=> OLD.jam_masuk) OR NOT (NEW.jam_pulang <=> OLD.jam_pulang)
+          OR NOT (NEW.id_penempatan <=> OLD.id_penempatan) OR NOT (NEW.tanggal_kerja <=> OLD.tanggal_kerja)
+          OR NOT (NEW.id_karyawan_pengganti <=> OLD.id_karyawan_pengganti)) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jadwal ini sedang diajukan untuk backup shift. Proses atau tunggu pengajuan tersebut selesai terlebih dahulu.';
+  END IF;
+  IF NEW.id_karyawan_pengganti IS NOT NULL AND NOT (NEW.id_karyawan_pengganti <=> OLD.id_karyawan_pengganti)
+     AND NOT EXISTS (SELECT 1 FROM tbl_pertukaran_shift
+                     WHERE id_jadwal_pengaju = NEW.id AND id_karyawan_rekan = NEW.id_karyawan_pengganti AND status = 'Disetujui') THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengganti shift hanya dapat ditetapkan melalui pengajuan backup shift yang disetujui.';
+  END IF;
+  CALL sp_cek_jadwal_kerja(OLD.id, NEW.id_penempatan, NEW.tanggal_kerja, NEW.status, NEW.jam_masuk, NEW.jam_pulang, NEW.id_karyawan_pengganti);
 END //
 
 DROP TRIGGER IF EXISTS `trg_set_status_karyawan_baru` //
@@ -199,6 +217,32 @@ CREATE TRIGGER `trg_klien_log_ubah` AFTER UPDATE ON `tbl_klien` FOR EACH ROW BEG
   END IF;
 END //
 
+DROP TRIGGER IF EXISTS `trg_koreksi_check_out_insert` //
+CREATE TRIGGER `trg_koreksi_check_out_insert` BEFORE INSERT ON `tbl_koreksi_check_out` FOR EACH ROW BEGIN
+  CALL sp_cek_koreksi_check_out(NEW.id_absensi, NEW.jam_keluar);
+END //
+
+DROP TRIGGER IF EXISTS `trg_koreksi_check_out_update` //
+CREATE TRIGGER `trg_koreksi_check_out_update` BEFORE UPDATE ON `tbl_koreksi_check_out` FOR EACH ROW BEGIN
+  -- Diperiksa ulang saat disetujui, termasuk pengajuan yang dibuat sebelum aturan ini ada.
+  IF (NEW.status = 'Disetujui' AND OLD.status <> 'Disetujui')
+     OR NOT (NEW.jam_keluar <=> OLD.jam_keluar) OR NOT (NEW.id_absensi <=> OLD.id_absensi) THEN
+    CALL sp_cek_koreksi_check_out(NEW.id_absensi, NEW.jam_keluar);
+  END IF;
+END //
+
+DROP TRIGGER IF EXISTS `trg_log_aktivitas_tolak_update` //
+CREATE TRIGGER `trg_log_aktivitas_tolak_update` BEFORE UPDATE ON `tbl_log_aktivitas` FOR EACH ROW BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Log aktivitas tidak boleh diubah karena merupakan jejak audit';
+END //
+
+DROP TRIGGER IF EXISTS `trg_log_aktivitas_tolak_delete` //
+CREATE TRIGGER `trg_log_aktivitas_tolak_delete` BEFORE DELETE ON `tbl_log_aktivitas` FOR EACH ROW BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Log aktivitas tidak boleh dihapus karena merupakan jejak audit';
+END //
+
 DROP TRIGGER IF EXISTS `trg_mutasi_payroll_cair` //
 CREATE TRIGGER `trg_mutasi_payroll_cair` AFTER UPDATE ON `tbl_payroll` FOR EACH ROW BEGIN
   IF NOT (NEW.status_bayar <=> OLD.status_bayar) THEN
@@ -231,6 +275,94 @@ CREATE TRIGGER `trg_penempatan_log_ubah` AFTER UPDATE ON `tbl_penempatan` FOR EA
   END IF;
 END //
 
+DROP TRIGGER IF EXISTS `trg_penempatan_batalkan_backup` //
+CREATE TRIGGER `trg_penempatan_batalkan_backup` AFTER UPDATE ON `tbl_penempatan` FOR EACH ROW BEGIN
+  IF NOT (NEW.status <=> OLD.status) OR NOT (NEW.tgl_selesai <=> OLD.tgl_selesai) OR NOT (NEW.tgl_mulai <=> OLD.tgl_mulai) THEN
+    -- Jadwal pengaju berada di penempatan yang berakhir/dirotasi.
+    UPDATE tbl_pertukaran_shift ps
+    JOIN tbl_jadwal_kerja j ON j.id = ps.id_jadwal_pengaju
+    SET ps.status = 'Dibatalkan',
+        ps.catatan_keputusan = 'Dibatalkan otomatis: penempatan pengaju berakhir atau dirotasi.',
+        ps.diproses_pada = NOW(), ps.updated_at = NOW()
+    WHERE ps.status = 'Menunggu' AND j.id_penempatan = NEW.id
+      AND (NEW.status <> 'Aktif' OR j.tanggal_kerja < NEW.tgl_mulai
+           OR (NEW.tgl_selesai IS NOT NULL AND j.tanggal_kerja > NEW.tgl_selesai));
+
+    -- Rekan tidak lagi punya penempatan aktif pada tanggal shift yang diminta.
+    UPDATE tbl_pertukaran_shift ps
+    SET ps.status = 'Dibatalkan',
+        ps.catatan_keputusan = 'Dibatalkan otomatis: penempatan rekan pengganti berakhir atau dirotasi.',
+        ps.diproses_pada = NOW(), ps.updated_at = NOW()
+    WHERE ps.status = 'Menunggu' AND ps.id_karyawan_rekan = NEW.id_karyawan
+      AND NOT EXISTS (SELECT 1 FROM tbl_penempatan p
+                      WHERE p.id_karyawan = NEW.id_karyawan AND p.status = 'Aktif'
+                        AND p.tgl_mulai <= ps.tanggal_kerja AND (p.tgl_selesai IS NULL OR p.tgl_selesai >= ps.tanggal_kerja));
+  END IF;
+END //
+
+DROP TRIGGER IF EXISTS `trg_pengajuan_ketidakhadiran_insert` //
+CREATE TRIGGER `trg_pengajuan_ketidakhadiran_insert` BEFORE INSERT ON `tbl_pengajuan_ketidakhadiran` FOR EACH ROW BEGIN
+  DECLARE v_pesan VARCHAR(255);
+  DECLARE v_bentrok DATE DEFAULT NULL;
+
+  IF NEW.status <> 'Menunggu' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengajuan ketidakhadiran baru harus berstatus Menunggu.';
+  END IF;
+  IF (SELECT status FROM tbl_karyawan WHERE id = NEW.id_karyawan) = 'Nonaktif' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Karyawan berstatus Nonaktif tidak dapat mengajukan ketidakhadiran.';
+  END IF;
+
+  SET v_bentrok = (SELECT MIN(pk.tgl_mulai) FROM tbl_pengajuan_ketidakhadiran pk
+                   WHERE pk.id_karyawan = NEW.id_karyawan AND pk.status IN ('Menunggu', 'Disetujui')
+                     AND pk.tgl_mulai <= NEW.tgl_selesai AND pk.tgl_selesai >= NEW.tgl_mulai);
+  IF v_bentrok IS NOT NULL THEN
+    SET v_pesan = CONCAT('Rentang tanggal bertabrakan dengan pengajuan lain yang mulai ', DATE_FORMAT(v_bentrok, '%d-%m-%Y'),
+                         ' (Menunggu/Disetujui).');
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_pesan;
+  END IF;
+END //
+
+DROP TRIGGER IF EXISTS `trg_pengajuan_ketidakhadiran_update` //
+CREATE TRIGGER `trg_pengajuan_ketidakhadiran_update` BEFORE UPDATE ON `tbl_pengajuan_ketidakhadiran` FOR EACH ROW BEGIN
+  IF NOT (NEW.id_karyawan <=> OLD.id_karyawan) OR NOT (NEW.jenis <=> OLD.jenis)
+     OR NOT (NEW.tgl_mulai <=> OLD.tgl_mulai) OR NOT (NEW.tgl_selesai <=> OLD.tgl_selesai)
+     OR NOT (NEW.alasan <=> OLD.alasan) OR NOT (NEW.file_bukti <=> OLD.file_bukti) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Isi pengajuan ketidakhadiran tidak dapat diubah setelah dikirim.';
+  END IF;
+  IF OLD.status <> 'Menunggu' AND NOT (NEW.status <=> OLD.status) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengajuan ini sudah diproses sebelumnya dan tidak dapat diproses lagi.';
+  END IF;
+  -- Persetujuan wajib lewat procedure agar baris absensi tercatat dalam operasi yang sama.
+  IF NEW.status = 'Disetujui' AND OLD.status = 'Menunggu' AND NOT (@sji_pengajuan_disetujui <=> NEW.id) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Persetujuan ketidakhadiran hanya dapat dilakukan melalui sp_setujui_pengajuan_ketidakhadiran.';
+  END IF;
+END //
+
+DROP TRIGGER IF EXISTS `trg_pertukaran_shift_insert` //
+CREATE TRIGGER `trg_pertukaran_shift_insert` BEFORE INSERT ON `tbl_pertukaran_shift` FOR EACH ROW BEGIN
+  IF NEW.status <> 'Menunggu' OR NEW.status_rekan <> 'Menunggu' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengajuan backup shift baru harus berstatus Menunggu.';
+  END IF;
+  CALL sp_cek_pertukaran_shift(NEW.id_jadwal_pengaju, NEW.id_karyawan_pengaju, NEW.id_karyawan_rekan, NEW.tanggal_kerja);
+END //
+
+DROP TRIGGER IF EXISTS `trg_pertukaran_shift_update` //
+CREATE TRIGGER `trg_pertukaran_shift_update` BEFORE UPDATE ON `tbl_pertukaran_shift` FOR EACH ROW BEGIN
+  IF NOT (NEW.id_jadwal_pengaju <=> OLD.id_jadwal_pengaju) OR NOT (NEW.id_karyawan_pengaju <=> OLD.id_karyawan_pengaju)
+     OR NOT (NEW.id_karyawan_rekan <=> OLD.id_karyawan_rekan) OR NOT (NEW.tanggal_kerja <=> OLD.tanggal_kerja) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jadwal, pengaju, rekan, dan tanggal pengajuan tidak dapat diubah.';
+  END IF;
+  IF OLD.status <> 'Menunggu' AND NOT (NEW.status <=> OLD.status) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengajuan ini sudah diproses sebelumnya dan tidak dapat diproses lagi.';
+  END IF;
+  IF OLD.status_rekan <> 'Menunggu' AND NOT (NEW.status_rekan <=> OLD.status_rekan) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Rekan sudah menanggapi pengajuan ini.';
+  END IF;
+  IF NEW.status = 'Disetujui' AND OLD.status = 'Menunggu' AND NEW.status_rekan <> 'Diterima' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengajuan belum diterima rekan sehingga belum dapat disetujui.';
+  END IF;
+END //
+
 DROP TRIGGER IF EXISTS `trg_users_log_tambah` //
 CREATE TRIGGER `trg_users_log_tambah` AFTER INSERT ON `tbl_users` FOR EACH ROW BEGIN
   INSERT INTO tbl_log_aktivitas (id_user, nama_tabel, aksi, id_data, keterangan)
@@ -257,19 +389,6 @@ CREATE TRIGGER `trg_users_log_hapus` AFTER DELETE ON `tbl_users` FOR EACH ROW BE
   INSERT INTO tbl_log_aktivitas (id_user, nama_tabel, aksi, id_data, keterangan)
   VALUES (@app_user_id, 'tbl_users', 'DELETE', OLD.id,
           LEFT(CONCAT('Akun dihapus ', OLD.username), 255));
-END //
-
--- Append-only tbl_log_aktivitas (sql/Komponen/19_log_append_only.sql)
-DROP TRIGGER IF EXISTS `trg_log_aktivitas_tolak_update` //
-CREATE TRIGGER `trg_log_aktivitas_tolak_update` BEFORE UPDATE ON `tbl_log_aktivitas` FOR EACH ROW BEGIN
-  SIGNAL SQLSTATE '45000'
-    SET MESSAGE_TEXT = 'Log aktivitas tidak boleh diubah karena merupakan jejak audit';
-END //
-
-DROP TRIGGER IF EXISTS `trg_log_aktivitas_tolak_delete` //
-CREATE TRIGGER `trg_log_aktivitas_tolak_delete` BEFORE DELETE ON `tbl_log_aktivitas` FOR EACH ROW BEGIN
-  SIGNAL SQLSTATE '45000'
-    SET MESSAGE_TEXT = 'Log aktivitas tidak boleh dihapus karena merupakan jejak audit';
 END //
 
 DELIMITER ;

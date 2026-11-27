@@ -1,10 +1,27 @@
 -- ============================================================
 -- sql/final/03_function.sql — Function
--- Diekspor dari database db_sji (MySQL 8) setelah Finalisasi Tahap 1–10. DEFINER dihapus agar bisa diimpor
--- di komputer lain. Urutan impor: lihat sql/README.md.
+-- Diekspor dari database db_sji (MySQL 8) setelah migration terakhir (sql/Komponen/24). DEFINER dihapus agar bisa
+-- diimpor di komputer lain. Urutan impor: lihat sql/README.md.
 -- ============================================================
 
+-- Charset koneksi saat impor: klien mysql di Windows memakai cp850 bila tidak diatur.
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 DELIMITER //
+
+DROP FUNCTION IF EXISTS `fn_gaji_pokok_berlaku` //
+CREATE FUNCTION `fn_gaji_pokok_berlaku`(p_id_karyawan INT, p_bulan INT, p_tahun INT) RETURNS decimal(12,2)
+    READS SQL DATA
+BEGIN
+  RETURN (
+    SELECT gaji_pokok FROM tbl_komponen_gaji
+    WHERE id_karyawan = p_id_karyawan
+      AND gaji_pokok IS NOT NULL
+      AND periode_tahun * 12 + periode_bulan <= p_tahun * 12 + p_bulan
+    ORDER BY periode_tahun DESC, periode_bulan DESC
+    LIMIT 1
+  );
+END //
 
 DROP FUNCTION IF EXISTS `fn_hari_kerja_kontrak` //
 CREATE FUNCTION `fn_hari_kerja_kontrak`(p_id_karyawan INT, p_awal DATE, p_akhir DATE) RETURNS int
@@ -34,6 +51,7 @@ CREATE FUNCTION `fn_hari_kerja_roster_klien`(p_id_karyawan INT, p_id_klien INT, 
     READS SQL DATA
 BEGIN
   -- Tanggal berstatus Kerja di roster, lintas penempatan; satu tanggal dihitung sekali.
+  -- Jadwal yang digantikan rekan (backup shift) bukan hari wajib pemilik jadwal.
   RETURN (
     SELECT COUNT(DISTINCT j.tanggal_kerja)
     FROM tbl_jadwal_kerja j
@@ -41,6 +59,7 @@ BEGIN
     WHERE p.id_karyawan = p_id_karyawan
       AND (p_id_klien IS NULL OR p.id_klien = p_id_klien)
       AND j.status = 'Kerja'
+      AND j.id_karyawan_pengganti IS NULL
       AND j.tanggal_kerja BETWEEN p_awal AND p_akhir
       AND j.tanggal_kerja >= p.tgl_mulai
       AND (p.tgl_selesai IS NULL OR j.tanggal_kerja <= p.tgl_selesai)
@@ -81,6 +100,7 @@ CREATE FUNCTION `fn_hari_tanpa_jadwal_klien`(p_id_karyawan INT, p_id_klien INT, 
 BEGIN
   -- Hari dalam masa penempatan yang belum punya baris jadwal (Kerja maupun Libur). Baris jadwal di luar masa
   -- penempatannya (sisa sebelum penempatan diperpendek oleh rotasi) tidak dihitung, sama dengan fn_hari_kerja_roster.
+  -- Hari ketika karyawan bertugas sebagai pengganti (backup shift) juga tidak dihitung: hari itu dibayar upah_backup.
   RETURN (
     WITH RECURSIVE hari AS (
       SELECT p_awal AS tgl
@@ -103,6 +123,10 @@ BEGIN
         AND j.tanggal_kerja = h.tgl
         AND j.tanggal_kerja >= p.tgl_mulai
         AND (p.tgl_selesai IS NULL OR j.tanggal_kerja <= p.tgl_selesai)
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM tbl_jadwal_kerja jb
+      WHERE jb.id_karyawan_pengganti = p_id_karyawan AND jb.tanggal_kerja = h.tgl
     )
   );
 END //
@@ -261,12 +285,15 @@ DROP FUNCTION IF EXISTS `fn_status_roster` //
 CREATE FUNCTION `fn_status_roster`(p_id_karyawan INT, p_tgl DATE) RETURNS varchar(5) CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci
     READS SQL DATA
 BEGIN
-  -- 'Kerja' bila ada jadwal Kerja di penempatan mana pun pada tanggal itu, 'Libur' bila hanya Libur, NULL bila belum dijadwalkan.
+  -- 'Kerja' bila ada jadwal Kerja miliknya sendiri (tidak digantikan) di penempatan mana pun pada tanggal itu.
+  -- 'Libur' bila hanya Libur, jadwalnya digantikan rekan, atau ia bertugas sebagai pengganti (backup shift),
+  -- sehingga absensi backup dibayar sebagai upah_backup. NULL bila belum dijadwalkan.
   RETURN (
-    SELECT CASE WHEN SUM(j.status = 'Kerja') > 0 THEN 'Kerja' WHEN COUNT(*) > 0 THEN 'Libur' END
+    SELECT CASE WHEN SUM(j.status = 'Kerja' AND j.id_karyawan_pengganti IS NULL AND p.id_karyawan = p_id_karyawan) > 0 THEN 'Kerja'
+                WHEN COUNT(*) > 0 THEN 'Libur' END
     FROM tbl_jadwal_kerja j
     JOIN tbl_penempatan p ON p.id = j.id_penempatan
-    WHERE p.id_karyawan = p_id_karyawan AND j.tanggal_kerja = p_tgl
+    WHERE (p.id_karyawan = p_id_karyawan OR j.id_karyawan_pengganti = p_id_karyawan) AND j.tanggal_kerja = p_tgl
   );
 END //
 

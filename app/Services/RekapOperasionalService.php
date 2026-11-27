@@ -118,6 +118,7 @@ class RekapOperasionalService
                 $data->terlambat += $hari->status_kehadiran === 'Terlambat' ? 1 : 0;
                 $data->izin += $hari->status_kehadiran === 'Izin' ? 1 : 0;
                 $data->sakit += $hari->status_kehadiran === 'Sakit' ? 1 : 0;
+                $data->cuti += $hari->status_kehadiran === 'Cuti' ? 1 : 0;
                 $data->alpha += $hari->status_kehadiran === 'Alpha' ? 1 : 0;
                 $data->menit_terlambat += $kolom['menit_terlambat'] ? (int) $hari->menit_terlambat : 0;
                 $data->jam_kerja += $this->jamKerjaTercatat($hari->jam_masuk, $hari->jam_keluar);
@@ -136,7 +137,7 @@ class RekapOperasionalService
                 }
             }
 
-            $data->tidak_hadir = $data->izin + $data->sakit + $data->alpha + count($data->tanggal_tanpa_absensi);
+            $data->tidak_hadir = $data->izin + $data->sakit + $data->cuti + $data->alpha + count($data->tanggal_tanpa_absensi);
 
             return $data;
         })->values();
@@ -192,6 +193,7 @@ class RekapOperasionalService
             'menit_terlambat' => 0,
             'izin' => 0,
             'sakit' => 0,
+            'cuti' => 0,
             'alpha' => 0,
             'tidak_hadir' => 0,
             'jam_kerja' => 0,

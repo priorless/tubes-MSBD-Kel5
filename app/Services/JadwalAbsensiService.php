@@ -213,7 +213,7 @@ class JadwalAbsensiService
      * Hari wajib yang sudah lewat tanpa baris absensi dihitung Alpha (tanpa keterangan), sehingga hari bolos
      * tanpa check-in tetap terdeteksi. Hari ini dan sesudahnya dihitung "belum berjalan".
      *
-     * @return array{hari_wajib: int, hadir: int, terlambat: int, izin: int, sakit: int, alpha: int, belum_berjalan: int,
+     * @return array{hari_wajib: int, hadir: int, terlambat: int, izin: int, sakit: int, cuti: int, alpha: int, belum_berjalan: int,
      *     hadir_luar_roster: int, harian: list<array{tanggal: string, status_roster: string, shift: string|null, klien: string|null,
      *     absensi: object|null, keterangan_hadir: string}>}
      */
@@ -227,7 +227,7 @@ class JadwalAbsensiService
             ->get()
             ->keyBy(fn (object $baris): string => substr((string) $baris->tgl, 0, 10));
 
-        $rekap = ['hari_wajib' => 0, 'hadir' => 0, 'terlambat' => 0, 'izin' => 0, 'sakit' => 0, 'alpha' => 0,
+        $rekap = ['hari_wajib' => 0, 'hadir' => 0, 'terlambat' => 0, 'izin' => 0, 'sakit' => 0, 'cuti' => 0, 'alpha' => 0,
             'belum_berjalan' => 0, 'hadir_luar_roster' => 0, 'harian' => []];
 
         foreach ($this->rosterKaryawan($idKaryawan, $awal->toDateString(), $awal->endOfMonth()->toDateString()) as $hari) {
@@ -248,6 +248,7 @@ class JadwalAbsensiService
                     in_array($status, ['Hadir', 'Terlambat'], true) => $rekap['hadir']++,
                     $status === 'Izin' => $rekap['izin']++,
                     $status === 'Sakit' => $rekap['sakit']++,
+                    $status === 'Cuti' => $rekap['cuti']++,
                     $status === 'Alpha', $status === null && $hari['tanggal'] < $hariIni => $rekap['alpha']++,
                     default => $rekap['belum_berjalan']++,
                 };

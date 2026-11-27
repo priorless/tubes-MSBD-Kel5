@@ -62,9 +62,18 @@ GRANT SELECT ON tbl_p2h_item TO 'sji_role_hrd';
 -- Perbaikan lupa check-out: HRD memutuskan pengajuan dan mengisi jam_keluar (lembur dihitung trigger).
 GRANT SELECT, INSERT, UPDATE ON tbl_koreksi_check_out TO 'sji_role_hrd';
 GRANT UPDATE (jam_keluar) ON tbl_absensi TO 'sji_role_hrd';
+-- sp_cek_koreksi_check_out sengaja tanpa GRANT: hanya dipanggil trigger trg_koreksi_check_out_insert/_update.
+-- sp_tandai_alpha_otomatis sengaja tanpa GRANT: hanya dipanggil event ev_tandai_alpha_otomatis (hak definer).
 GRANT SELECT ON v_dashboard_eksekutif TO 'sji_role_hrd';
+-- Status & sisa hari sertifikat dihitung di view (kolom status tidak disimpan).
+GRANT SELECT ON v_sertifikat_karyawan TO 'sji_role_hrd';
 GRANT EXECUTE ON FUNCTION fn_sisa_hari_dokumen TO 'sji_role_hrd';
 GRANT EXECUTE ON PROCEDURE sp_input_ketidakhadiran TO 'sji_role_hrd';
+-- Pengajuan Izin/Sakit/Cuti dibuat karyawan (lewat aplikasi). HRD menolak dengan UPDATE status dan menyetujui
+-- HANYA lewat procedure, yang sekaligus mencatat baris tbl_absensi (dijaga trigger trg_pengajuan_ketidakhadiran_update).
+GRANT SELECT, UPDATE (status, catatan_keputusan, diproses_oleh, diproses_pada, updated_at)
+  ON tbl_pengajuan_ketidakhadiran TO 'sji_role_hrd';
+GRANT EXECUTE ON PROCEDURE sp_setujui_pengajuan_ketidakhadiran TO 'sji_role_hrd';
 
 -- ------------------------------------------------------------
 -- Operasional — klien, penempatan, rotasi, monitoring lapangan

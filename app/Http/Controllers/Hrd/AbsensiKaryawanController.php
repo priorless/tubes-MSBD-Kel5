@@ -119,6 +119,7 @@ class AbsensiKaryawanController extends Controller
             'payrollDibuat' => $payrollDibuat,
         ]);
     }
+
     public function exportPdf(Request $request): Response
     {
         abort_unless(Schema::hasView('v_absensi_harian'), 503, 'Data absensi belum tersedia.');
@@ -213,6 +214,7 @@ class AbsensiKaryawanController extends Controller
                 COALESCE(SUM(a.menit_terlambat), 0) AS total_menit_terlambat,
                 COUNT(CASE WHEN a.status_kehadiran = 'Izin' THEN 1 END) AS izin,
                 COUNT(CASE WHEN a.status_kehadiran = 'Sakit' THEN 1 END) AS sakit,
+                COUNT(CASE WHEN a.status_kehadiran = 'Cuti' THEN 1 END) AS cuti,
                 COUNT(CASE WHEN a.status_kehadiran = 'Alpha' THEN 1 END) AS alpha,
                 COUNT(CASE WHEN a.jam_masuk IS NOT NULL AND a.jam_keluar IS NULL THEN 1 END) AS belum_check_out,
                 COUNT(CASE WHEN a.jam_lembur > 0 THEN 1 END) AS lembur,

@@ -62,7 +62,7 @@
             <x-ui.stat-card label="Karyawan" :value="$rekap['total']['karyawan']" />
             <x-ui.stat-card label="Hari kerja terjadwal" :value="$rekap['total']['kerja_terjadwal']" />
             <x-ui.stat-card label="Hari hadir" :value="$rekap['total']['hadir']" :hint="$rekap['total']['terlambat'].' hari terlambat'" />
-            <x-ui.stat-card label="Tidak hadir" :value="$rekap['total']['tidak_hadir']" hint="Izin, sakit, alpha, atau tanpa catatan"
+            <x-ui.stat-card label="Tidak hadir" :value="$rekap['total']['tidak_hadir']" hint="Izin, sakit, cuti, alpha, atau tanpa catatan"
                 :tone="$rekap['total']['tidak_hadir'] > 0 ? 'warning' : 'default'" />
             <x-ui.stat-card label="Jam lembur" :value="$rekap['total']['jam_lembur']" :hint="$rekap['total']['jam_kerja'].' jam kerja tercatat'" />
         </div>
@@ -82,7 +82,7 @@
                             <th>Jadwal (kerja / libur / belum diatur)</th>
                             <th>Hadir</th>
                             <th>Terlambat</th>
-                            <th>Izin / Sakit / Alpha</th>
+                            <th>Izin / Sakit / Cuti / Alpha</th>
                             <th>Tanpa catatan</th>
                             <th>Jam kerja</th>
                             <th>Lembur</th>
@@ -103,7 +103,7 @@
                                         <p class="text-xs text-gray-400">{{ $baris->menit_terlambat }} menit</p>
                                     @endif
                                 </td>
-                                <td class="whitespace-nowrap tabular-nums">{{ $baris->izin }} / {{ $baris->sakit }} / {{ $baris->alpha }}</td>
+                                <td class="whitespace-nowrap tabular-nums">{{ $baris->izin }} / {{ $baris->sakit }} / {{ $baris->cuti }} / {{ $baris->alpha }}</td>
                                 <td class="tabular-nums">{{ count($baris->tanggal_tanpa_absensi) }}</td>
                                 <td class="tabular-nums">{{ $baris->jam_kerja }} jam</td>
                                 <td class="whitespace-nowrap tabular-nums">

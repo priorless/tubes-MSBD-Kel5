@@ -2,39 +2,57 @@
 
 namespace App\Http\Controllers\TenagaKerja;
 
+use App\Http\Controllers\Concerns\MenanganiSignalDatabase;
 use App\Http\Controllers\Controller;
 use App\Support\KaryawanAktif;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
 
 /**
  * Pengajuan koreksi lupa check-out oleh karyawan: absensi hari sebelumnya yang sudah check-in tetapi belum check-out
- * dapat diajukan jam keluarnya. HRD yang menyetujui atau menolak (Hrd\KoreksiCheckOutController).
+ * dapat diajukan jam keluarnya. Formulir & riwayatnya tampil di halaman Absensi (tidak ada halaman terpisah).
+ * HRD yang menyetujui atau menolak (Hrd\KoreksiCheckOutController).
  */
 class KoreksiCheckOutController extends Controller
 {
+    use MenanganiSignalDatabase;
+
     /** Batas hari ke belakang absensi yang masih dapat diajukan koreksinya. */
     public const int BATAS_HARI = 30;
 
-    public function index(): View
-    {
-        $idKaryawan = (int) KaryawanAktif::id();
+    /** Jumlah pengajuan terakhir yang ditampilkan di halaman Absensi. */
+    public const int JUMLAH_RIWAYAT = 5;
 
-        return view('tenaga-kerja.koreksi-check-out', [
-            'lupaCheckOut' => $this->queryLupaCheckOut($idKaryawan)
+    /** URL lama halaman koreksi tetap berlaku: diarahkan ke bagian lupa check-out di halaman Absensi. */
+    public function index(): RedirectResponse
+    {
+        return redirect()->to(route('tenaga-kerja.absensi').'#lupa-check-out');
+    }
+
+    /**
+     * Data bagian "Lupa check-out" di halaman Absensi.
+     *
+     * @return array{lupaCheckOut: Collection<int, object>, pengajuanKoreksi: Collection<int, object>}
+     */
+    public static function dataHalamanAbsensi(int $idKaryawan): array
+    {
+        return [
+            'lupaCheckOut' => self::queryLupaCheckOut($idKaryawan)
                 ->orderByDesc('a.tgl')
                 ->get(['a.id', 'a.tgl', 'a.jam_masuk']),
-            'pengajuan' => DB::table('tbl_koreksi_check_out as kc')
+            'pengajuanKoreksi' => DB::table('tbl_koreksi_check_out as kc')
                 ->join('tbl_absensi as a', 'a.id', '=', 'kc.id_absensi')
                 ->where('a.id_karyawan', $idKaryawan)
+                ->where('kc.created_at', '>=', now()->subDays(self::BATAS_HARI))
                 ->orderByDesc('kc.created_at')
-                ->limit(20)
+                ->limit(self::JUMLAH_RIWAYAT)
                 ->get(['kc.id', 'a.tgl', 'a.jam_masuk', 'kc.jam_keluar', 'kc.alasan', 'kc.status', 'kc.catatan_keputusan', 'kc.created_at']),
-        ]);
+        ];
     }
 
     public function store(Request $request): RedirectResponse
@@ -51,8 +69,26 @@ class KoreksiCheckOutController extends Controller
             'alasan.max' => 'Alasan maksimal 500 karakter.',
         ]);
 
+        try {
+            $this->simpanPengajuan($request, $idKaryawan, $valid);
+        } catch (QueryException $exception) {
+            // Batas wajar jam keluar (sp_cek_koreksi_check_out lewat trigger trg_koreksi_check_out_insert).
+            throw ValidationException::withMessages([
+                'jam_keluar' => $this->teksSignalDatabase($exception) ?? throw $exception,
+            ]);
+        }
+
+        return redirect()->route('tenaga-kerja.absensi')
+            ->with('sukses', 'Pengajuan koreksi check-out terkirim dan menunggu persetujuan HRD.');
+    }
+
+    /**
+     * @param  array{id_absensi: int|string, jam_keluar: string, alasan: string}  $valid
+     */
+    private function simpanPengajuan(Request $request, int $idKaryawan, array $valid): void
+    {
         DB::transaction(function () use ($request, $idKaryawan, $valid): void {
-            $absensi = $this->queryLupaCheckOut($idKaryawan)
+            $absensi = self::queryLupaCheckOut($idKaryawan)
                 ->where('a.id', $valid['id_absensi'])
                 ->lockForUpdate()
                 ->first(['a.id', 'a.jam_masuk']);
@@ -77,16 +113,13 @@ class KoreksiCheckOutController extends Controller
                 'updated_at' => now(),
             ]);
         });
-
-        return redirect()->route('tenaga-kerja.koreksi-check-out.index')
-            ->with('success', 'Pengajuan koreksi check-out terkirim dan menunggu persetujuan HRD.');
     }
 
     /**
      * Absensi milik karyawan sebelum hari ini yang sudah check-in, belum check-out,
      * dan belum memiliki pengajuan Menunggu atau Disetujui.
      */
-    private function queryLupaCheckOut(int $idKaryawan): Builder
+    private static function queryLupaCheckOut(int $idKaryawan): Builder
     {
         return DB::table('tbl_absensi as a')
             ->where('a.id_karyawan', $idKaryawan)

@@ -66,7 +66,7 @@
                     <th>Kerja / Libur / Belum diatur</th>
                     <th>Hadir</th>
                     <th>Terlambat</th>
-                    <th>Izin / Sakit / Alpha</th>
+                    <th>Izin / Sakit / Cuti / Alpha</th>
                     <th>Tanpa catatan</th>
                     <th>Jam kerja</th>
                     <th>Lembur</th>
@@ -86,7 +86,7 @@
                                 <div class="muted">{{ $baris->menit_terlambat }} menit</div>
                             @endif
                         </td>
-                        <td>{{ $baris->izin }} / {{ $baris->sakit }} / {{ $baris->alpha }}</td>
+                        <td>{{ $baris->izin }} / {{ $baris->sakit }} / {{ $baris->cuti }} / {{ $baris->alpha }}</td>
                         <td>{{ count($baris->tanggal_tanpa_absensi) }}</td>
                         <td>{{ $baris->jam_kerja }} jam</td>
                         <td>{{ $baris->jam_lembur }} jam</td>

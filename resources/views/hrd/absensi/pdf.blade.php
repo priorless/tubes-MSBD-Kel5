@@ -54,7 +54,7 @@
         <tr>
             <td><div class="summary-label">Hadir</div><div class="summary-value">{{ $ringkasanRekap->hadir }}</div></td>
             <td><div class="summary-label">Terlambat</div><div class="summary-value">{{ $ringkasanRekap->terlambat }} kali</div><div class="muted">{{ $ringkasanRekap->total_menit_terlambat }} menit</div></td>
-            <td><div class="summary-label">Izin / Sakit</div><div class="summary-value">{{ $ringkasanRekap->izin }} / {{ $ringkasanRekap->sakit }}</div></td>
+            <td><div class="summary-label">Izin / Sakit / Cuti</div><div class="summary-value">{{ $ringkasanRekap->izin }} / {{ $ringkasanRekap->sakit }} / {{ $ringkasanRekap->cuti }}</div></td>
             <td><div class="summary-label">Alpha tercatat</div><div class="summary-value">{{ $ringkasanRekap->alpha }}</div></td>
         </tr>
         <tr>

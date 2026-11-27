@@ -59,6 +59,7 @@
             ['Terlambat', $ringkasanRekap->terlambat.' kali · '.$ringkasanRekap->total_menit_terlambat.' menit', 'text-amber-600'],
             ['Izin', $ringkasanRekap->izin, 'text-blue-600'],
             ['Sakit', $ringkasanRekap->sakit, 'text-blue-600'],
+            ['Cuti', $ringkasanRekap->cuti, 'text-blue-600'],
             ['Alpha tercatat', $ringkasanRekap->alpha, 'text-red-600'],
             ['Tanpa catatan', $ringkasanRekap->tanpa_catatan, 'text-gray-700'],
             ['Belum check-out', $ringkasanRekap->belum_check_out, 'text-gray-700'],
@@ -99,7 +100,7 @@
                             <td class="whitespace-nowrap">{{ FormatKolom::tanggal($baris->tgl, 'd/m/Y') }}</td>
                             <td><span class="font-medium">{{ $baris->nama }}</span><span class="block text-xs text-gray-500">{{ $baris->nip }}</span></td>
                             <td>{{ $baris->nama_klien ?? '—' }}@if ($baris->lokasi_kerja)<span class="block text-xs text-gray-500">{{ $baris->lokasi_kerja }}</span>@endif</td>
-                            <td><span class="badge badge-{{ ['Hadir' => 'success', 'Terlambat' => 'warning', 'Izin' => 'info', 'Sakit' => 'info', 'Alpha' => 'danger'][$baris->status_kehadiran] ?? 'secondary' }}">{{ $baris->status_kehadiran }}</span></td>
+                            <td><span class="badge badge-{{ ['Hadir' => 'success', 'Terlambat' => 'warning', 'Izin' => 'info', 'Sakit' => 'info', 'Cuti' => 'info', 'Alpha' => 'danger'][$baris->status_kehadiran] ?? 'secondary' }}">{{ $baris->status_kehadiran }}</span></td>
                             <td>{{ (int) $baris->menit_terlambat > 0 ? $baris->menit_terlambat.' menit' : '—' }}</td>
                             <td class="font-mono">{{ FormatKolom::jam($baris->jam_masuk) }}</td>
                             <td class="font-mono">{{ FormatKolom::jam($baris->jam_keluar) }}</td>

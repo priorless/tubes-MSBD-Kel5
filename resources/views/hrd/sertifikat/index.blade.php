@@ -46,15 +46,17 @@
                             <td>{{ \Illuminate\Support\Carbon::parse($item->tgl_terbit)->format('d/m/Y') }}</td>
                             <td>{{ \Illuminate\Support\Carbon::parse($item->tgl_kadaluarsa)->format('d/m/Y') }}</td>
                             <td>
-                                @if ((int) $item->sisa_hari === 0)
+                                @if ($item->status === 'Kadaluarsa')
                                     <span class="badge badge-danger">Kedaluwarsa</span>
+                                @elseif ((int) $item->sisa_hari === 0)
+                                    <span class="badge badge-danger">Berakhir hari ini</span>
                                 @else
                                     <span class="badge badge-{{ $item->sisa_hari < $batasHari ? 'danger' : 'success' }}">{{ $item->sisa_hari }} hari</span>
                                 @endif
                             </td>
                             <td>
                                 @if ($item->file_upload)
-                                    <a href="{{ asset('storage/'.$item->file_upload) }}" target="_blank" rel="noopener" class="font-medium text-sji-biru hover:underline">Lihat</a>
+                                    <a href="{{ route('sertifikat.berkas', $item->id) }}" target="_blank" rel="noopener" class="font-medium text-sji-biru hover:underline">Lihat</a>
                                 @else
                                     <span class="text-gray-400">&mdash;</span>
                                 @endif
