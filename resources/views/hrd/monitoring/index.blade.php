@@ -25,19 +25,39 @@
 
     <form method="GET" action="{{ route('hrd.monitoring') }}" class="card mb-6">
         <div class="card-body grid grid-cols-1 gap-4 md:grid-cols-12 md:items-end">
-            <div class="md:col-span-3">
+            <div class="md:col-span-2">
                 <label for="tanggal" class="form-label">Tanggal laporan</label>
                 <input id="tanggal" name="tanggal" type="date" value="{{ $tanggal }}"
                     @class(['form-input', 'form-input-error' => $errors->has('tanggal')])>
                 @error('tanggal') <p class="form-error">{{ $message }}</p> @enderror
             </div>
-            <div class="md:col-span-5">
+            <div class="md:col-span-3">
                 <label for="q" class="form-label">Nama tenaga kerja</label>
                 <input id="q" name="q" type="search" value="{{ $kataKunci }}" maxlength="100" placeholder="Cari nama atau NIP"
                     @class(['form-input', 'form-input-error' => $errors->has('q')])>
                 @error('q') <p class="form-error">{{ $message }}</p> @enderror
             </div>
-            <div class="flex gap-2 md:col-span-4">
+            <div class="md:col-span-3">
+                <label for="klien" class="form-label">Klien</label>
+                <select id="klien" name="klien" @class(['form-input', 'form-input-error' => $errors->has('klien')])>
+                    <option value="">Semua Klien</option>
+                    @foreach ($daftarKlien as $klien)
+                        <option value="{{ $klien->id }}" @selected($idKlien === (int) $klien->id)>{{ $klien->nama_perusahaan }}</option>
+                    @endforeach
+                </select>
+                @error('klien') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+            <div class="md:col-span-2">
+                <label for="layanan" class="form-label">Jenis layanan</label>
+                <select id="layanan" name="layanan" @class(['form-input', 'form-input-error' => $errors->has('layanan')])>
+                    <option value="">Semua Jenis Layanan</option>
+                    @foreach ($daftarLayanan as $layanan)
+                        <option value="{{ $layanan->id }}" @selected($idLayanan === (int) $layanan->id)>{{ $layanan->nama_layanan }}</option>
+                    @endforeach
+                </select>
+                @error('layanan') <p class="form-error">{{ $message }}</p> @enderror
+            </div>
+            <div class="flex gap-2 md:col-span-2">
                 <button type="submit" class="btn-primary">Terapkan</button>
             </div>
         </div>
@@ -54,12 +74,12 @@
                 @endif
                 <p class="text-sm text-gray-500">{{ $laporan->total() }} laporan sesuai filter</p>
             </div>
-            <a href="{{ route('hrd.monitoring', request()->only('tanggal', 'q')) }}" class="btn-secondary">Kembali ke daftar tenaga kerja</a>
+            <a href="{{ route('hrd.monitoring', $filterAktif) }}" class="btn-secondary">Kembali ke daftar tenaga kerja</a>
         </div>
 
         @if ($laporan->isEmpty())
             <x-ui.empty-state title="Belum ada laporan aktivitas."
-                :message="$tanggal || $kataKunci !== '' ? 'Tidak ada laporan yang cocok dengan filter ini.' : 'Tenaga kerja ini belum memiliki laporan aktivitas.'" />
+                :message="$filterAktif !== [] ? 'Tidak ada laporan yang cocok dengan filter ini.' : 'Tenaga kerja ini belum memiliki laporan aktivitas.'" />
         @else
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 @foreach ($laporan as $item)
@@ -132,11 +152,11 @@
         </dialog>
     @elseif ($tenagaKerja->isEmpty())
         <x-ui.empty-state title="Belum ada laporan aktivitas."
-            :message="$tanggal || $kataKunci !== '' ? 'Tidak ada laporan yang cocok dengan filter ini.' : 'Laporan yang dikirim tenaga kerja dari halaman Absensi akan tampil di sini.'" />
+            :message="$filterAktif !== [] ? 'Tidak ada laporan yang cocok dengan filter ini.' : 'Laporan yang dikirim tenaga kerja dari halaman Absensi akan tampil di sini.'" />
     @else
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             @foreach ($tenagaKerja as $item)
-                <a href="{{ route('hrd.monitoring', array_merge(request()->only('tanggal', 'q'), ['karyawan' => $item->id_karyawan])) }}"
+                <a href="{{ route('hrd.monitoring', [...$filterAktif, 'karyawan' => $item->id_karyawan]) }}"
                     class="card flex min-h-44 flex-col justify-between gap-4 p-5 transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-sji-biru"
                     data-tenaga-kerja="{{ $item->id_karyawan }}">
                     <div>

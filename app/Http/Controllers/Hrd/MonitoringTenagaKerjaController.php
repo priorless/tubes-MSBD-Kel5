@@ -7,6 +7,7 @@ use App\Services\LaporanAktivitasService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class MonitoringTenagaKerjaController extends Controller
@@ -17,21 +18,28 @@ class MonitoringTenagaKerjaController extends Controller
             'tanggal' => ['nullable', 'date_format:Y-m-d'],
             'q' => ['nullable', 'string', 'max:100'],
             'karyawan' => ['nullable', 'integer'],
+            'klien' => ['nullable', 'integer', Rule::exists('tbl_klien', 'id')],
+            'layanan' => ['nullable', 'integer', Rule::exists('tbl_jenis_layanan', 'id')],
         ], [
             'tanggal.date_format' => 'Tanggal laporan tidak valid.',
             'q.max' => 'Kata pencarian maksimal 100 karakter.',
             'karyawan.integer' => 'Tenaga kerja yang dipilih tidak valid.',
+            'klien.*' => 'Klien yang dipilih tidak valid.',
+            'layanan.*' => 'Jenis layanan yang dipilih tidak valid.',
         ]);
 
         $tanggal = $validated['tanggal'] ?? null;
         $kataKunci = trim((string) ($validated['q'] ?? ''));
+        // Klien = tempat bekerja aktual saat laporan dikirim (penempatan pada absensi laporan, termasuk backup shift).
+        $idKlien = isset($validated['klien']) ? (int) $validated['klien'] : null;
+        $idLayanan = isset($validated['layanan']) ? (int) $validated['layanan'] : null;
         $detailKaryawanId = isset($validated['karyawan']) ? (int) $validated['karyawan'] : null;
         $laporan = null;
         $tenagaKerja = null;
         $karyawan = null;
 
         if ($laporanAktivitas->tersedia()) {
-            $queryLaporan = static function () use ($tanggal, $kataKunci): Builder {
+            $queryLaporan = static function () use ($tanggal, $kataKunci, $idKlien, $idLayanan): Builder {
                 return DB::table('tbl_laporan_aktivitas as la')
                     ->join('tbl_karyawan as k', 'k.id', '=', 'la.id_karyawan')
                     ->leftJoin('tbl_jenis_layanan as jl', 'jl.id', '=', 'k.id_jenis_layanan')
@@ -39,6 +47,8 @@ class MonitoringTenagaKerjaController extends Controller
                     ->leftJoin('tbl_penempatan as p', 'p.id', '=', 'a.id_penempatan')
                     ->leftJoin('tbl_klien as kl', 'kl.id', '=', 'p.id_klien')
                     ->when($tanggal, fn (Builder $query, string $tgl) => $query->whereDate('la.waktu_lapor', $tgl))
+                    ->when($idKlien, fn (Builder $query, int $id) => $query->where('p.id_klien', $id))
+                    ->when($idLayanan, fn (Builder $query, int $id) => $query->where('k.id_jenis_layanan', $id))
                     ->when($kataKunci !== '', fn (Builder $query) => $query->where(fn (Builder $cari) => $cari
                         ->where('k.nama', 'like', '%'.$kataKunci.'%')
                         ->orWhere('k.nip', 'like', '%'.$kataKunci.'%')));
@@ -87,6 +97,15 @@ class MonitoringTenagaKerjaController extends Controller
             'detailKaryawanId' => $detailKaryawanId,
             'tanggal' => $tanggal,
             'kataKunci' => $kataKunci,
+            'idKlien' => $idKlien,
+            'idLayanan' => $idLayanan,
+            // Hanya klien yang pernah menjadi tempat penempatan, agar pilihan tidak berisi klien tanpa tenaga kerja.
+            'daftarKlien' => DB::table('tbl_klien as kl')
+                ->whereExists(fn (Builder $query) => $query->selectRaw('1')->from('tbl_penempatan as p')->whereColumn('p.id_klien', 'kl.id'))
+                ->orderBy('kl.nama_perusahaan')
+                ->get(['kl.id', 'kl.nama_perusahaan']),
+            'daftarLayanan' => DB::table('tbl_jenis_layanan')->orderBy('nama_layanan')->get(['id', 'nama_layanan']),
+            'filterAktif' => array_filter($request->only('tanggal', 'q', 'klien', 'layanan'), filled(...)),
         ]);
     }
 }

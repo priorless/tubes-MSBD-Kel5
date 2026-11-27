@@ -64,7 +64,8 @@ class GajiPokokKaryawanHrdTest extends TestCase
             ->assertSee('<th class="min-w-36 text-right">Gaji Pokok</th>', false)
             ->assertDontSee('<th>Kategori</th>', false)
             ->assertDontSee('badge-dark', false)
-            ->assertSee('name="kategori"', false)
+            ->assertDontSee('name="kategori"', false)
+            ->assertDontSeeText('Semua kategori')
             ->assertSeeText('Rp 4.250.000')
             ->assertSeeText('Rp 4.100.000')
             ->assertSeeText('Rp 5.000.000')
@@ -77,6 +78,7 @@ class GajiPokokKaryawanHrdTest extends TestCase
         $this->assertSame('Satpam', trim(strip_tags($sel[1][1])));
         $this->assertSame('-', trim(strip_tags($sel[1][2])));
     }
+
     public function test_add_form_shows_rupiah_salary_input(): void
     {
         $this->get(route('hrd.karyawan.create'))

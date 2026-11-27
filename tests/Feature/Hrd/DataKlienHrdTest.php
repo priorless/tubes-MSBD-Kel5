@@ -121,6 +121,24 @@ class DataKlienHrdTest extends TestCase
         $this->assertDatabaseHas('tbl_klien', ['id' => 1, 'kode_klien' => 'KL001', 'nama_perusahaan' => 'PT Alpha Baru', 'status' => 'Nonaktif']);
     }
 
+    public function test_hrd_sidebar_shows_data_klien_as_active_and_operasional_keeps_its_own_menu(): void
+    {
+        $this->createClientData();
+        $navigasi = static function (string $html): string {
+            preg_match('/<nav[^>]*aria-label="Menu utama"[^>]*>(.*?)<\/nav>/s', $html, $nav);
+
+            return $nav[1] ?? '';
+        };
+
+        $navHrd = $navigasi($this->actingAs($this->hrd())->get(route('hrd.klien.show', 1))->assertOk()->getContent());
+        $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('hrd.klien.index'), '/').'"[^>]*aria-current="page"/s', $navHrd);
+        $this->assertStringNotContainsString(route('operasional.klien.index'), $navHrd);
+
+        $navOperasional = $navigasi($this->actingAs($this->operasional())->get(route('operasional.klien.index'))->assertOk()->getContent());
+        $this->assertStringContainsString('href="'.route('operasional.klien.index').'"', $navOperasional);
+        $this->assertStringNotContainsString(route('hrd.klien.index'), $navOperasional);
+    }
+
     public function test_hrd_cannot_delete_a_client(): void
     {
         $this->createTables();

@@ -42,6 +42,9 @@
                 ['Pengajuan Izin/Cuti', 'hrd.ketidakhadiran.index', 'hrd.ketidakhadiran.*'],
                 ['Sertifikat Karyawan', 'hrd.sertifikat.index', 'hrd.sertifikat.*'],
             ];
+            $menu['Data Klien'] = [
+                ['Data Klien', 'hrd.klien.index', 'hrd.klien.*'],
+            ];
             $menu['Monitoring'] = [
                 ['Monitoring Tenaga Kerja', 'hrd.monitoring', 'hrd.monitoring'],
                 ['Catatan Driver', 'hrd.catatan-driver', 'hrd.catatan-driver'],

@@ -104,8 +104,8 @@ class StatusSertifikatTest extends TestCase
         ])->assertRedirect(route('hrd.sertifikat.index'));
 
         $sertifikat = DB::table('tbl_sertifikat')->where('id_karyawan', $idPemilik)->sole();
-        Storage::disk(SertifikatController::DISK)->assertExists($sertifikat->file_upload);
-        Storage::disk('public')->assertMissing($sertifikat->file_upload);
+        $this->assertTrue(Storage::disk(SertifikatController::DISK)->exists($sertifikat->file_upload));
+        $this->assertFalse(Storage::disk('public')->exists($sertifikat->file_upload));
 
         $this->get(route('sertifikat.berkas', $sertifikat->id))->assertOk();
         $this->actingAs($this->akunKaryawan($idPemilik))->get(route('sertifikat.berkas', $sertifikat->id))->assertOk();

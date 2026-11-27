@@ -13,13 +13,7 @@
 
     <div class="card overflow-hidden">
         <form method="GET" action="{{ route('hrd.karyawan.index') }}" class="grid grid-cols-1 gap-3 border-b border-gray-200 bg-gray-50 px-6 py-4 md:grid-cols-12">
-            <input type="search" name="q" value="{{ request('q') }}" class="form-input md:col-span-5" placeholder="Cari nama atau NIP" aria-label="Cari nama atau NIP">
-            <select name="kategori" class="form-input md:col-span-3" aria-label="Filter kategori">
-                <option value="">Semua kategori</option>
-                @foreach (['Lapangan', 'Internal'] as $kategori)
-                    <option value="{{ $kategori }}" @selected(request('kategori') === $kategori)>{{ $kategori }}</option>
-                @endforeach
-            </select>
+            <input type="search" name="q" value="{{ request('q') }}" class="form-input md:col-span-8" placeholder="Cari nama atau NIP" aria-label="Cari nama atau NIP">
             <select name="status" class="form-input md:col-span-2" aria-label="Filter status">
                 <option value="">Semua status</option>
                 @foreach (array_keys($warnaStatus) as $status)
