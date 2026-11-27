@@ -21,7 +21,7 @@
                     aria-controls="hasil-karyawan" aria-expanded="false"
                     value="{{ $karyawanTerpilih ? $karyawanTerpilih->nama.' ('.$karyawanTerpilih->nip.')' : '' }}">
                 <input id="id_karyawan" type="hidden" name="id_karyawan" value="{{ $filterRekap['id_karyawan'] ?? '' }}">
-                <div id="hasil-karyawan" class="absolute z-20 mt-1 hidden max-h-64 w-full overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg" role="listbox" aria-label="Hasil pencarian karyawan"></div>
+                <div id="hasil-karyawan" data-panel-mengambang="filter_karyawan" class="hidden max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg" role="listbox" aria-label="Hasil pencarian karyawan"></div>
                 <p id="status-pencarian-karyawan" class="mt-1 text-xs text-gray-500" aria-live="polite">
                     @if ($karyawanTerpilih)
                         Filter: {{ $karyawanTerpilih->nama }} ({{ $karyawanTerpilih->nip }})

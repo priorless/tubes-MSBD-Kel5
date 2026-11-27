@@ -20,6 +20,28 @@
 
 /*
 |--------------------------------------------------------------------------
+| Skala lapisan (z-index) seluruh aplikasi
+|--------------------------------------------------------------------------
+| Pakai token ini (z-(--lapis-*) atau var(--lapis-*)), jangan angka z-index lepas.
+| Dropdown/autocomplete/popover dipindah ke <body> oleh resources/js/panel-mengambang.js,
+| sehingga lapisannya dibandingkan langsung dengan header dan sidebar, bukan terkurung di kartunya.
+| Modal memakai <dialog>.showModal() yang tampil di top layer browser (di atas semua token ini);
+| panel mengambang di dalam dialog ikut dipindah ke dialog tersebut.
+*/
+:root {
+    --lapis-isi: 10; /* di atas isi sekitarnya dalam satu komponen: sel tabel sticky, dekorasi kartu */
+    --lapis-isi-atas: 20; /* di atas --lapis-isi dalam komponen yang sama: kepala tabel sticky */
+    --lapis-menempel: 30; /* bilah sticky di area konten, mis. bilah simpan */
+    --lapis-header: 40; /* header aplikasi (sticky) */
+    --lapis-latar: 50; /* latar gelap saat sidebar dibuka di layar kecil */
+    --lapis-sidebar: 60; /* sidebar / menu navigasi */
+    --lapis-mengambang: 70; /* dropdown, select, autocomplete, popover */
+    --lapis-notifikasi: 80; /* toast notifikasi */
+    --lapis-efek: 90; /* efek sesaat tanpa interaksi (konfeti) */
+}
+
+/*
+|--------------------------------------------------------------------------
 | Komponen bersama semua modul (CEO, HRD, Operasional, Keuangan, Tenaga Kerja)
 |--------------------------------------------------------------------------
 */
@@ -202,7 +224,12 @@
     }
 
     .pilihan-cari-daftar {
-        @apply absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg;
+        @apply max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg;
+    }
+
+    /* Panel dari resources/js/panel-mengambang.js: posisi (top/left/width) diatur script mengikuti jangkarnya. */
+    .panel-mengambang {
+        @apply fixed z-(--lapis-mengambang) m-0;
     }
 
     .pilihan-cari-opsi {
@@ -262,8 +289,10 @@
         transition-delay: var(--tunda, 0ms);
     }
 
+    /* translate: none (bukan translate-y-0) agar kartu tidak menjadi stacking context setelah tampil. */
     .tk-reveal.tampil {
-        @apply translate-y-0 opacity-100;
+        @apply opacity-100;
+        translate: none;
     }
 
     /* Panel status absensi: hanya panel yang sesuai data-status yang tampil */
@@ -320,7 +349,7 @@
     }
 
     .tk-konfeti {
-        @apply pointer-events-none fixed z-50 size-2 rounded-sm;
+        @apply pointer-events-none fixed z-(--lapis-efek) size-2 rounded-sm;
         animation: tk-konfeti 0.9s ease-out forwards;
     }
 
@@ -334,7 +363,7 @@
 
     /* Toast notifikasi */
     #tkToastWrap {
-        @apply fixed right-4 bottom-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2;
+        @apply fixed right-4 bottom-4 z-(--lapis-notifikasi) flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2;
     }
 
     .tk-toast {

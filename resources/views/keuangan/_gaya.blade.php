@@ -343,7 +343,7 @@
             .keu-halaman .keu-bilah-simpan {
                 position: sticky;
                 bottom: 0;
-                z-index: 20;
+                z-index: var(--lapis-menempel);
                 display: flex;
                 flex-wrap: wrap;
                 align-items: center;

@@ -151,9 +151,9 @@
 
 <div class="flex min-h-screen">
     {{-- Latar gelap saat sidebar dibuka di layar kecil --}}
-    <div id="sidebarBackdrop" class="fixed inset-0 z-30 hidden bg-gray-900/50 md:hidden" data-sidebar-close></div>
+    <div id="sidebarBackdrop" class="fixed inset-0 z-(--lapis-latar) hidden bg-gray-900/50 md:hidden" data-sidebar-close></div>
 
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col bg-sji-biru-tua text-blue-100 transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-(--lapis-sidebar) flex w-64 -translate-x-full flex-col bg-sji-biru-tua text-blue-100 transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0">
         <a href="{{ $penggunaAktif?->homeUrl() ?? url('/') }}" class="flex items-center gap-3 border-b border-white/10 px-5 py-4">
             <img src="{{ asset('images/logo-sji.png') }}" alt="Logo PT Satu Jaya Indonesia" class="size-10 object-contain">
             <span class="leading-tight">
@@ -201,7 +201,7 @@
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">
-        <header class="app-header sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+        <header class="app-header sticky top-0 z-(--lapis-header) flex h-16 items-center justify-between gap-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur sm:px-6">
             <div class="flex min-w-0 items-center gap-3">
                 <button type="button" class="rounded-md p-2 text-gray-500 hover:bg-gray-100 md:hidden" data-sidebar-open aria-label="Buka menu">
                     <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">

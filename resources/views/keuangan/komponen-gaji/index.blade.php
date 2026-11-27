@@ -120,9 +120,9 @@
                     </colgroup>
                     <thead>
                         <tr>
-                            <th class="sticky left-0 z-30 bg-gray-50">NIP</th>
-                            <th class="sticky left-36 z-30 bg-gray-50">Nama Karyawan</th>
-                            <th class="sticky left-[21rem] z-30 bg-gray-50 shadow-[inset_-1px_0_0_var(--op-line)]">Jenis Pekerjaan</th>
+                            <th class="sticky left-0 z-(--lapis-isi-atas) bg-gray-50">NIP</th>
+                            <th class="sticky left-36 z-(--lapis-isi-atas) bg-gray-50">Nama Karyawan</th>
+                            <th class="sticky left-[21rem] z-(--lapis-isi-atas) bg-gray-50 shadow-[inset_-1px_0_0_var(--op-line)]">Jenis Pekerjaan</th>
                             <th class="keu-kolom-isi text-right">Gaji Pokok <span class="font-normal">/ bulan</span></th>
                             <th class="keu-kolom-isi text-right">Tunjangan</th>
                             <th class="text-right">Upah Back-up</th>
@@ -135,9 +135,9 @@
                     <tbody>
                         @forelse ($karyawan as $item)
                             <tr>
-                                <td class="sticky left-0 z-10 bg-white whitespace-nowrap font-mono text-gray-600">{{ $item->nip }}</td>
-                                <td class="sticky left-36 z-10 bg-white whitespace-nowrap font-medium text-gray-800">{{ $item->nama }}</td>
-                                <td class="sticky left-[21rem] z-10 bg-white shadow-[inset_-1px_0_0_var(--op-line)]">{{ $item->nama_layanan ?? 'Belum diatur' }}</td>
+                                <td class="sticky left-0 z-(--lapis-isi) bg-white whitespace-nowrap font-mono text-gray-600">{{ $item->nip }}</td>
+                                <td class="sticky left-36 z-(--lapis-isi) bg-white whitespace-nowrap font-medium text-gray-800">{{ $item->nama }}</td>
+                                <td class="sticky left-[21rem] z-(--lapis-isi) bg-white shadow-[inset_-1px_0_0_var(--op-line)]">{{ $item->nama_layanan ?? 'Belum diatur' }}</td>
                                 <td class="keu-kolom-isi">
                                     <label class="sr-only" for="gaji-{{ $item->id }}">Gaji pokok sebulan {{ $item->nama }}</label>
                                     <div class="grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-1"><span class="text-gray-500">Rp</span><input id="gaji-{{ $item->id }}" @class(['form-input min-w-0 w-full bg-white text-right tabular-nums', 'form-input-error' => $errors->has('komponen.'.$item->id.'.gaji_pokok')]) type="number" name="komponen[{{ $item->id }}][gaji_pokok]" min="1" max="9999999999.99" step="0.01" value="{{ old('komponen.'.$item->id.'.gaji_pokok', $item->gaji_bulanan !== null ? (float) $item->gaji_bulanan : '') }}" placeholder="Isi gaji pokok"></div>

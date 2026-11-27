@@ -211,7 +211,7 @@
 
                     {{-- Lokasi Penempatan --}}
                     <div class="my-4 border-t border-white/15"></div>
-                    <div class="relative z-10">
+                    <div class="relative z-(--lapis-isi)">
                         <p class="text-[11px] font-semibold uppercase tracking-wider text-blue-200">Lokasi Penempatan</p>
                         <p class="tk-heading mt-1 text-sm font-bold text-white">{{ $penugasan->nama_klien }}</p>
                         <p class="text-xs text-blue-100">{{ $penugasan->lokasi_kerja }}</p>
@@ -222,7 +222,7 @@
 
                     {{-- Foto absensi & dokumentasi sesuai jenis layanan --}}
                     <div class="my-4 border-t border-white/15"></div>
-                    <div class="relative z-10">
+                    <div class="relative z-(--lapis-isi)">
                         <p class="text-[11px] font-semibold uppercase tracking-wider text-blue-200">Foto Absensi</p>
                         <p class="mt-1 text-sm font-bold text-white">Wajib saat check-in &amp; check-out</p>
                         @if ($jenisMonitoring === \App\Services\LaporanAktivitasService::JENIS_BERKALA)

@@ -4,7 +4,9 @@
  * Select asli tetap ada (disembunyikan) sehingga nilai yang dikirim form serta handler change/onchange tidak berubah.
  * Perubahan dari script lain (select.value = ..., opsi disabled/ditambah, select disabled) ikut tersinkron.
  */
-const PEMILIH = 'select.form-input:not([multiple]):not([data-tanpa-cari]), select[data-cari]';
+import { pasangPanelMengambang } from './panel-mengambang';
+
+const PEMILIH ='select.form-input:not([multiple]):not([data-tanpa-cari]), select[data-cari]';
 const deskriptorValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
 let urutan = 0;
 
@@ -62,6 +64,8 @@ function pasangPilihanCari(select) {
     daftar.className = 'pilihan-cari-daftar';
     daftar.setAttribute('role', 'listbox');
     daftar.hidden = true;
+    // Klik di area daftar (mis. scrollbar) tidak boleh memindahkan fokus dari input, agar daftar tidak tertutup.
+    daftar.addEventListener('mousedown', (event) => event.preventDefault());
 
     let aktif = -1;
     let tampil = [];
@@ -223,7 +227,9 @@ function pasangPilihanCari(select) {
 
     select.hidden = true;
     select.after(wadah);
-    wadah.append(input, tombol, daftar);
+    wadah.append(input, tombol);
+    // Daftar tampil di lapisan mengambang (di luar kartu/tabel) agar tidak tertutup atau terpotong.
+    pasangPanelMengambang(daftar, wadah);
     sinkronTampilan();
 }
 
