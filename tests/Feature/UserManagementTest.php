@@ -179,14 +179,15 @@ class UserManagementTest extends TestCase
         $this->actingAs($this->ceo)->get(route('users.edit', $lapangan))->assertForbidden();
     }
 
-    public function test_destroy_deletes_user(): void
+    public function test_destroy_deactivates_user_instead_of_deleting(): void
     {
         $target = User::factory()->withRole(Role::Keuangan)->create();
 
         $this->actingAs($this->ceo)
             ->delete(route('users.destroy', $target))
-            ->assertRedirect(route('users.index'));
+            ->assertRedirect(route('users.index'))
+            ->assertSessionHas('success', "Akun {$target->username} berhasil dinonaktifkan.");
 
-        $this->assertDatabaseMissing('tbl_users', ['id' => $target->id]);
+        $this->assertSame(User::StatusNonaktif, $target->refresh()->status);
     }
 }
