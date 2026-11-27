@@ -264,25 +264,38 @@ class HrdModulTest extends TestCase
         $response->assertDontSee('Staf Kantor TST');
     }
 
-    public function test_hapus_karyawan_yang_punya_riwayat_ditolak_dengan_pesan(): void
+    public function test_nonaktifkan_karyawan_dengan_penempatan_aktif_ditolak_dengan_pesan(): void
+    {
+        $id = $this->buatKaryawanLangsung();
+        $idKlien = DB::table('tbl_klien')->insertGetId([
+            'kode_klien' => 'TSTHRD01', 'nama_perusahaan' => 'Klien Uji HRD', 'alamat' => 'Jl. Uji', 'pic_nama' => 'PIC', 'pic_telp' => '0800', 'status' => 'Aktif',
+        ]);
+        DB::table('tbl_penempatan')->insert([
+            'id_karyawan' => $id, 'id_klien' => $idKlien, 'lokasi_kerja' => 'Pos Uji', 'jam_datang' => '08:00:00', 'jam_pulang' => '16:00:00',
+            'tgl_mulai' => '2026-01-05', 'status' => 'Aktif',
+        ]);
+
+        $this->from(route('hrd.karyawan.index'))
+            ->delete(route('hrd.karyawan.destroy', $id))
+            ->assertRedirect(route('hrd.karyawan.index'))
+            ->assertSessionHas('error', 'Karyawan Karyawan Uji masih memiliki penempatan aktif. Selesaikan penempatannya terlebih dahulu.');
+
+        $this->assertDatabaseHas('tbl_karyawan', ['id' => $id, 'status' => 'Tersedia']);
+        $this->assertDatabaseHas('tbl_users', ['id_karyawan' => $id, 'status' => User::StatusAktif]);
+    }
+
+    public function test_nonaktifkan_karyawan_mempertahankan_data_riwayat_dan_menonaktifkan_akun(): void
     {
         $id = $this->buatKaryawanLangsung();
         DB::table('tbl_sertifikat')->insert(['id_karyawan' => $id, 'nama_dokumen' => 'KTA', 'tgl_terbit' => '2025-01-01', 'tgl_kadaluarsa' => '2027-01-01']);
 
-        $this->delete(route('hrd.karyawan.destroy', $id))->assertSessionHas('error');
+        $this->delete(route('hrd.karyawan.destroy', $id))
+            ->assertRedirect(route('hrd.karyawan.index'))
+            ->assertSessionHas('success', 'Karyawan Karyawan Uji berhasil dinonaktifkan.');
 
-        $this->assertDatabaseHas('tbl_karyawan', ['id' => $id]);
-        $this->assertDatabaseHas('tbl_users', ['id_karyawan' => $id]);
-    }
-
-    public function test_hapus_karyawan_tanpa_riwayat_ikut_menghapus_akun(): void
-    {
-        $id = $this->buatKaryawanLangsung();
-
-        $this->delete(route('hrd.karyawan.destroy', $id))->assertSessionHas('success');
-
-        $this->assertDatabaseMissing('tbl_karyawan', ['id' => $id]);
-        $this->assertDatabaseMissing('tbl_users', ['id_karyawan' => $id]);
+        $this->assertDatabaseHas('tbl_karyawan', ['id' => $id, 'nip' => 'TST-001', 'status' => 'Nonaktif']);
+        $this->assertDatabaseHas('tbl_users', ['id_karyawan' => $id, 'username' => 'TST-001', 'status' => User::StatusNonaktif]);
+        $this->assertDatabaseHas('tbl_sertifikat', ['id_karyawan' => $id, 'nama_dokumen' => 'KTA']);
     }
 
     public function test_semua_halaman_hrd_dapat_dibuka(): void

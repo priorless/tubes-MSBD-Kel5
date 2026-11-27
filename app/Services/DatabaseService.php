@@ -63,16 +63,6 @@ class DatabaseService
     */
 
     /**
-     * View v_pool_karyawan_hrd: karyawan lapangan berstatus Tersedia.
-     *
-     * @return Collection<int, object>
-     */
-    public static function getPoolKaryawan(): Collection
-    {
-        return DB::table('v_pool_karyawan_hrd')->orderBy('nama')->get();
-    }
-
-    /**
      * Procedure sp_input_ketidakhadiran: HRD mencatat Izin/Sakit/Alpha.
      *
      * @throws QueryException SQLSTATE 45000 jika status/tanggal tidak valid, karyawan Nonaktif,
@@ -81,16 +71,6 @@ class DatabaseService
     public static function callInputKetidakhadiran(int $idKaryawan, string $tgl, string $status, ?string $keterangan): void
     {
         DB::statement('CALL sp_input_ketidakhadiran(?, ?, ?, ?)', [$idKaryawan, $tgl, $status, $keterangan]);
-    }
-
-    /**
-     * Function fn_sisa_hari_dokumen: sisa hari sebelum dokumen kadaluarsa (minimal 0).
-     */
-    public static function getSisaHariDokumen(string $tglKadaluarsa): int
-    {
-        $result = DB::selectOne('SELECT fn_sisa_hari_dokumen(?) AS sisa_hari', [$tglKadaluarsa]);
-
-        return (int) ($result->sisa_hari ?? 0);
     }
 
     /*
