@@ -10,31 +10,16 @@ use Tests\Concerns\CreatesTemplateJadwalTables;
 use Tests\TestCase;
 
 /**
- * Halaman Klien CEO (hanya baca): jumlah klien, jumlah & nama karyawan yang sedang ditempatkan per klien,
- * dan profit per klien aktif. fn_profit_klien hanya ada di MySQL, jadi di SQLite diganti fungsi tiruan.
+ * Halaman Klien CEO (hanya baca): jumlah klien, jumlah & nama karyawan yang sedang ditempatkan per klien.
  */
 class KlienCeoTest extends TestCase
 {
     use CreatesSjiAuthTables;
     use CreatesTemplateJadwalTables;
 
-    /**
-     * @param  array<int, float>  $profitPerKlien  id klien => profit
-     * @param  list<array{int, int, int}>  $panggilan  argumen yang diterima fungsi (id, bulan, tahun)
-     */
-    private function daftarkanFnProfitKlien(array $profitPerKlien, array &$panggilan = []): void
-    {
-        DB::connection()->getPdo()->sqliteCreateFunction('fn_profit_klien', function ($idKlien, $bulan, $tahun) use ($profitPerKlien, &$panggilan): float {
-            $panggilan[] = [(int) $idKlien, (int) $bulan, (int) $tahun];
-
-            return $profitPerKlien[(int) $idKlien] ?? 0.0;
-        }, 3);
-    }
-
     public function test_ceo_sees_clients_with_only_actively_placed_employees(): void
     {
         $this->createTables();
-        $this->daftarkanFnProfitKlien([]);
         $alpha = $this->createClient('KL001');
         $beta = $this->createClient('KL002');
         DB::table('tbl_klien')->where('id', $beta)->update(['status' => 'Nonaktif']);
@@ -51,28 +36,8 @@ class KlienCeoTest extends TestCase
             ->assertSeeTextInOrder(['Klien KL001', 'Aktif', '2 orang', 'Andi', 'Budi', 'Klien KL002', 'Nonaktif', '0 orang', 'Belum ada yang ditempatkan'])
             ->assertDontSeeText('Citra Selesai')
             ->assertDontSee(route('hrd.klien.create'), false)
-            ->assertDontSee(route('operasional.klien.create'), false);
-    }
-
-    public function test_ceo_sees_profit_per_active_client_for_selected_period(): void
-    {
-        $this->createTables();
-        $alpha = $this->createClient('KL001');
-        $beta = $this->createClient('KL002');
-        $gamma = $this->createClient('KL003');
-        DB::table('tbl_klien')->where('id', $gamma)->update(['status' => 'Nonaktif']);
-        $panggilan = [];
-        $this->daftarkanFnProfitKlien([$alpha => 4000000, $beta => 1500000, $gamma => 999999], $panggilan);
-
-        $this->actingAs(User::factory()->withRole(Role::Ceo)->create())
-            ->get(route('ceo.klien', ['periode' => '2026-10']))
-            ->assertOk()
-            ->assertSeeText('Total profit')
-            ->assertSeeText('Rp 5.500.000')
-            ->assertSeeTextInOrder(['Klien KL001', 'Rp 4.000.000', 'Klien KL002', 'Rp 1.500.000', 'Klien KL003'])
-            ->assertDontSeeText('Rp 999.999');
-
-        $this->assertEqualsCanonicalizing([[$alpha, 10, 2026], [$beta, 10, 2026]], $panggilan);
+            ->assertDontSee(route('operasional.klien.create'), false)
+            ->assertDontSeeText('profit');
     }
 
     public function test_roles_other_than_ceo_cannot_open_the_ceo_client_page(): void
@@ -83,7 +48,6 @@ class KlienCeoTest extends TestCase
 
         $this->actingAs(User::factory()->withRole(Role::Keuangan)->create())
             ->get(route('ceo.klien'))
-            ->assertForbidden()
-            ->assertDontSeeText('Total profit');
+            ->assertForbidden();
     }
 }

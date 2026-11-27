@@ -20,7 +20,7 @@
             <h3 class="font-semibold text-gray-800">Karyawan &amp; penempatan saat ini</h3>
             <div>
                 <label for="id_penempatan_lama" class="form-label">Karyawan</label>
-                <select id="id_penempatan_lama" name="id_penempatan_lama" @class(['form-input', 'form-input-error' => $errors->has('id_penempatan_lama')]) required>
+                <select id="id_penempatan_lama" name="id_penempatan_lama" data-cari="Ketik NIP atau nama karyawan..." @class(['form-input', 'form-input-error' => $errors->has('id_penempatan_lama')]) required>
                     <option value="">Pilih karyawan</option>
                     @foreach ($penempatan as $item)
                         <option value="{{ $item->id }}" @selected($idPenempatanTerpilih === (string) $item->id)
@@ -51,7 +51,7 @@
             <h3 class="font-semibold text-gray-800">Penempatan tujuan</h3>
             <div>
                 <label for="id_klien_baru" class="form-label">Klien</label>
-                <select id="id_klien_baru" name="id_klien_baru" @class(['form-input', 'form-input-error' => $errors->has('id_klien_baru')]) required>
+                <select id="id_klien_baru" name="id_klien_baru" data-cari="Ketik nama klien..." @class(['form-input', 'form-input-error' => $errors->has('id_klien_baru')]) required>
                     <option value="">Pilih klien tujuan</option>
                     @foreach ($klien as $item)
                         <option value="{{ $item->id }}" @selected((string) old('id_klien_baru') === (string) $item->id)>

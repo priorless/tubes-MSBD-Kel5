@@ -184,6 +184,47 @@
         @apply border-red-400 focus:border-red-500 focus:ring-red-500/20;
     }
 
+    /* Combobox dari resources/js/pilihan-cari.js: ketik untuk mencari atau klik untuk memilih. */
+    .pilihan-cari {
+        @apply relative;
+    }
+
+    .pilihan-cari-input {
+        @apply pr-9;
+    }
+
+    .pilihan-cari-tombol {
+        @apply absolute inset-y-0 right-0 flex w-9 items-center justify-center text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed;
+    }
+
+    .pilihan-cari-tombol svg {
+        @apply size-4;
+    }
+
+    .pilihan-cari-daftar {
+        @apply absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg;
+    }
+
+    .pilihan-cari-opsi {
+        @apply cursor-pointer px-3 py-2 text-gray-800;
+    }
+
+    .pilihan-cari-opsi.is-kosong {
+        @apply text-gray-500;
+    }
+
+    .pilihan-cari-opsi[aria-selected='true'] {
+        @apply font-semibold text-sji-biru;
+    }
+
+    .pilihan-cari-opsi.is-aktif {
+        @apply bg-blue-50;
+    }
+
+    .pilihan-cari-kosong {
+        @apply px-3 py-2 text-gray-400;
+    }
+
     .form-check {
         @apply size-4 border-gray-300 text-blue-700 accent-blue-700;
     }

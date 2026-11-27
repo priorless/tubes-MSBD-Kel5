@@ -34,7 +34,7 @@
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <div>
                         <label for="id_klien" class="form-label">Klien</label>
-                        <select id="id_klien" name="id_klien" class="form-input" required>
+                        <select id="id_klien" name="id_klien" data-cari="Ketik nama klien..." class="form-input" required>
                             <option value="">Pilih klien</option>
                             @foreach ($klien as $item)
                                 <option value="{{ $item->id }}" @selected((string) old('id_klien') === (string) $item->id)>
@@ -83,7 +83,7 @@
                 <div class="flex flex-wrap items-end gap-3">
                     <div>
                         <label for="id_klien_standar" class="form-label">Klien</label>
-                        <select id="id_klien_standar" name="id_klien" class="form-input" required>
+                        <select id="id_klien_standar" name="id_klien" data-cari="Ketik nama klien..." class="form-input" required>
                             <option value="">Pilih klien</option>
                             @foreach ($klien as $item)
                                 <option value="{{ $item->id }}">{{ $item->kode_klien }} &mdash; {{ $item->nama_perusahaan }}</option>

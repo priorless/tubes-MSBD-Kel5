@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Operasional;
 
 use App\Http\Controllers\Controller;
 use App\Services\RekapOperasionalService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Rekap & Laporan Operasional: jadwal kerja dibandingkan dengan realisasi absensi per karyawan per bulan.
@@ -36,40 +37,19 @@ class RekapOperasionalController extends Controller
         ]);
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request): Response
     {
         $filter = $this->filter($request);
-        $rekap = $this->rekapOperasionalService->rekap($filter['bulan'], $filter['id_klien'], $filter['id_karyawan']);
-        $belumTersedia = 'belum tersedia';
-        $kolom = [
-            'NIP' => static fn (object $b): string => (string) $b->nip,
-            'Nama' => static fn (object $b): string => (string) $b->nama,
-            'Klien' => static fn (object $b): string => (string) $b->klien,
-            'Hari kerja terjadwal' => static fn (object $b): int => $b->kerja_terjadwal,
-            'Libur terjadwal' => static fn (object $b): int => $b->libur_terjadwal,
-            'Tanggal belum diatur' => static fn (object $b): int => $b->belum_diatur,
-            'Hadir' => static fn (object $b): int => $b->hadir,
-            'Terlambat (hari)' => static fn (object $b): int => $b->terlambat,
-            'Terlambat (menit)' => static fn (object $b): int|string => $rekap['kolom']['menit_terlambat'] ? $b->menit_terlambat : $belumTersedia,
-            'Izin' => static fn (object $b): int => $b->izin,
-            'Sakit' => static fn (object $b): int => $b->sakit,
-            'Alpha' => static fn (object $b): int => $b->alpha,
-            'Kerja tanpa catatan absensi' => static fn (object $b): int => count($b->tanggal_tanpa_absensi),
-            'Jam kerja tercatat' => static fn (object $b): int => $b->jam_kerja,
-            'Jam lembur' => static fn (object $b): int => $b->jam_lembur,
-        ];
 
-        return response()->streamDownload(function () use ($rekap, $kolom): void {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, array_keys($kolom), ';');
-
-            foreach ($rekap['baris'] as $baris) {
-                fputcsv($out, array_map(static fn (callable $nilai): int|string => $nilai($baris), array_values($kolom)), ';');
-            }
-
-            fclose($out);
-        }, 'rekap-operasional-'.$filter['bulan'].'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return Pdf::loadView('operasional.rekap.pdf', [
+            'filter' => $filter,
+            'rekap' => $this->rekapOperasionalService->rekap($filter['bulan'], $filter['id_klien'], $filter['id_karyawan']),
+            'klien' => $filter['id_klien'] ? DB::table('tbl_klien')->where('id', $filter['id_klien'])->value('nama_perusahaan') : null,
+            'waktuCetak' => now(),
+        ])
+            ->setPaper('a4', 'landscape')
+            ->setOption('defaultFont', 'DejaVu Sans')
+            ->download('rekap-operasional-'.$filter['bulan'].'.pdf');
     }
 
     /**

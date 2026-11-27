@@ -29,7 +29,7 @@ class RekapOperasionalTest extends TestCase
      */
     public static function reportRoutes(): array
     {
-        return ['page' => ['operasional.rekap.index'], 'csv' => ['operasional.rekap.export']];
+        return ['page' => ['operasional.rekap.index'], 'pdf' => ['operasional.rekap.export']];
     }
 
     #[DataProvider('reportRoutes')]
@@ -147,25 +147,18 @@ class RekapOperasionalTest extends TestCase
             ->get(route('operasional.rekap.index', ['bulan' => '2025-01']))
             ->assertOk()
             ->assertSeeText('Tidak ada penempatan pada Januari 2025')
-            ->assertDontSee('Unduh CSV');
+            ->assertDontSee('Unduh PDF');
     }
 
-    public function test_csv_export_contains_the_same_numbers(): void
+    public function test_pdf_export_downloads_the_report(): void
     {
         $this->createReportData(false);
 
         $response = $this->actingAs($this->operasional())
             ->get(route('operasional.rekap.export', ['bulan' => '2026-11', 'id_klien' => 1]));
 
-        $response->assertOk()->assertDownload('rekap-operasional-2026-11.csv');
-        $lines = explode("\n", trim(str_replace("\xEF\xBB\xBF", '', $response->streamedContent())));
-        $this->assertSame(
-            'NIP;Nama;Klien;"Hari kerja terjadwal";"Libur terjadwal";"Tanggal belum diatur";Hadir;"Terlambat (hari)";"Terlambat (menit)";Izin;Sakit;Alpha;'
-            .'"Kerja tanpa catatan absensi";"Jam kerja tercatat";"Jam lembur"',
-            $lines[0],
-        );
-        $this->assertSame('SJI001;Andi;"PT Alpha";5;2;23;4;1;"belum tersedia";0;1;0;1;19;2', $lines[1]);
-        $this->assertCount(2, $lines);
+        $response->assertOk()->assertDownload('rekap-operasional-2026-11.pdf');
+        $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
     }
 
     public function test_sidebar_and_home_link_to_the_report(): void

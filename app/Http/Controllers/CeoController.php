@@ -31,7 +31,6 @@ class CeoController extends Controller
             ['label' => 'Lapangan Siap', 'nilai' => (int) ($ringkasan->lapangan_siap ?? 0), 'uang' => false, 'ikon' => 'fa-user-check', 'warna' => 'success'],
             ['label' => 'Internal Aktif', 'nilai' => (int) ($ringkasan->internal_aktif ?? 0), 'uang' => false, 'ikon' => 'fa-user-tie', 'warna' => 'primary'],
             ['label' => 'Total Piutang', 'nilai' => (float) ($ringkasan->total_piutang ?? 0), 'uang' => true, 'ikon' => 'fa-file-invoice-dollar', 'warna' => 'warning'],
-            ['label' => 'Profit Bulan Berjalan', 'nilai' => (float) ($ringkasan->profit_bulan_berjalan ?? 0), 'uang' => true, 'ikon' => 'fa-chart-line', 'warna' => 'danger'],
         ];
 
         return view('ceo.dashboard', [
